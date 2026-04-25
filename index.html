@@ -406,14 +406,42 @@
 
 <header class="app-header">
   <div class="logo">Swing<span>Trader</span> NSE</div>
-  <div class="header-badge">📍 Midcap · Smallcap · ₹25K Capital</div>
+  <div class="header-badge" onclick="openSettings()" style="cursor:pointer;" title="Click to edit">
+    ✏️ <span id="badgeText">Midcap · Smallcap · ₹25K Capital</span>
+  </div>
 </header>
+
+<!-- Settings Modal -->
+<div id="settingsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:500;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);border-radius:var(--radius);padding:24px;max-width:400px;width:90%;box-shadow:var(--shadow-lg);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-family:'Playfair Display',serif;font-size:18px;font-weight:700;">⚙️ My Settings</div>
+      <button class="btn btn-secondary btn-sm" onclick="closeSettings()">✕</button>
+    </div>
+    <div style="display:grid;gap:14px;">
+      <div>
+        <label>Trading Capital (₹)</label>
+        <input type="number" id="s_capital" placeholder="e.g. 25000" oninput="previewBadge()"/>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;">This pre-fills the Risk Calculator automatically</div>
+      </div>
+      <div>
+        <label>Stock Universe</label>
+        <input type="text" id="s_universe" placeholder="e.g. Midcap · Smallcap" oninput="previewBadge()"/>
+      </div>
+      <div style="padding:10px 12px;background:var(--surface2);border-radius:var(--radius-sm);font-size:13px;color:var(--text2);">
+        Preview: <span id="s_preview" style="color:var(--accent);font-weight:600;"></span>
+      </div>
+      <button class="btn btn-primary" onclick="saveSettings()" style="width:100%;">💾 Save Settings</button>
+    </div>
+  </div>
+</div>
 
 <div class="tab-bar">
   <button class="tab-btn active" onclick="switchTab('screener',this)"><span class="tab-icon">🔍</span>Screener</button>
-  <button class="tab-btn" onclick="switchTab('risk',this)"><span class="tab-icon">⚖️</span>Risk Calculator</button>
-  <button class="tab-btn" onclick="switchTab('journal',this)"><span class="tab-icon">📒</span>Trade Journal</button>
-  <button class="tab-btn" onclick="switchTab('guide',this)"><span class="tab-icon">📖</span>Swing Guide</button>
+  <button class="tab-btn" onclick="switchTab('discover',this)"><span class="tab-icon">🧭</span>Discover</button>
+  <button class="tab-btn" onclick="switchTab('risk',this)"><span class="tab-icon">⚖️</span>Risk Calc</button>
+  <button class="tab-btn" onclick="switchTab('journal',this)"><span class="tab-icon">📒</span>Journal</button>
+  <button class="tab-btn" onclick="switchTab('guide',this)"><span class="tab-icon">📖</span>Guide</button>
 </div>
 
 <!-- ═══════════════════════════════════════════════ SCREENER ═══════════════════════════════════════════════ -->
@@ -737,6 +765,23 @@
     </div>
   </div>
 </div>
+<!-- ═══════════════════════════════════════════════ DISCOVER ═══════════════════════════════════════════════ -->
+<div id="tab-discover" class="tab-panel">
+  <div class="card" style="margin-bottom:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+      <div>
+        <div style="font-size:13px;color:var(--text2);">Live sector heat — ranked by 5-day price performance.</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px;" id="discoverMeta">Not loaded yet · click Refresh to fetch</div>
+      </div>
+      <button class="btn btn-primary" onclick="runDiscover()" id="discoverBtn">🔥 Refresh Heat</button>
+    </div>
+  </div>
+  <div id="discoverSectors"></div>
+  <div style="margin-top:12px;padding:10px 14px;background:var(--surface2);border-radius:var(--radius-sm);font-size:12px;color:var(--text3);">
+    💡 Sectors ranked hottest → coldest by avg 5-day return. Tap + to add any stock to your watchlist.
+  </div>
+</div>
+
 </div><!-- /main -->
 
 <script>
@@ -807,6 +852,7 @@ function switchTab(name, btn) {
   document.getElementById('tab-' + name).classList.add('active');
   if (btn) btn.classList.add('active');
   if (name === 'journal') renderJournal();
+  if (name === 'discover') { if (!discoverLoaded) runDiscover(); else renderSectorHeat(); }
 }
 
 // ═══════════════════ AUTOCOMPLETE ═══════════════════
@@ -867,7 +913,447 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// ═══════════════════ WATCHLIST ═══════════════════
+// ═══════════════════ DISCOVER — STOCK UNIVERSE BY THEME ═══════════════════
+// ═══════════════════ DISCOVER — LIVE SECTOR HEAT ═══════════════════
+const SECTOR_BASKETS = [
+  { name: '🛡️ PSU · Defence',    emoji:'🛡️', stocks: [
+    {sym:'BEL',      name:'Bharat Electronics'},
+    {sym:'HAL',      name:'Hindustan Aeronautics'},
+    {sym:'BHEL',     name:'Bharat Heavy Electricals'},
+    {sym:'COCHINSHIP',name:'Cochin Shipyard'},
+    {sym:'MAZDOCK',  name:'Mazagon Dock'},
+    {sym:'PARAS',    name:'Paras Defence'},
+  ]},
+  { name: '🚂 Railways',          emoji:'🚂', stocks: [
+    {sym:'IRFC',     name:'Indian Railway Finance'},
+    {sym:'RVNL',     name:'Rail Vikas Nigam'},
+    {sym:'IRCTC',    name:'Indian Railway Catering'},
+    {sym:'IRCON',    name:'Ircon International'},
+    {sym:'RAILTEL',  name:'RailTel Corporation'},
+    {sym:'TITAGARH', name:'Titagarh Rail Systems'},
+  ]},
+  { name: '⚡ Power · Energy',    emoji:'⚡', stocks: [
+    {sym:'NHPC',     name:'NHPC Ltd'},
+    {sym:'SJVN',     name:'SJVN Ltd'},
+    {sym:'SUZLON',   name:'Suzlon Energy'},
+    {sym:'INOXWIND', name:'Inox Wind'},
+    {sym:'TORNTPOWER',name:'Torrent Power'},
+    {sym:'CESC',     name:'CESC Ltd'},
+  ]},
+  { name: '🏗️ Capex · Infra',    emoji:'🏗️', stocks: [
+    {sym:'KEC',      name:'KEC International'},
+    {sym:'KALPATPOWR',name:'Kalpataru Power'},
+    {sym:'HGINFRA',  name:'H.G. Infra Engineering'},
+    {sym:'NCC',      name:'NCC Ltd'},
+    {sym:'KEI',      name:'KEI Industries'},
+    {sym:'POLYCAB',  name:'Polycab India'},
+  ]},
+  { name: '🏦 Banking · Finance', emoji:'🏦', stocks: [
+    {sym:'FEDERALBNK',name:'Federal Bank'},
+    {sym:'IDFCFIRSTB',name:'IDFC First Bank'},
+    {sym:'MANAPPURAM',name:'Manappuram Finance'},
+    {sym:'CHOLAFIN', name:'Cholamandalam Finance'},
+    {sym:'ANGELONE', name:'Angel One'},
+    {sym:'CDSL',     name:'CDSL'},
+  ]},
+  { name: '💊 Pharma',            emoji:'💊', stocks: [
+    {sym:'LAURUSLABS',name:'Laurus Labs'},
+    {sym:'GRANULES',  name:'Granules India'},
+    {sym:'IPCALAB',   name:'IPCA Laboratories'},
+    {sym:'JBCHEPHARM',name:'JB Chemicals'},
+    {sym:'ERIS',      name:'Eris Lifesciences'},
+    {sym:'APLLTD',    name:'Alembic Pharma'},
+  ]},
+  { name: '🧪 Chemicals',         emoji:'🧪', stocks: [
+    {sym:'DEEPAKNITR',name:'Deepak Nitrite'},
+    {sym:'NAVINFLUOR',name:'Navin Fluorine'},
+    {sym:'CLEAN',     name:'Clean Science'},
+    {sym:'FINEORG',   name:'Fine Organics'},
+    {sym:'AARTI',     name:'Aarti Industries'},
+    {sym:'PIIND',     name:'PI Industries'},
+  ]},
+  { name: '💻 IT · Tech',         emoji:'💻', stocks: [
+    {sym:'MPHASIS',   name:'Mphasis'},
+    {sym:'PERSISTENT',name:'Persistent Systems'},
+    {sym:'COFORGE',   name:'Coforge'},
+    {sym:'LTTS',      name:'L&T Technology'},
+    {sym:'KPITTECH',  name:'KPIT Technologies'},
+    {sym:'TATAELXSI', name:'Tata Elxsi'},
+  ]},
+  { name: '🛍️ Consumer · Retail', emoji:'🛍️', stocks: [
+    {sym:'TRENT',     name:'Trent Ltd'},
+    {sym:'METRO',     name:'Metro Brands'},
+    {sym:'CAMPUS',    name:'Campus Activewear'},
+    {sym:'DEVYANI',   name:'Devyani International'},
+    {sym:'SAPPHIRE',  name:'Sapphire Foods'},
+    {sym:'PVRINOX',   name:'PVR Inox'},
+  ]},
+  { name: '🔩 Auto Ancillary',    emoji:'🔩', stocks: [
+    {sym:'MOTHERSON', name:'Samvardhana Motherson'},
+    {sym:'ENDURANCE', name:'Endurance Technologies'},
+    {sym:'BALKRISIND',name:'Balkrishna Industries'},
+    {sym:'SONACOMS',  name:'Sona BLW Precision'},
+    {sym:'TIINDIA',   name:'Tube Investments'},
+    {sym:'MINDA',     name:'Minda Corporation'},
+  ]},
+  { name: '📱 Electronics · EMS', emoji:'📱', stocks: [
+    {sym:'DIXON',     name:'Dixon Technologies'},
+    {sym:'AMBER',     name:'Amber Enterprises'},
+    {sym:'KAYNES',    name:'Kaynes Technology'},
+    {sym:'SYRMA',     name:'Syrma SGS Technology'},
+  ]},
+  { name: '🏠 Housing Finance',   emoji:'🏠', stocks: [
+    {sym:'AAVAS',     name:'Aavas Financiers'},
+    {sym:'HOMEFIRST', name:'Home First Finance'},
+    {sym:'APTUS',     name:'Aptus Value Housing'},
+    {sym:'CANFINHOME',name:'Can Fin Homes'},
+    {sym:'REPCO',     name:'Repco Home Finance'},
+  ]},
+];
+
+let discoverData = {}; // sym → {price, chg5d}
+let discoverLoaded = false;
+
+async function runDiscover() {
+  const btn = document.getElementById('discoverBtn');
+  const meta = document.getElementById('discoverMeta');
+  const container = document.getElementById('discoverSectors');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loader"></span> Fetching...';
+  container.innerHTML = `<div style="text-align:center;padding:32px;color:var(--text3);">⏳ Fetching price data for all sectors...</div>`;
+
+  // Collect unique symbols
+  const allSyms = [...new Set(SECTOR_BASKETS.flatMap(b => b.stocks.map(s => s.sym)))];
+
+  // Fetch all in parallel batches of 5
+  const BATCH = 5;
+  for (let i = 0; i < allSyms.length; i += BATCH) {
+    const batch = allSyms.slice(i, i + BATCH);
+    await Promise.allSettled(batch.map(async sym => {
+      try {
+        const d = await fetchPriceData(sym);
+        if (d) discoverData[sym] = d;
+      } catch(e) {}
+    }));
+  }
+
+  discoverLoaded = true;
+  renderSectorHeat();
+  btn.disabled = false;
+  btn.innerHTML = '🔥 Refresh Heat';
+  meta.textContent = `${Object.keys(discoverData).length} stocks fetched · ${new Date().toLocaleTimeString('en-IN')}`;
+}
+
+async function fetchPriceData(symbol) {
+  const nseSymbol = symbol + '.NS';
+  const urls = [
+    `https://query2.finance.yahoo.com/v8/finance/chart/${nseSymbol}?interval=1d&range=1mo`,
+    `https://query1.finance.yahoo.com/v8/finance/chart/${nseSymbol}?interval=1d&range=1mo`,
+  ];
+  let raw = null;
+  for (const url of urls) {
+    try {
+      const resp = await fetch(url, { signal: AbortSignal.timeout(7000), headers: { 'Accept': 'application/json' } });
+      if (!resp.ok) continue;
+      const json = await resp.json();
+      if (json?.chart?.result?.[0]) { raw = json; break; }
+    } catch(e) { continue; }
+  }
+  if (!raw) return null;
+
+  const closes = (raw.chart.result[0].indicators.quote[0].close || []).filter(v => v != null);
+  if (closes.length < 6) return null;
+
+  const price  = closes[closes.length - 1];
+  const price5 = closes[closes.length - 6]; // 5 trading days ago
+  const chg5d  = ((price - price5) / price5 * 100);
+  const chg1d  = ((price - closes[closes.length - 2]) / closes[closes.length - 2] * 100);
+  return { price, chg5d, chg1d };
+}
+
+function renderSectorHeat() {
+  const container = document.getElementById('discoverSectors');
+
+  // Score each sector by avg 5d change of its stocks
+  const scored = SECTOR_BASKETS.map(basket => {
+    const results = basket.stocks
+      .map(s => ({ ...s, data: discoverData[s.sym] || null }))
+      .filter(s => s.data);
+    const avgChg = results.length
+      ? results.reduce((sum, s) => sum + s.data.chg5d, 0) / results.length
+      : null;
+    return { ...basket, results, avgChg };
+  }).filter(b => b.avgChg !== null);
+
+  // Sort hottest → coldest
+  scored.sort((a, b) => b.avgChg - a.avgChg);
+
+  const maxAbs = Math.max(...scored.map(b => Math.abs(b.avgChg)), 1);
+
+  container.innerHTML = scored.map((basket, rank) => {
+    const isHot  = basket.avgChg > 1;
+    const isCold = basket.avgChg < -1;
+    const accentColor = isHot ? 'var(--green)' : isCold ? 'var(--red)' : 'var(--orange)';
+    const bgColor     = isHot ? 'var(--green-bg)' : isCold ? 'var(--red-bg)' : 'var(--orange-bg)';
+    const barWidth    = Math.min(Math.abs(basket.avgChg) / maxAbs * 100, 100).toFixed(1);
+    const rankLabel   = rank === 0 ? '🔥 Hottest' : rank === scored.length-1 ? '🥶 Coldest' : `#${rank+1}`;
+
+    const stockRows = basket.results
+      .sort((a,b) => b.data.chg5d - a.data.chg5d)
+      .map(s => {
+        const inWL = watchlist.includes(s.sym);
+        const c5 = s.data.chg5d;
+        const c1 = s.data.chg1d;
+        const c5Color = c5 >= 0 ? 'var(--green)' : 'var(--red)';
+        const c1Color = c1 >= 0 ? 'var(--green)' : 'var(--red)';
+        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);">
+          <div style="flex:1;min-width:0;">
+            <span style="font-family:'DM Mono',monospace;font-size:12px;font-weight:600;">${s.sym}</span>
+            <span style="font-size:11px;color:var(--text3);margin-left:4px;">${s.name}</span>
+          </div>
+          <div style="text-align:right;min-width:52px;">
+            <div style="font-size:11px;color:var(--text3);">1D</div>
+            <div style="font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:${c1Color};">${c1>=0?'+':''}${c1.toFixed(1)}%</div>
+          </div>
+          <div style="text-align:right;min-width:52px;">
+            <div style="font-size:11px;color:var(--text3);">5D</div>
+            <div style="font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:${c5Color};">${c5>=0?'+':''}${c5.toFixed(1)}%</div>
+          </div>
+          <button onclick="discoverAdd('${s.sym}',this)"
+            style="padding:4px 10px;font-size:11px;font-weight:600;border-radius:6px;
+                   border:1.5px solid ${inWL?'var(--green)':'var(--border)'};
+                   background:${inWL?'var(--green-bg)':'var(--surface2)'};
+                   color:${inWL?'var(--green)':'var(--text2)'};
+                   cursor:pointer;white-space:nowrap;font-family:'DM Sans',sans-serif;flex-shrink:0;">
+            ${inWL ? '✓' : '+'}
+          </button>
+        </div>`;
+      }).join('');
+
+    return `<div class="card" style="margin-bottom:12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;">
+        <div style="display:flex;align-items:center;gap:8px;flex:1;">
+          <span style="font-size:13px;font-weight:600;color:var(--text);">${basket.name}</span>
+          <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:${bgColor};color:${accentColor};font-weight:600;">${rankLabel}</span>
+        </div>
+        <div style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:${accentColor};">
+          ${basket.avgChg >= 0 ? '+' : ''}${basket.avgChg.toFixed(2)}%
+        </div>
+      </div>
+      <div style="height:6px;background:var(--border);border-radius:3px;margin-bottom:12px;overflow:hidden;">
+        <div style="height:100%;width:${barWidth}%;background:${accentColor};border-radius:3px;transition:width 0.6s ease;${isCold?'margin-left:auto;':''}"></div>
+      </div>
+      <div>${stockRows}</div>
+      <button onclick="addAllSector(${JSON.stringify(basket.stocks.map(s=>s.sym)).replace(/"/g,"'")})"
+        style="margin-top:10px;width:100%;padding:7px;font-size:12px;font-weight:600;
+               border-radius:6px;border:1.5px solid var(--border);background:var(--surface2);
+               color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;">
+        + Add all ${basket.name} to watchlist
+      </button>
+    </div>`;
+  }).join('');
+
+  if (!scored.length) {
+    container.innerHTML = `<div style="text-align:center;padding:32px;color:var(--text3);">No data yet — click 🔥 Refresh Heat above.</div>`;
+  }
+}
+
+function discoverAdd(sym, btn) {
+  if (!watchlist.includes(sym)) {
+    watchlist.push(sym);
+    saveWatchlist();
+    renderWatchlist();
+  }
+  if (btn) {
+    btn.textContent = '✓';
+    btn.style.background = 'var(--green-bg)';
+    btn.style.color = 'var(--green)';
+    btn.style.borderColor = 'var(--green)';
+  }
+}
+
+function addAllSector(syms) {
+  syms.forEach(sym => { if (!watchlist.includes(sym)) watchlist.push(sym); });
+  saveWatchlist();
+  renderWatchlist();
+  renderSectorHeat(); // refresh button states
+}
+  // PSU / Defence
+  {sym:'BHEL',    name:'Bharat Heavy Electricals', theme:'PSU · Defence', why:'Power & industrial capex play. Govt order book at multi-year high.'},
+  {sym:'BEL',     name:'Bharat Electronics',       theme:'PSU · Defence', why:'Defence electronics monopoly. Strong export order pipeline.'},
+  {sym:'HAL',     name:'Hindustan Aeronautics',    theme:'PSU · Defence', why:'Aircraft MRO & manufacturing. Tejas, helicopters driving revenue.'},
+  {sym:'COCHINSHIP',name:'Cochin Shipyard',        theme:'PSU · Defence', why:'Shipbuilding & repair. Beneficiary of Atmanirbhar defence push.'},
+  {sym:'MAZDOCK', name:'Mazagon Dock',             theme:'PSU · Defence', why:'Submarine & warship builder. Massive naval order backlog.'},
+  {sym:'GRSE',    name:'Garden Reach Shipbuilders',theme:'PSU · Defence', why:'Frigate & patrol vessel builder for Indian Navy.'},
+  {sym:'MIDHANI', name:'Mishra Dhatu Nigam',       theme:'PSU · Defence', why:'Speciality alloys for defence & space. Niche monopoly.'},
+  {sym:'PARAS',   name:'Paras Defence',            theme:'PSU · Defence', why:'Optics & electronics for defence. Small cap high growth.'},
+
+  // Railways & Infra PSU
+  {sym:'IRFC',    name:'Indian Railway Finance',   theme:'Railways', why:'AAA-rated NBFC funding Indian Railways. Safe with dividend.'},
+  {sym:'RVNL',    name:'Rail Vikas Nigam',         theme:'Railways', why:'Railway construction EPC. Massive order book visibility.'},
+  {sym:'IRCTC',   name:'Indian Railway Catering',  theme:'Railways', why:'Ticketing monopoly. High margin convenience fee income.'},
+  {sym:'IRCON',   name:'Ircon International',      theme:'Railways', why:'Railway & highway EPC. Strong international project pipeline.'},
+  {sym:'RAILTEL', name:'RailTel Corporation',      theme:'Railways', why:'Telecom infra on railway land. Data centre + Wi-Fi growth.'},
+  {sym:'RITES',   name:'RITES Ltd',                theme:'Railways', why:'Railway consultancy & exports. High dividend yield PSU.'},
+  {sym:'TITAGARH',name:'Titagarh Rail Systems',   theme:'Railways', why:'Wagon & metro coach manufacturer. Order book multi-year high.'},
+
+  // Capital Goods & Infra
+  {sym:'KEC',     name:'KEC International',        theme:'Capex · Infra', why:'Power transmission towers globally. Strong order inflows.'},
+  {sym:'KALPATPOWR',name:'Kalpataru Power',        theme:'Capex · Infra', why:'T&D EPC + real estate. Consistent execution track record.'},
+  {sym:'HGINFRA', name:'H.G. Infra Engineering',  theme:'Capex · Infra', why:'Roads & highways EPC. Strong HAM project execution.'},
+  {sym:'NCC',     name:'NCC Ltd',                  theme:'Capex · Infra', why:'Diversified EPC — buildings, roads, water. Improving margins.'},
+  {sym:'AHLUCONT',name:'Ahluwalia Contracts',      theme:'Capex · Infra', why:'Building construction. Hospital & institutional segment strong.'},
+  {sym:'PNCINFRA',name:'PNC Infratech',            theme:'Capex · Infra', why:'Road EPC & HAM. Consistent revenue growth & low debt.'},
+  {sym:'GPPL',    name:'Gujarat Pipavav Port',     theme:'Capex · Infra', why:'Private port. Container volume growth with Gujarat trade.'},
+  {sym:'KEI',     name:'KEI Industries',           theme:'Capex · Infra', why:'Cables & wires. Infra & real estate boom driving demand.'},
+  {sym:'POLYCAB', name:'Polycab India',            theme:'Capex · Infra', why:'Largest cable & wire company. FMEG segment scaling up.'},
+
+  // Power & Energy
+  {sym:'NHPC',    name:'NHPC Ltd',                 theme:'Power · Energy', why:'Hydropower PSU. Renewable capacity addition on track.'},
+  {sym:'SJVN',    name:'SJVN Ltd',                 theme:'Power · Energy', why:'Hydro + solar PSU. 5x capacity target by 2030.'},
+  {sym:'CESC',    name:'CESC Ltd',                 theme:'Power · Energy', why:'Kolkata utility + renewable arm. Consistent dividend payer.'},
+  {sym:'TORNTPOWER',name:'Torrent Power',          theme:'Power · Energy', why:'Private utility + RE. Ahmedabad distribution monopoly.'},
+  {sym:'INOXWIND',name:'Inox Wind',                theme:'Power · Energy', why:'Wind turbine manufacturer. Orderbook at record high.'},
+  {sym:'SUZLON',  name:'Suzlon Energy',            theme:'Power · Energy', why:'Debt-free wind energy turnaround. O&M recurring revenue.'},
+  {sym:'RPOWER',  name:'Reliance Power',           theme:'Power · Energy', why:'High risk/reward. Debt resolution play — speculative only.'},
+  {sym:'GIPCL',   name:'Gujarat Industries Power', theme:'Power · Energy', why:'Low debt Gujarat utility. Steady dividend, low volatility.'},
+
+  // Banking & Finance
+  {sym:'FEDERALBNK',name:'Federal Bank',           theme:'Banking · Finance', why:'South India private bank. Consistent NIM, low NPA.'},
+  {sym:'IDFCFIRSTB',name:'IDFC First Bank',        theme:'Banking · Finance', why:'High growth retail bank. Transition from infra lender complete.'},
+  {sym:'RBLBANK', name:'RBL Bank',                 theme:'Banking · Finance', why:'Turnaround story. New management improving asset quality.'},
+  {sym:'MANAPPURAM',name:'Manappuram Finance',     theme:'Banking · Finance', why:'Gold NBFC. High yield, plays on gold price rally.'},
+  {sym:'MUTHOOTFIN',name:'Muthoot Finance',        theme:'Banking · Finance', why:'Largest gold loan NBFC. Consistent compounder.'},
+  {sym:'CHOLAFIN',name:'Cholamandalam Finance',    theme:'Banking · Finance', why:'Vehicle finance NBFC. Southern India dominance.'},
+  {sym:'ANGELONE',name:'Angel One',                theme:'Banking · Finance', why:'Discount broker. Market activity directly drives revenue.'},
+  {sym:'CDSL',    name:'CDSL',                     theme:'Banking · Finance', why:'Depository monopoly. Benefits from every new demat account.'},
+  {sym:'MCX',     name:'Multi Commodity Exchange', theme:'Banking · Finance', why:'Commodity trading monopoly. Gold/oil vol drives revenue.'},
+  {sym:'CANFINHOME',name:'Can Fin Homes',          theme:'Banking · Finance', why:'Affordable housing finance. Low NPA, steady growth.'},
+
+  // Pharma & Healthcare
+  {sym:'LAURUSLABS',name:'Laurus Labs',            theme:'Pharma · Healthcare', why:'API + formulations. CDMO business scaling rapidly.'},
+  {sym:'GRANULES', name:'Granules India',          theme:'Pharma · Healthcare', why:'Paracetamol API & formulations. US generics recovery play.'},
+  {sym:'IPCALAB', name:'IPCA Laboratories',        theme:'Pharma · Healthcare', why:'Branded generics India + exports. Malaria API leader.'},
+  {sym:'GLENMARK',name:'Glenmark Pharma',         theme:'Pharma · Healthcare', why:'US generics + India branded. Skin & respiratory focus.'},
+  {sym:'JBCHEPHARM',name:'JB Chemicals',           theme:'Pharma · Healthcare', why:'Niche cardiac & derma brands. KKR-backed growth story.'},
+  {sym:'ERIS',    name:'Eris Lifesciences',        theme:'Pharma · Healthcare', why:'India chronic disease brands. Consistent 20%+ margins.'},
+  {sym:'NEULANDLAB',name:'Neuland Laboratories',   theme:'Pharma · Healthcare', why:'GMP API & CDMO. High value complex APIs for innovators.'},
+  {sym:'APLLTD',  name:'Alembic Pharma',           theme:'Pharma · Healthcare', why:'US ANDA approvals + India brands. Debt-free balance sheet.'},
+
+  // Chemicals & Specialty
+  {sym:'DEEPAKNITR',name:'Deepak Nitrite',         theme:'Chemicals', why:'Phenol chain integration. Industrial chemicals + specialty.'},
+  {sym:'NAVINFLUOR',name:'Navin Fluorine',         theme:'Chemicals', why:'Fluorochemicals & CDMO. Agrochemical + pharma API supplier.'},
+  {sym:'CLEAN',   name:'Clean Science',            theme:'Chemicals', why:'HPPO technology moat. Catechol & guaiacol global leader.'},
+  {sym:'FINEORG', name:'Fine Organics',            theme:'Chemicals', why:'Food & polymer additives. Niche global exporter. High margin.'},
+  {sym:'GALAXYSURF',name:'Galaxy Surfactants',     theme:'Chemicals', why:'Surfactants for FMCG. 70% export revenue. Steady compounder.'},
+  {sym:'AARTI',   name:'Aarti Industries',         theme:'Chemicals', why:'Benzene chain chemicals. Long-term supply contracts with MNCs.'},
+  {sym:'PIIND',   name:'PI Industries',            theme:'Chemicals', why:'Agrochemical CSM exports + India brands. Consistent 20% growth.'},
+  {sym:'SUMICHEM',name:'Sumitomo Chemical India',  theme:'Chemicals', why:'Japanese parent. Agro + specialty chem. Niche crop protection.'},
+
+  // IT & Technology
+  {sym:'MPHASIS', name:'Mphasis',                  theme:'IT · Tech', why:'BFS-focused IT. DXC & Blackstone parentage. US mortgage recovery.'},
+  {sym:'PERSISTENT',name:'Persistent Systems',     theme:'IT · Tech', why:'BFSI & healthcare IT. Fastest growing mid-tier IT company.'},
+  {sym:'COFORGE', name:'Coforge',                  theme:'IT · Tech', why:'BFS & travel IT. Consistent deal wins & revenue growth.'},
+  {sym:'LTTS',    name:'L&T Technology Services',  theme:'IT · Tech', why:'Engineering R&D services. Auto, aero & medtech verticals.'},
+  {sym:'KPITTECH',name:'KPIT Technologies',        theme:'IT · Tech', why:'Auto software — EV & ADAS focus. Multi-year secular growth.'},
+  {sym:'TATAELXSI',name:'Tata Elxsi',             theme:'IT · Tech', why:'Design & tech services. Auto, media & healthcare. Premium play.'},
+  {sym:'MASTEK',  name:'Mastek',                   theme:'IT · Tech', why:'UK govt IT & Oracle services. Consistent dividend growth.'},
+  {sym:'TANLA',   name:'Tanla Platforms',          theme:'IT · Tech', why:'CPaaS — SMS & messaging infrastructure. Platform model.'},
+
+  // Consumer & Retail
+  {sym:'TRENT',   name:'Trent Ltd',                theme:'Consumer · Retail', why:'Zudio fast fashion. Most exciting retail growth story in India.'},
+  {sym:'BATA',    name:'Bata India',               theme:'Consumer · Retail', why:'Footwear retail turnaround. Premium & sports pivot driving ASP.'},
+  {sym:'METRO',   name:'Metro Brands',             theme:'Consumer · Retail', why:'Premium footwear retail. Crocs & Fitflop licensee.'},
+  {sym:'CAMPUS',  name:'Campus Activewear',        theme:'Consumer · Retail', why:'Mass-market sports shoes. Tier 2/3 city distribution strength.'},
+  {sym:'VMART',   name:'V-Mart Retail',            theme:'Consumer · Retail', why:'Value fashion for Bharat. Post-merger Unlimited integration.'},
+  {sym:'SAPPHIRE',name:'Sapphire Foods',           theme:'Consumer · Retail', why:'KFC & Pizza Hut franchisee. India QSR recovery play.'},
+  {sym:'DEVYANI', name:'Devyani International',    theme:'Consumer · Retail', why:'KFC, Pizza Hut, Costa Coffee. Largest Yum! franchisee.'},
+
+  // Auto Ancillary
+  {sym:'MOTHERSON',name:'Samvardhana Motherson',   theme:'Auto Ancillary', why:'Global wiring harness + mirrors. EV transition beneficiary.'},
+  {sym:'ENDURANCE',name:'Endurance Technologies',  theme:'Auto Ancillary', why:'2W components. Bajaj & Honda supply. Die casting + ABS.'},
+  {sym:'SUPRAJIT',name:'Suprajit Engineering',     theme:'Auto Ancillary', why:'Cables for 2W & 4W globally. Western Rexnord acquisition.'},
+  {sym:'BALKRISIND',name:'Balkrishna Industries',  theme:'Auto Ancillary', why:'OHV tyres — farm & construction. 30% global market share.'},
+  {sym:'SONACOMS',name:'Sona BLW Precision',       theme:'Auto Ancillary', why:'EV differential gears. 30%+ EV revenue already.'},
+  {sym:'CRAFTSMAN',name:'Craftsman Automation',    theme:'Auto Ancillary', why:'Powertrain + aluminium casting. CV & tractor exposure.'},
+  {sym:'TIINDIA', name:'Tube Investments',         theme:'Auto Ancillary', why:'Precision tubes + cycles + financial services. Conglomerate.'},
+  {sym:'MINDA',   name:'Minda Corporation',        theme:'Auto Ancillary', why:'Switches, locks, sensors. EV component ramp-up underway.'},
+
+  // Housing Finance & Real Estate
+  {sym:'AAVAS',   name:'Aavas Financiers',         theme:'Housing Finance', why:'Affordable housing rural. Near-zero NPA. Rajasthan focus.'},
+  {sym:'HOMEFIRST',name:'Home First Finance',      theme:'Housing Finance', why:'Digital affordable housing NBFC. Tech-driven low-ticket loans.'},
+  {sym:'APTUS',   name:'Aptus Value Housing',      theme:'Housing Finance', why:'Self-employed rural home loans. South India dominance.'},
+  {sym:'PNBHOUSING',name:'PNB Housing Finance',    theme:'Housing Finance', why:'Turnaround. Retail pivot + affordable focus post-clean up.'},
+  {sym:'REPCO',   name:'Repco Home Finance',       theme:'Housing Finance', why:'Tamil Nadu housing NBFC. Self-employed segment focus.'},
+
+  // Consumption & FMCG
+  {sym:'RADICO',  name:'Radico Khaitan',           theme:'FMCG · Consumption', why:'Alcobev premium shift. 8PM whisky + Magic Moments vodka.'},
+  {sym:'MCDOWELL',name:'United Spirits',           theme:'FMCG · Consumption', why:'Diageo India. Premium alcobev + spirits leader.'},
+  {sym:'BIKAJI',  name:'Bikaji Foods',             theme:'FMCG · Consumption', why:'Bhujia & ethnic snacks. Pan-India distribution scaling up.'},
+  {sym:'PVRINOX', name:'PVR Inox',                 theme:'FMCG · Consumption', why:'Post-merger multiplex monopoly. Box office recovery play.'},
+  {sym:'MHRIL',   name:'Mahindra Holidays',        theme:'FMCG · Consumption', why:'Club Mahindra vacation ownership. Member addition driving ARR.'},
+
+  // Electronics & EMS
+  {sym:'DIXON',   name:'Dixon Technologies',       theme:'Electronics · EMS', why:'EMS for mobiles, TVs, LEDs. PLI scheme direct beneficiary.'},
+  {sym:'AMBER',   name:'Amber Enterprises',        theme:'Electronics · EMS', why:'AC & white goods EMS. Component backward integration.'},
+  {sym:'KAYNES',  name:'Kaynes Technology',        theme:'Electronics · EMS', why:'IoT & industrial electronics EMS. High value-add products.'},
+  {sym:'SYRMA',   name:'Syrma SGS Technology',     theme:'Electronics · EMS', why:'RFID + PCB + consumer EMS. Niche high-margin segments.'},
+
+  // Microcap Gems (higher risk, higher reward)
+  {sym:'ELECON',  name:'Elecon Engineering',       theme:'Microcap Gems', why:'Industrial gears & material handling. Capex cycle play.'},
+  {sym:'HBLPOWER',name:'HBL Power Systems',        theme:'Microcap Gems', why:'Railway electronics + defence batteries. Niche monopoly.'},
+  {sym:'DATAPATTNS',name:'Data Patterns India',    theme:'Microcap Gems', why:'Embedded defence electronics. Radar & avionics systems.'},
+  {sym:'IDEAFORGE',name:'ideaForge Technology',    theme:'Microcap Gems', why:'India\'s largest drone maker. Defence & surveillance UAVs.'},
+  {sym:'CENTUM',  name:'Centum Electronics',       theme:'Microcap Gems', why:'Defence & space electronics modules. ISRO & DRDO supplier.'},
+  {sym:'GPIL',    name:'Godawari Power',           theme:'Microcap Gems', why:'Iron ore pellet + steel + power. Integrated low-cost producer.'},
+  {sym:'MSTCLTD', name:'MSTC Ltd',                theme:'Microcap Gems', why:'PSU e-commerce & scrap recycling monopoly. High dividend.'},
+  {sym:'AFFLE',   name:'Affle India',              theme:'Microcap Gems', why:'Mobile ad-tech. Consumer platform CPCU model. High ROE.'},
+];
+
+function loadSettings() {
+  const s = JSON.parse(localStorage.getItem('st_settings') || '{}');
+  const capital  = s.capital  || 25000;
+  const universe = s.universe || 'Midcap · Smallcap';
+  // Apply capital to risk calculator
+  document.getElementById('r_capital').value = capital;
+  // Update badge
+  document.getElementById('badgeText').textContent =
+    `${universe} · ₹${Number(capital).toLocaleString('en-IN')} Capital`;
+  return s;
+}
+
+function openSettings() {
+  const s = JSON.parse(localStorage.getItem('st_settings') || '{}');
+  document.getElementById('s_capital').value  = s.capital  || 25000;
+  document.getElementById('s_universe').value = s.universe || 'Midcap · Smallcap';
+  previewBadge();
+  document.getElementById('settingsModal').style.display = 'flex';
+}
+
+function closeSettings() {
+  document.getElementById('settingsModal').style.display = 'none';
+}
+
+function previewBadge() {
+  const cap = document.getElementById('s_capital').value;
+  const uni = document.getElementById('s_universe').value || 'Midcap · Smallcap';
+  const capFmt = cap ? '₹' + Number(cap).toLocaleString('en-IN') + ' Capital' : '₹— Capital';
+  document.getElementById('s_preview').textContent = `${uni} · ${capFmt}`;
+}
+
+function saveSettings() {
+  const capital  = parseFloat(document.getElementById('s_capital').value)  || 25000;
+  const universe = document.getElementById('s_universe').value.trim() || 'Midcap · Smallcap';
+  localStorage.setItem('st_settings', JSON.stringify({ capital, universe }));
+  // Apply to risk calculator immediately
+  document.getElementById('r_capital').value = capital;
+  calcRisk();
+  // Update badge
+  document.getElementById('badgeText').textContent =
+    `${universe} · ₹${Number(capital).toLocaleString('en-IN')} Capital`;
+  closeSettings();
+}
 function saveWatchlist() { localStorage.setItem('st_watchlist', JSON.stringify(watchlist)); }
 
 function renderWatchlist() {
@@ -902,7 +1388,10 @@ function removeSymbol(i) {
 }
 
 function loadPreset() {
-  getPreset().forEach(s => { if (!watchlist.includes(s)) watchlist.push(s); });
+  if (watchlist.length > 0) {
+    if (!confirm('Replace your current watchlist with the preset? Your journal data is not affected.')) return;
+  }
+  watchlist = [...getPreset()];
   saveWatchlist();
   renderWatchlist();
 }
@@ -920,7 +1409,11 @@ function savePreset() {
     .split('\n').map(s => s.trim().toUpperCase()).filter(Boolean);
   localStorage.setItem('st_preset', JSON.stringify(lines));
   closePresetManager();
-  alert(`Preset saved with ${lines.length} stocks.`);
+  if (confirm(`Preset saved with ${lines.length} stocks. Apply to watchlist now?`)) {
+    watchlist = [...lines];
+    saveWatchlist();
+    renderWatchlist();
+  }
 }
 function resetPreset() {
   document.getElementById('presetEditor').value = DEFAULT_PRESET.join('\n');
@@ -1334,14 +1827,22 @@ function exportJournal() {
 }
 
 // ═══════════════════ INIT ═══════════════════
+if (watchlist.length === 0) {
+  watchlist = [...getPreset()];
+  saveWatchlist();
+}
+
+loadSettings();
 renderWatchlist();
 renderJournal();
 calcRisk();
 document.getElementById('j_date').value = new Date().toISOString().split('T')[0];
 
-// Close preset modal on backdrop click
 document.getElementById('presetModal').addEventListener('click', function(e) {
   if (e.target === this) closePresetManager();
+});
+document.getElementById('settingsModal').addEventListener('click', function(e) {
+  if (e.target === this) closeSettings();
 });
 </script>
 </body>
