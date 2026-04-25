@@ -422,7 +422,7 @@
   <div class="card">
     <div class="card-title">🔍 Stock Screener — Swing Signals</div>
     <div class="info-box" style="margin-bottom:14px;">
-      ⚡ Fetches live data from Yahoo Finance (15-min delay). Scores each stock on 5 momentum signals. Host on GitHub Pages for best reliability.
+      ⚡ Fetches live data from Yahoo Finance using browser session (15-min delay). Scores each stock on 5 momentum signals.
     </div>
 
     <!-- Watchlist -->
@@ -931,67 +931,124 @@ async function runScreener() {
   if (!watchlist.length) { alert('Add symbols to your watchlist first.'); return; }
   const btn = document.getElementById('screenBtn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="loader"></span> Fetching...';
+  btn.innerHTML = '<span class="loader"></span> Connecting...';
   document.getElementById('screenerResults').style.display = 'block';
-
-  const total = watchlist.length;
-  let done = 0;
   document.getElementById('screenerBody').innerHTML =
     `<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--text3);">
-      ⏳ Fetching <span id="fetchProgress">0</span>/${total} stocks in parallel...
+      🔐 Connecting to Yahoo Finance...
     </td></tr>`;
 
-  // Fetch all in parallel with concurrency limit of 5
+  // Step 1: Get Yahoo session cookie + crumb
+  const crumbOk = await initYahooCrumb();
+  if (!crumbOk) {
+    document.getElementById('screenerBody').innerHTML =
+      `<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--red);">
+        ❌ Could not connect to Yahoo Finance. Please check your internet and try again.<br/>
+        <span style="font-size:12px;color:var(--text3);">If the problem persists, try opening the tool in Chrome or Edge.</span>
+      </td></tr>`;
+    btn.disabled = false;
+    btn.innerHTML = '▶ Run Screen';
+    return;
+  }
+
+  // Step 2: Fetch all stocks in parallel batches
+  const total = watchlist.length;
+  let done = 0;
+  btn.innerHTML = '<span class="loader"></span> Fetching...';
+  document.getElementById('screenerBody').innerHTML =
+    `<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--text3);">
+      ⏳ Fetching <span id="fetchProgress">0</span> / ${total} stocks...
+    </td></tr>`;
+
   const results = [];
-  const BATCH = 5;
+  const BATCH = 4;
   for (let i = 0; i < watchlist.length; i += BATCH) {
     const batch = watchlist.slice(i, i + BATCH);
     const settled = await Promise.allSettled(batch.map(sym => fetchStockData(sym)));
-    settled.forEach(r => { if (r.status === 'fulfilled' && r.value) results.push(r.value); });
+    settled.forEach(r => {
+      if (r.status === 'fulfilled' && r.value) results.push(r.value);
+    });
     done += batch.length;
     const el = document.getElementById('fetchProgress');
     if (el) el.textContent = Math.min(done, total);
   }
 
-  results.sort((a,b) => b.score - a.score);
+  results.sort((a, b) => b.score - a.score);
   renderScreenerResults(results);
   btn.disabled = false;
   btn.innerHTML = '▶ Run Screen';
   document.getElementById('screenerMeta').textContent =
-    `${results.length}/${total} stocks screened · ${new Date().toLocaleTimeString('en-IN')}`;
+    `${results.length} / ${total} stocks fetched · ${new Date().toLocaleTimeString('en-IN')}`;
+}
+
+// ═══════════════════ YAHOO FINANCE — COOKIE + CRUMB FLOW ═══════════════════
+let yfCrumb = null;
+
+async function initYahooCrumb() {
+  if (yfCrumb) return true; // already have crumb
+  try {
+    // Step 1: Hit Yahoo consent page to get session cookie (A1 cookie)
+    await fetch('https://fc.yahoo.com/', { credentials: 'include', mode: 'no-cors' });
+    // Small wait for cookie to settle
+    await new Promise(r => setTimeout(r, 300));
+    // Step 2: Get crumb token using that cookie
+    const resp = await fetch('https://query1.finance.yahoo.com/v1/test/getcrumb', {
+      credentials: 'include',
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    if (!resp.ok) throw new Error('Crumb fetch failed: ' + resp.status);
+    const crumb = await resp.text();
+    if (!crumb || crumb.includes('<')) throw new Error('Got HTML instead of crumb');
+    yfCrumb = crumb.trim();
+    return true;
+  } catch(e) {
+    console.warn('Yahoo crumb init failed:', e.message);
+    return false;
+  }
 }
 
 async function fetchStockData(symbol) {
   const nseSymbol = symbol + '.NS';
-  // Direct Yahoo Finance — works reliably on https:// (GitHub Pages)
-  // Uses v8 chart API: 6 months of daily OHLCV data
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${nseSymbol}?interval=1d&range=6mo&events=div`;
+  // Build URL with crumb if we have it
+  const base = `https://query1.finance.yahoo.com/v8/finance/chart/${nseSymbol}?interval=1d&range=6mo`;
+  const url  = yfCrumb ? base + `&crumb=${encodeURIComponent(yfCrumb)}` : base;
 
   let raw;
   try {
     const resp = await fetch(url, {
+      credentials: 'include',
       signal: AbortSignal.timeout(8000),
       headers: { 'Accept': 'application/json' }
     });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    raw = await resp.json();
-  } catch(e) {
-    // Fallback: try query2 endpoint (Yahoo has two servers)
-    try {
-      const url2 = url.replace('query1', 'query2');
-      const resp2 = await fetch(url2, { signal: AbortSignal.timeout(8000) });
-      if (!resp2.ok) throw new Error('Both Yahoo endpoints failed');
+    if (resp.status === 401 || resp.status === 403) {
+      // Crumb expired — reset and retry once
+      yfCrumb = null;
+      const ok = await initYahooCrumb();
+      if (!ok) throw new Error('Auth failed');
+      const url2 = yfCrumb
+        ? base + `&crumb=${encodeURIComponent(yfCrumb)}`
+        : base;
+      const resp2 = await fetch(url2, {
+        credentials: 'include',
+        signal: AbortSignal.timeout(8000),
+        headers: { 'Accept': 'application/json' }
+      });
+      if (!resp2.ok) throw new Error('HTTP ' + resp2.status);
       raw = await resp2.json();
-    } catch(e2) {
-      throw new Error('Yahoo Finance unavailable: ' + e2.message);
+    } else if (!resp.ok) {
+      throw new Error('HTTP ' + resp.status);
+    } else {
+      raw = await resp.json();
     }
+  } catch(e) {
+    throw new Error(e.message);
   }
 
   const chart = raw?.chart?.result?.[0];
   if (!chart) return null;
 
   const q       = chart.indicators.quote[0];
-  const closes  = (q.close  || []).map(v => (v == null ? null : v)).filter(v => v !== null);
+  const closes  = (q.close  || []).filter(v => v != null);
   const volumes = (q.volume || []).map(v => v || 0);
   if (closes.length < 55) return null;
 
@@ -1001,13 +1058,11 @@ async function fetchStockData(symbol) {
   const ema20     = calcEMA(closes, 20);
   const ema50     = calcEMA(closes, 50);
   const rsi       = calcRSI(closes, 14);
-
-  const vols     = volumes.filter(v => v > 0);
-  const avgVol20 = vols.slice(-21, -1).reduce((a, b) => a + b, 0) / 20;
-  const lastVol  = vols[vols.length - 1] || 0;
-  const volSpike = avgVol20 > 0 ? lastVol / avgVol20 : 0;
-
-  const high52        = Math.max(...closes);
+  const vols      = volumes.filter(v => v > 0);
+  const avgVol20  = vols.slice(-21, -1).reduce((a, b) => a + b, 0) / 20;
+  const lastVol   = vols[vols.length - 1] || 0;
+  const volSpike  = avgVol20 > 0 ? lastVol / avgVol20 : 0;
+  const high52    = Math.max(...closes);
   const pctFrom52High = ((high52 - price) / high52 * 100);
 
   let score = 0;
