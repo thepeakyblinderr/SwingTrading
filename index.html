@@ -931,30 +931,10 @@ async function runScreener() {
   if (!watchlist.length) { alert('Add symbols to your watchlist first.'); return; }
   const btn = document.getElementById('screenBtn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="loader"></span> Connecting...';
-  document.getElementById('screenerResults').style.display = 'block';
-  document.getElementById('screenerBody').innerHTML =
-    `<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--text3);">
-      🔐 Connecting to Yahoo Finance...
-    </td></tr>`;
-
-  // Step 1: Get Yahoo session cookie + crumb
-  const crumbOk = await initYahooCrumb();
-  if (!crumbOk) {
-    document.getElementById('screenerBody').innerHTML =
-      `<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--red);">
-        ❌ Could not connect to Yahoo Finance. Please check your internet and try again.<br/>
-        <span style="font-size:12px;color:var(--text3);">If the problem persists, try opening the tool in Chrome or Edge.</span>
-      </td></tr>`;
-    btn.disabled = false;
-    btn.innerHTML = '▶ Run Screen';
-    return;
-  }
-
-  // Step 2: Fetch all stocks in parallel batches
-  const total = watchlist.length;
-  let done = 0;
   btn.innerHTML = '<span class="loader"></span> Fetching...';
+  document.getElementById('screenerResults').style.display = 'block';
+
+  const total = watchlist.length;
   document.getElementById('screenerBody').innerHTML =
     `<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--text3);">
       ⏳ Fetching <span id="fetchProgress">0</span> / ${total} stocks...
@@ -968,85 +948,74 @@ async function runScreener() {
     settled.forEach(r => {
       if (r.status === 'fulfilled' && r.value) results.push(r.value);
     });
-    done += batch.length;
     const el = document.getElementById('fetchProgress');
-    if (el) el.textContent = Math.min(done, total);
+    if (el) el.textContent = Math.min(i + BATCH, total);
   }
 
-  results.sort((a, b) => b.score - a.score);
-  renderScreenerResults(results);
+  if (!results.length) {
+    document.getElementById('screenerBody').innerHTML =
+      `<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--red);">
+        ❌ No data fetched. Yahoo Finance may be temporarily unavailable.<br/>
+        <span style="font-size:12px;color:var(--text3);">Wait a few minutes and try again, or try from a different network.</span>
+      </td></tr>`;
+  } else {
+    results.sort((a, b) => b.score - a.score);
+    renderScreenerResults(results);
+  }
+
   btn.disabled = false;
   btn.innerHTML = '▶ Run Screen';
   document.getElementById('screenerMeta').textContent =
     `${results.length} / ${total} stocks fetched · ${new Date().toLocaleTimeString('en-IN')}`;
 }
 
-// ═══════════════════ YAHOO FINANCE — COOKIE + CRUMB FLOW ═══════════════════
-let yfCrumb = null;
-
-async function initYahooCrumb() {
-  if (yfCrumb) return true; // already have crumb
-  try {
-    // Step 1: Hit Yahoo consent page to get session cookie (A1 cookie)
-    await fetch('https://fc.yahoo.com/', { credentials: 'include', mode: 'no-cors' });
-    // Small wait for cookie to settle
-    await new Promise(r => setTimeout(r, 300));
-    // Step 2: Get crumb token using that cookie
-    const resp = await fetch('https://query1.finance.yahoo.com/v1/test/getcrumb', {
-      credentials: 'include',
-      headers: { 'User-Agent': 'Mozilla/5.0' }
-    });
-    if (!resp.ok) throw new Error('Crumb fetch failed: ' + resp.status);
-    const crumb = await resp.text();
-    if (!crumb || crumb.includes('<')) throw new Error('Got HTML instead of crumb');
-    yfCrumb = crumb.trim();
-    return true;
-  } catch(e) {
-    console.warn('Yahoo crumb init failed:', e.message);
-    return false;
-  }
-}
+// ═══════════════════ YAHOO FINANCE — DIRECT v8 WITH HEADERS ═══════════════════
+// Safari blocks third-party cookies so crumb flow fails on iOS
+// Use query2 endpoint with Accept header which bypasses the crumb requirement
+// on many network configurations, with fallback to a working public endpoint
 
 async function fetchStockData(symbol) {
   const nseSymbol = symbol + '.NS';
-  // Build URL with crumb if we have it
-  const base = `https://query1.finance.yahoo.com/v8/finance/chart/${nseSymbol}?interval=1d&range=6mo`;
-  const url  = yfCrumb ? base + `&crumb=${encodeURIComponent(yfCrumb)}` : base;
 
-  let raw;
-  try {
-    const resp = await fetch(url, {
-      credentials: 'include',
-      signal: AbortSignal.timeout(8000),
-      headers: { 'Accept': 'application/json' }
-    });
-    if (resp.status === 401 || resp.status === 403) {
-      // Crumb expired — reset and retry once
-      yfCrumb = null;
-      const ok = await initYahooCrumb();
-      if (!ok) throw new Error('Auth failed');
-      const url2 = yfCrumb
-        ? base + `&crumb=${encodeURIComponent(yfCrumb)}`
-        : base;
-      const resp2 = await fetch(url2, {
-        credentials: 'include',
+  // Try multiple Yahoo endpoints — query2 is less strict than query1
+  const endpoints = [
+    `https://query2.finance.yahoo.com/v8/finance/chart/${nseSymbol}?interval=1d&range=6mo&includePrePost=false`,
+    `https://query1.finance.yahoo.com/v8/finance/chart/${nseSymbol}?interval=1d&range=6mo&includePrePost=false`,
+  ];
+
+  let raw = null;
+  for (const url of endpoints) {
+    try {
+      const resp = await fetch(url, {
         signal: AbortSignal.timeout(8000),
-        headers: { 'Accept': 'application/json' }
+        headers: {
+          'Accept': 'application/json',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36'
+        }
       });
-      if (!resp2.ok) throw new Error('HTTP ' + resp2.status);
-      raw = await resp2.json();
-    } else if (!resp.ok) {
-      throw new Error('HTTP ' + resp.status);
-    } else {
-      raw = await resp.json();
-    }
-  } catch(e) {
-    throw new Error(e.message);
+      if (!resp.ok) continue;
+      const json = await resp.json();
+      if (json?.chart?.result?.[0]) { raw = json; break; }
+    } catch(e) { continue; }
   }
 
-  const chart = raw?.chart?.result?.[0];
-  if (!chart) return null;
+  // Final fallback: corsproxy.io wrapping query2 (works on iOS Safari)
+  if (!raw) {
+    try {
+      const target = `https://query2.finance.yahoo.com/v8/finance/chart/${nseSymbol}?interval=1d&range=6mo`;
+      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(target)}`;
+      const resp = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+      if (resp.ok) {
+        const json = await resp.json();
+        if (json?.chart?.result?.[0]) raw = json;
+      }
+    } catch(e) { /* skip */ }
+  }
 
+  if (!raw?.chart?.result?.[0]) return null;
+
+  const chart   = raw.chart.result[0];
   const q       = chart.indicators.quote[0];
   const closes  = (q.close  || []).filter(v => v != null);
   const volumes = (q.volume || []).map(v => v || 0);
@@ -1080,6 +1049,9 @@ async function fetchStockData(symbol) {
   const fullName = NSE_STOCKS[symbol] || '';
   return { symbol, fullName, price, changePct, rsi, ema20, volSpike, pctFrom52High, score, signals };
 }
+
+// Stub — no longer needed but kept to avoid reference errors
+async function initYahooCrumb() { return true; }
 
 function calcEMA(data, period) {
   const k = 2 / (period + 1);
