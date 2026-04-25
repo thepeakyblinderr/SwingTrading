@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="theme-color" content="#f5f0e8"/>
+<title>SwingTrader NSE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #f7f3ec;
+    --surface: #ffffff;
+    --surface2: #f0ebe0;
+    --border: #e2d9c8;
+    --text: #1a1612;
+    --text2: #6b5f4e;
+    --text3: #9c8e7a;
+    --accent: #c8722a;
+    --accent2: #2a6bc8;
+    --green: #1e7a4e;
+    --green-bg: #eaf5ef;
+    --red: #c0392b;
+    --red-bg: #fdf0ee;
+    --orange: #d4780a;
+    --orange-bg: #fef5e7;
+    --gold: #b8860b;
+    --shadow: 0 2px 12px rgba(0,0,0,0.07);
+    --shadow-lg: 0 8px 32px rgba(0,0,0,0.10);
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  /* HEADER */
+  .app-header {
+    background: var(--surface);
+    border-bottom: 2px solid var(--border);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 60px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: var(--shadow);
+  }
+  .logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+  }
+  .logo span { color: var(--text); }
+  .header-badge {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text3);
+    background: var(--surface2);
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+  }
+
+  /* TABS */
+  .tab-bar {
+    display: flex;
+    gap: 4px;
+    padding: 16px 24px 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .tab-btn {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 10px 20px;
+    border: none;
+    background: transparent;
+    color: var(--text2);
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.2s;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .tab-btn:hover { color: var(--accent); background: var(--surface2); }
+  .tab-btn.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    background: var(--bg);
+    font-weight: 600;
+  }
+  .tab-icon { font-size: 15px; }
+
+  /* MAIN CONTENT */
+  .main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* CARDS */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    margin-bottom: 16px;
+  }
+  .card-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* GRID */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+
+  /* FORM ELEMENTS */
+  label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text2);
+    margin-bottom: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  input, select, textarea {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    color: var(--text);
+    background: var(--bg);
+    transition: border-color 0.2s;
+    outline: none;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); background: white; }
+  textarea { resize: vertical; min-height: 70px; }
+
+  /* BUTTONS */
+  .btn {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 9px 18px;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.18s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+  }
+  .btn-primary:hover { background: #a85e22; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(200,114,42,0.3); }
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1.5px solid var(--border);
+  }
+  .btn-secondary:hover { background: var(--border); }
+  .btn-danger { background: var(--red-bg); color: var(--red); border: 1.5px solid #f5c6c2; }
+  .btn-danger:hover { background: var(--red); color: white; }
+  .btn-green { background: var(--green-bg); color: var(--green); border: 1.5px solid #b8e0cc; }
+  .btn-green:hover { background: var(--green); color: white; }
+  .btn-sm { padding: 5px 12px; font-size: 12px; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+
+  /* BADGES */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: 'DM Mono', monospace;
+  }
+  .badge-green { background: var(--green-bg); color: var(--green); }
+  .badge-red { background: var(--red-bg); color: var(--red); }
+  .badge-orange { background: var(--orange-bg); color: var(--orange); }
+  .badge-blue { background: #e8f0fd; color: var(--accent2); }
+  .badge-gold { background: #fef9e7; color: var(--gold); }
+
+  /* STAT BOXES */
+  .stat-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    text-align: center;
+  }
+  .stat-value {
+    font-family: 'Playfair Display', serif;
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.1;
+  }
+  .stat-label {
+    font-size: 11px;
+    color: var(--text3);
+    font-weight: 500;
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* TABLE */
+  .tbl-wrap { overflow-x: auto; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    background: var(--surface2);
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    vertical-align: middle;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--surface2); }
+  .mono { font-family: 'DM Mono', monospace; font-size: 12px; }
+
+  /* SCORE BAR */
+  .score-bar-wrap { display: flex; align-items: center; gap: 8px; }
+  .score-bar { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .score-bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+  .score-num { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 500; min-width: 28px; text-align: right; }
+
+  /* LOADER */
+  .loader { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* SCREENER */
+  .screener-controls { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 16px; }
+  .watchlist-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .tag {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.15s;
+  }
+  .tag:hover { background: var(--border); }
+  .tag-remove { color: var(--text3); font-size: 14px; line-height: 1; }
+
+  /* SIGNAL PILLS */
+  .signal-row { display: flex; gap: 4px; flex-wrap: wrap; }
+  .sig { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+  .sig-pass { background: var(--green-bg); color: var(--green); }
+  .sig-fail { background: var(--red-bg); color: var(--red); }
+  .sig-neutral { background: var(--surface2); color: var(--text3); }
+
+  /* RISK CALC */
+  .result-highlight {
+    background: linear-gradient(135deg, #fff8f0, #fff);
+    border: 2px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-top: 16px;
+  }
+  .result-big {
+    font-family: 'Playfair Display', serif;
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  /* JOURNAL */
+  .trade-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .status-open { color: var(--orange); font-weight: 600; }
+  .status-win { color: var(--green); font-weight: 600; }
+  .status-loss { color: var(--red); font-weight: 600; }
+
+  /* EMPTY STATE */
+  .empty-state { text-align: center; padding: 48px 24px; color: var(--text3); }
+  .empty-icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-title { font-size: 16px; font-weight: 600; color: var(--text2); margin-bottom: 6px; }
+
+  /* INFO BOX */
+  .info-box {
+    background: var(--orange-bg);
+    border: 1px solid #f0c070;
+    border-radius: var(--radius-sm);
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--orange);
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  /* DIVIDER */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+  /* SECTION HEADER */
+  .section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  /* TOOLTIP */
+  .tooltip-wrap { position: relative; display: inline-flex; }
+  .tooltip-wrap:hover .tooltip { display: block; }
+  .tooltip {
+    display: none;
+    position: absolute;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--text);
+    color: white;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    white-space: nowrap;
+    z-index: 999;
+  }
+
+  /* SWING GUIDE */
+  .guide-step {
+    display: flex;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .guide-step:last-child { border-bottom: none; }
+  .step-num {
+    width: 28px;
+    height: 28px;
+    background: var(--accent);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .step-title { font-weight: 600; margin-bottom: 4px; color: var(--text); }
+  .step-desc { color: var(--text2); font-size: 13px; line-height: 1.5; }
+
+  @media (max-width: 700px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    .main { padding: 12px; }
+    .tab-btn { padding: 8px 12px; font-size: 12px; }
+    .logo { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="logo">Swing<span>Trader</span> NSE</div>
+  <div class="header-badge">📍 Midcap · Smallcap · ₹25K Capital</div>
+</header>
+
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('screener',this)"><span class="tab-icon">🔍</span>Screener</button>
+  <button class="tab-btn" onclick="switchTab('risk',this)"><span class="tab-icon">⚖️</span>Risk Calculator</button>
+  <button class="tab-btn" onclick="switchTab('journal',this)"><span class="tab-icon">📒</span>Trade Journal</button>
+  <button class="tab-btn" onclick="switchTab('guide',this)"><span class="tab-icon">📖</span>Swing Guide</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════ SCREENER ═══════════════════════════════════════════════ -->
+<div class="main">
+<div id="tab-screener" class="tab-panel active">
+  <div class="card">
+    <div class="card-title">🔍 Stock Screener — Swing Signals</div>
+    <div class="info-box" style="margin-bottom:14px;">
+      ⚡ Fetches live data from Yahoo Finance (15-min delay). Scores each stock on 5 momentum signals. Host on GitHub Pages for best reliability.
+    </div>
+
+    <!-- Watchlist -->
+    <label>Your Watchlist</label>
+    <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+      <div style="position:relative;flex:1;min-width:200px;max-width:280px;">
+        <input type="text" id="addSymbol" placeholder="Type stock name or symbol..." autocomplete="off"
+          oninput="showSuggestions(this.value)"
+          onkeydown="handleSuggestKey(event)"/>
+        <div id="suggestBox" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1.5px solid var(--accent);border-top:none;border-radius:0 0 var(--radius-sm) var(--radius-sm);z-index:200;max-height:200px;overflow-y:auto;box-shadow:var(--shadow-lg);"></div>
+      </div>
+      <button class="btn btn-secondary" onclick="addSymbolFromInput()">+ Add</button>
+      <button class="btn btn-secondary" onclick="openPresetManager()">⚙️ Manage Preset</button>
+      <button class="btn btn-secondary" onclick="loadPreset()">📋 Load Preset</button>
+      <button class="btn btn-primary" onclick="runScreener()" id="screenBtn">▶ Run Screen</button>
+    </div>
+    <div class="watchlist-tags" id="watchlistTags"></div>
+
+    <!-- Preset Manager Modal -->
+    <div id="presetModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:500;align-items:center;justify-content:center;">
+      <div style="background:var(--surface);border-radius:var(--radius);padding:24px;max-width:520px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:var(--shadow-lg);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <div style="font-family:'Playfair Display',serif;font-size:18px;font-weight:700;">⚙️ Manage Preset Watchlist</div>
+          <button class="btn btn-secondary btn-sm" onclick="closePresetManager()">✕ Close</button>
+        </div>
+        <div style="font-size:13px;color:var(--text2);margin-bottom:12px;">Edit your preset list. One symbol per line. These are saved to your browser — they persist next time you open the tool.</div>
+        <textarea id="presetEditor" style="width:100%;height:200px;font-family:'DM Mono',monospace;font-size:13px;" placeholder="BHEL&#10;BEL&#10;IRFC..."></textarea>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button class="btn btn-primary" onclick="savePreset()">💾 Save Preset</button>
+          <button class="btn btn-secondary" onclick="resetPreset()">↺ Reset to Default</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="screenerResults" style="display:none;">
+    <div class="section-head">
+      <div class="section-title">Screening Results</div>
+      <div id="screenerMeta" style="font-size:12px;color:var(--text3);"></div>
+    </div>
+    <div class="tbl-wrap">
+      <table id="screenerTable">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Price (₹)</th>
+            <th>Change %</th>
+            <th>RSI (14)</th>
+            <th>Vol Spike</th>
+            <th>vs 20 EMA</th>
+            <th>vs 52W High</th>
+            <th>Signals</th>
+            <th>Score</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="screenerBody"></tbody>
+      </table>
+    </div>
+    <div style="margin-top:10px;font-size:12px;color:var(--text3);">
+      * Score 70+ = Strong candidate · 50-69 = Watch · Below 50 = Avoid · Data: Yahoo Finance (15-min delay) · Host on GitHub Pages for best results
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ RISK CALCULATOR ═══════════════════════════════════════════════ -->
+<div id="tab-risk" class="tab-panel">
+  <div class="grid-2">
+    <div>
+      <div class="card">
+        <div class="card-title">⚖️ Position Sizing Calculator</div>
+        <div style="display:grid;gap:12px;">
+          <div>
+            <label>Total Capital (₹)</label>
+            <input type="number" id="r_capital" value="25000" oninput="calcRisk()"/>
+          </div>
+          <div>
+            <label>Risk Per Trade (%)</label>
+            <input type="number" id="r_riskPct" value="2" step="0.5" min="0.5" max="10" oninput="calcRisk()"/>
+            <div style="font-size:11px;color:var(--text3);margin-top:4px;">Recommended: 1–3% for beginners</div>
+          </div>
+          <hr class="divider"/>
+          <div>
+            <label>Entry Price (₹)</label>
+            <input type="number" id="r_entry" placeholder="e.g. 245.50" oninput="calcRisk()"/>
+          </div>
+          <div>
+            <label>Stop-Loss Price (₹)</label>
+            <input type="number" id="r_sl" placeholder="e.g. 232.00" oninput="calcRisk()"/>
+          </div>
+          <div>
+            <label>Target Price (₹) — optional</label>
+            <input type="number" id="r_target" placeholder="e.g. 278.00" oninput="calcRisk()"/>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📐 SL Placement Guide</div>
+        <div style="display:grid;gap:8px;font-size:13px;color:var(--text2);">
+          <div>🕯️ <strong>Candle SL:</strong> Below recent swing low (last 3–5 days low)</div>
+          <div>📊 <strong>ATR-based:</strong> Entry − (1.5 × ATR14). Wider, avoids noise.</div>
+          <div>📉 <strong>EMA SL:</strong> Below 20 EMA for momentum trades</div>
+          <div>📏 <strong>% SL:</strong> Fixed 4–6% below entry. Simple for beginners.</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="result-highlight">
+        <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:8px;">Position Size</div>
+        <div class="result-big" id="r_qty">—</div>
+        <div style="color:var(--text2);font-size:13px;margin-top:2px;">shares to buy</div>
+        <hr class="divider"/>
+        <div class="grid-2" style="gap:16px;margin-top:4px;">
+          <div>
+            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;">Capital Deployed</div>
+            <div style="font-size:20px;font-family:'Playfair Display',serif;font-weight:700;margin-top:2px;" id="r_deployed">—</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;">Max Loss</div>
+            <div style="font-size:20px;font-family:'Playfair Display',serif;font-weight:700;color:var(--red);margin-top:2px;" id="r_maxloss">—</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;">Potential Profit</div>
+            <div style="font-size:20px;font-family:'Playfair Display',serif;font-weight:700;color:var(--green);margin-top:2px;" id="r_profit">—</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;">Risk : Reward</div>
+            <div style="font-size:20px;font-family:'Playfair Display',serif;font-weight:700;margin-top:2px;" id="r_rr">—</div>
+          </div>
+        </div>
+        <hr class="divider"/>
+        <div id="r_verdict" style="font-size:13px;padding:10px;border-radius:8px;background:var(--surface2);"></div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title">💡 Capital Allocation Rule</div>
+        <div id="r_allocation" style="font-size:13px;color:var(--text2);line-height:1.7;">
+          Enter your values above to see allocation breakdown.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🎯 Send to Journal</div>
+        <div style="display:grid;gap:10px;">
+          <div>
+            <label>Symbol</label>
+            <input type="text" id="r_symbol" placeholder="e.g. BHEL"/>
+          </div>
+          <button class="btn btn-primary" onclick="sendToJournal()" style="width:100%;">📒 Add to Trade Journal</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ JOURNAL ═══════════════════════════════════════════════ -->
+<div id="tab-journal" class="tab-panel">
+  <!-- Stats -->
+  <div class="grid-4" id="journalStats" style="margin-bottom:16px;">
+    <div class="stat-box"><div class="stat-value" id="j_total">0</div><div class="stat-label">Total Trades</div></div>
+    <div class="stat-box"><div class="stat-value" id="j_winrate" style="color:var(--green);">0%</div><div class="stat-label">Win Rate</div></div>
+    <div class="stat-box"><div class="stat-value" id="j_pnl">₹0</div><div class="stat-label">Net P&L</div></div>
+    <div class="stat-box"><div class="stat-value" id="j_open">0</div><div class="stat-label">Open Trades</div></div>
+  </div>
+
+  <!-- Add Trade Form -->
+  <div class="card">
+    <div class="card-title">➕ Log New Trade</div>
+    <div class="trade-form">
+      <div><label>Symbol</label><input type="text" id="j_sym" placeholder="BHEL"/></div>
+      <div><label>Entry Price (₹)</label><input type="number" id="j_entry" placeholder="245.50"/></div>
+      <div><label>Stop-Loss (₹)</label><input type="number" id="j_sl" placeholder="232.00"/></div>
+      <div><label>Target (₹)</label><input type="number" id="j_tgt" placeholder="278.00"/></div>
+      <div><label>Quantity</label><input type="number" id="j_qty" placeholder="20"/></div>
+      <div><label>Entry Date</label><input type="date" id="j_date"/></div>
+      <div><label>Exit Price (₹)</label><input type="number" id="j_exit" placeholder="Leave blank if open"/></div>
+      <div><label>Exit Date</label><input type="date" id="j_exitdate"/></div>
+    </div>
+    <div style="margin-top:10px;display:grid;gap:8px;">
+      <div><label>Notes / Reason</label><textarea id="j_notes" placeholder="Why did you take this trade? e.g. RSI breakout above 60 with volume spike"></textarea></div>
+      <button class="btn btn-primary" onclick="addTrade()" style="width:fit-content;">💾 Save Trade</button>
+    </div>
+  </div>
+
+  <!-- Trade List -->
+  <div class="section-head">
+    <div class="section-title">Trade History</div>
+    <div style="display:flex;gap:8px;">
+      <select id="j_filter" onchange="renderJournal()" style="width:auto;">
+        <option value="all">All Trades</option>
+        <option value="open">Open Only</option>
+        <option value="closed">Closed Only</option>
+        <option value="win">Wins Only</option>
+        <option value="loss">Losses Only</option>
+      </select>
+      <button class="btn btn-secondary btn-sm" onclick="exportJournal()">⬇ Export CSV</button>
+    </div>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th>Entry Date</th>
+          <th>Entry ₹</th>
+          <th>SL ₹</th>
+          <th>Target ₹</th>
+          <th>Qty</th>
+          <th>Exit ₹</th>
+          <th>P&L</th>
+          <th>R:R</th>
+          <th>Status</th>
+          <th>Notes</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="journalBody"></tbody>
+    </table>
+  </div>
+  <div id="journalEmpty" class="empty-state" style="display:none;">
+    <div class="empty-icon">📒</div>
+    <div class="empty-title">No trades yet</div>
+    <div>Log your first trade above to start tracking your performance.</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ GUIDE ═══════════════════════════════════════════════ -->
+<div id="tab-guide" class="tab-panel">
+  <div class="grid-2">
+    <div>
+      <div class="card">
+        <div class="card-title">📖 Momentum Swing Trading — Beginner's Playbook</div>
+        <div>
+          <div class="guide-step">
+            <div class="step-num">1</div>
+            <div>
+              <div class="step-title">Find the Trend</div>
+              <div class="step-desc">Price must be above its 20 EMA and 50 EMA on the daily chart. Never buy a falling stock — trade with the trend, not against it.</div>
+            </div>
+          </div>
+          <div class="guide-step">
+            <div class="step-num">2</div>
+            <div>
+              <div class="step-title">Check RSI Momentum</div>
+              <div class="step-desc">RSI (14) between 55–70 is the sweet spot. Above 70 = overbought (risk of reversal). Below 50 = weak momentum. Avoid both extremes.</div>
+            </div>
+          </div>
+          <div class="guide-step">
+            <div class="step-num">3</div>
+            <div>
+              <div class="step-title">Confirm with Volume</div>
+              <div class="step-desc">Volume should be 1.5x+ the 20-day average on the breakout day. High volume = smart money participation. Low volume breakouts often fail.</div>
+            </div>
+          </div>
+          <div class="guide-step">
+            <div class="step-num">4</div>
+            <div>
+              <div class="step-title">Set Entry, SL & Target</div>
+              <div class="step-desc">Buy on breakout or next day open. SL below recent swing low (3–5 days). Target = 2× to 3× the SL distance (minimum 1:2 R:R). Use the Risk Calculator.</div>
+            </div>
+          </div>
+          <div class="guide-step">
+            <div class="step-num">5</div>
+            <div>
+              <div class="step-title">Trail & Exit Discipline</div>
+              <div class="step-desc">Once up 50% of target, trail SL to breakeven. Exit at target OR if RSI crosses below 50 OR price closes below 20 EMA. <strong>Never hold losers hoping for recovery.</strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <div class="card-title">⚠️ Rules for ₹25K Capital</div>
+        <div style="display:grid;gap:10px;font-size:13px;color:var(--text2);">
+          <div class="info-box">📌 Risk max ₹500 per trade (2% of capital). This lets you survive 10+ losing trades in a row.</div>
+          <div style="padding:10px;background:var(--green-bg);border-radius:8px;color:var(--green);border:1px solid #b8e0cc;">
+            ✅ Max 2 open trades at once. Don't over-diversify with ₹25K — focus!
+          </div>
+          <div style="padding:10px;background:var(--red-bg);border-radius:8px;color:var(--red);border:1px solid #f5c6c2;">
+            ❌ Avoid stocks above ₹2,000/share — you can't get adequate quantity.
+          </div>
+          <div style="padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
+            🎯 <strong>Best price range:</strong> ₹50–₹800/share for meaningful quantity with ₹25K.
+          </div>
+          <div style="padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
+            ⏱️ <strong>Hold period:</strong> 5–15 trading days. Review every Friday.
+          </div>
+          <div style="padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
+            📅 <strong>Market timings:</strong> NSE 9:15 AM – 3:30 PM IST. Best entry: 9:30–10:30 AM or 2:00–3:00 PM.
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📊 Understanding the Score</div>
+        <div style="display:grid;gap:8px;font-size:13px;color:var(--text2);">
+          <div><span class="badge badge-green">RSI 55-70</span> &nbsp;Momentum without being overbought (+20 pts)</div>
+          <div><span class="badge badge-blue">Above 20 EMA</span> &nbsp;Short-term trend is up (+20 pts)</div>
+          <div><span class="badge badge-blue">Above 50 EMA</span> &nbsp;Medium-term trend is up (+20 pts)</div>
+          <div><span class="badge badge-orange">Vol Spike 1.5x+</span> &nbsp;Breakout with volume confirmation (+20 pts)</div>
+          <div><span class="badge badge-gold">Near 52W High</span> &nbsp;Price in breakout zone within 15% of high (+20 pts)</div>
+          <div style="margin-top:4px;padding:8px;background:var(--surface2);border-radius:6px;">
+            <strong>Score ≥ 70</strong> = Take a closer look on TradingView before entering.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div><!-- /main -->
+
+<script>
+// ═══════════════════ NSE STOCK DATABASE (symbol → full name) ═══════════════════
+const NSE_STOCKS = {
+  'BHEL':'Bharat Heavy Electricals','BEL':'Bharat Electronics','HAL':'Hindustan Aeronautics',
+  'IRFC':'Indian Railway Finance Corp','RVNL':'Rail Vikas Nigam','IRCTC':'Indian Railway Catering',
+  'IRCON':'Ircon International','RAILTEL':'RailTel Corporation','RITES':'RITES Ltd',
+  'FEDERALBNK':'Federal Bank','IDFCFIRSTB':'IDFC First Bank','RBLBANK':'RBL Bank',
+  'MANAPPURAM':'Manappuram Finance','MUTHOOTFIN':'Muthoot Finance','CHOLAFIN':'Cholamandalam Finance',
+  'LAURUSLABS':'Laurus Labs','GRANULES':'Granules India','DEEPAKNITR':'Deepak Nitrite',
+  'AARTI':'Aarti Industries','PIIND':'PI Industries','SUMICHEM':'Sumitomo Chemical',
+  'MPHASIS':'Mphasis','PERSISTENT':'Persistent Systems','COFORGE':'Coforge',
+  'LTTS':'L&T Technology','KPITTECH':'KPIT Technologies','TATAELXSI':'Tata Elxsi',
+  'HGINFRA':'H.G. Infra Engineering','KEC':'KEC International','KALPATPOWR':'Kalpataru Power',
+  'AHLUCONT':'Ahluwalia Contracts','PGIL':'Pearl Global Industries','NCC':'NCC Ltd',
+  'TRENT':'Trent Ltd','BATA':'Bata India','VMART':'V-Mart Retail',
+  'CAMPUS':'Campus Activewear','RELAXO':'Relaxo Footwears','METRO':'Metro Brands',
+  'MOTHERSON':'Samvardhana Motherson','ENDURANCE':'Endurance Technologies','SUPRAJIT':'Suprajit Engineering',
+  'BALKRISIND':'Balkrishna Industries','SWARAJENG':'Swaraj Engines','EIHOTEL':'EIH Hotels',
+  'NAVINFLUOR':'Navin Fluorine','CLEAN':'Clean Science','SUDARSCHEM':'Sudarshan Chemical',
+  'IONEXCHANG':'Ion Exchange','GALAXYSURF':'Galaxy Surfactants','FINEORG':'Fine Organics',
+  'APTUS':'Aptus Value Housing','HOMEFIRST':'Home First Finance','AAVAS':'Aavas Financiers',
+  'CREDITACC':'CreditAccess Grameen','SPANDANA':'Spandana Sphoorty','UJJIVANSFB':'Ujjivan Small Finance',
+  'DIXON':'Dixon Technologies','AMBER':'Amber Enterprises','KAYNES':'Kaynes Technology',
+  'SYRMA':'Syrma SGS Technology','AVALON':'Avalon Technologies','IDEAFORGE':'ideaForge Technology',
+  'ZOMATO':'Zomato','NYKAA':'FSN E-Commerce (Nykaa)','POLICYBZR':'PB Fintech (PolicyBazaar)',
+  'DELHIVERY':'Delhivery','CARTRADE':'CarTrade Tech','EASEMYTRIP':'Easy Trip Planners',
+  'POWERINDIA':'Hitachi Energy India','INOXWIND':'Inox Wind','SUZLON':'Suzlon Energy',
+  'RPOWER':'Reliance Power','NHPC':'NHPC Ltd','SJVN':'SJVN Ltd',
+  'CESC':'CESC Ltd','TORNTPOWER':'Torrent Power','TATAPOWER':'Tata Power',
+  'PGHL':'Procter & Gamble Health','ERIS':'Eris Lifesciences','SOLARA':'Solara Active Pharma',
+  'NEULANDLAB':'Neuland Laboratories','DIVI':'Divi\'s Laboratories','APLLTD':'Alembic Pharma',
+  'IPCALAB':'IPCA Laboratories','JBCHEPHARM':'JB Chemicals','GLENMARK':'Glenmark Pharma',
+  'SONACOMS':'Sona BLW Precision','CRAFTSMAN':'Craftsman Automation','MINDA':'Minda Corporation',
+  'UGROCAP':'Ugro Capital','APTL':'Apar Industries','KEI':'KEI Industries',
+  'POLYCAB':'Polycab India','FIEMIND':'Fiem Industries','GESHIP':'Great Eastern Shipping',
+  'SCI':'Shipping Corporation','ESCORTS':'Escorts Kubota','TIINDIA':'Tube Investments',
+  'ABSLAMC':'Aditya Birla Sun Life AMC','ANGELONE':'Angel One','CDSL':'CDSL',
+  'BSE':'BSE Ltd','MCX':'Multi Commodity Exchange','CAMS':'CAMS',
+  'HINDCOPPER':'Hindustan Copper','NATIONALUM':'National Aluminium','NMDC':'NMDC Ltd',
+  'MOIL':'MOIL Ltd','GMRAIRPORT':'GMR Airports','IRB':'IRB Infrastructure',
+  'PNBHOUSING':'PNB Housing Finance','CANFINHOME':'Can Fin Homes','REPCO':'Repco Home Finance',
+};
+
+const DEFAULT_PRESET = [
+  'BHEL','BEL','HAL','IRFC','RVNL','IRCTC',
+  'FEDERALBNK','IDFCFIRSTB','RBLBANK','MANAPPURAM',
+  'LAURUSLABS','GRANULES','DEEPAKNITR',
+  'MPHASIS','PERSISTENT','COFORGE',
+  'HGINFRA','KEC','KALPATPOWR',
+  'TRENT','BATA','MOTHERSON','ENDURANCE','SUPRAJIT'
+];
+
+function getPreset() {
+  const saved = localStorage.getItem('st_preset');
+  return saved ? JSON.parse(saved) : DEFAULT_PRESET;
+}
+
+let watchlist = JSON.parse(localStorage.getItem('st_watchlist') || '[]');
+let trades = JSON.parse(localStorage.getItem('st_trades') || '[]');
+let suggestIndex = -1;
+
+// ═══════════════════ TABS ═══════════════════
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (name === 'journal') renderJournal();
+}
+
+// ═══════════════════ AUTOCOMPLETE ═══════════════════
+function showSuggestions(val) {
+  const box = document.getElementById('suggestBox');
+  const q = val.trim().toUpperCase();
+  if (q.length < 1) { box.style.display = 'none'; return; }
+
+  const matches = Object.entries(NSE_STOCKS).filter(([sym, name]) =>
+    sym.startsWith(q) || name.toUpperCase().includes(q)
+  ).slice(0, 8);
+
+  if (!matches.length) { box.style.display = 'none'; return; }
+
+  suggestIndex = -1;
+  box.innerHTML = matches.map(([sym, name], i) =>
+    `<div class="suggest-item" data-sym="${sym}" onclick="selectSuggestion('${sym}')"
+      style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;">
+      <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:600;min-width:80px;">${sym}</span>
+      <span style="font-size:12px;color:var(--text2);">${name}</span>
+    </div>`
+  ).join('');
+  box.style.display = 'block';
+}
+
+function selectSuggestion(sym) {
+  document.getElementById('addSymbol').value = sym;
+  document.getElementById('suggestBox').style.display = 'none';
+  addSymbolFromInput();
+}
+
+function handleSuggestKey(e) {
+  const box = document.getElementById('suggestBox');
+  const items = box.querySelectorAll('.suggest-item');
+  if (e.key === 'ArrowDown') {
+    suggestIndex = Math.min(suggestIndex + 1, items.length - 1);
+    items.forEach((el, i) => el.style.background = i === suggestIndex ? 'var(--surface2)' : '');
+    e.preventDefault();
+  } else if (e.key === 'ArrowUp') {
+    suggestIndex = Math.max(suggestIndex - 1, -1);
+    items.forEach((el, i) => el.style.background = i === suggestIndex ? 'var(--surface2)' : '');
+    e.preventDefault();
+  } else if (e.key === 'Enter') {
+    if (suggestIndex >= 0 && items[suggestIndex]) {
+      selectSuggestion(items[suggestIndex].dataset.sym);
+    } else {
+      addSymbolFromInput();
+    }
+    e.preventDefault();
+  } else if (e.key === 'Escape') {
+    box.style.display = 'none';
+  }
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#addSymbol') && !e.target.closest('#suggestBox')) {
+    document.getElementById('suggestBox').style.display = 'none';
+  }
+});
+
+// ═══════════════════ WATCHLIST ═══════════════════
+function saveWatchlist() { localStorage.setItem('st_watchlist', JSON.stringify(watchlist)); }
+
+function renderWatchlist() {
+  const wrap = document.getElementById('watchlistTags');
+  wrap.innerHTML = watchlist.length ? '' : '<span style="font-size:12px;color:var(--text3);">No symbols yet — click "Load Preset" or search a stock name above.</span>';
+  watchlist.forEach((sym, i) => {
+    const name = NSE_STOCKS[sym] || '';
+    const tag = document.createElement('div');
+    tag.className = 'tag';
+    tag.title = name;
+    tag.innerHTML = `${sym}${name ? ` <span style="font-size:10px;color:var(--text3);font-weight:400;">${name.split(' ').slice(0,2).join(' ')}</span>` : ''} <span class="tag-remove" onclick="removeSymbol(${i})">×</span>`;
+    wrap.appendChild(tag);
+  });
+}
+
+function addSymbolFromInput() {
+  const input = document.getElementById('addSymbol');
+  const sym = input.value.trim().toUpperCase();
+  document.getElementById('suggestBox').style.display = 'none';
+  if (!sym) return;
+  if (watchlist.includes(sym)) { input.value = ''; return; }
+  watchlist.push(sym);
+  saveWatchlist();
+  renderWatchlist();
+  input.value = '';
+}
+
+function removeSymbol(i) {
+  watchlist.splice(i, 1);
+  saveWatchlist();
+  renderWatchlist();
+}
+
+function loadPreset() {
+  getPreset().forEach(s => { if (!watchlist.includes(s)) watchlist.push(s); });
+  saveWatchlist();
+  renderWatchlist();
+}
+
+// ═══════════════════ PRESET MANAGER ═══════════════════
+function openPresetManager() {
+  document.getElementById('presetEditor').value = getPreset().join('\n');
+  document.getElementById('presetModal').style.display = 'flex';
+}
+function closePresetManager() {
+  document.getElementById('presetModal').style.display = 'none';
+}
+function savePreset() {
+  const lines = document.getElementById('presetEditor').value
+    .split('\n').map(s => s.trim().toUpperCase()).filter(Boolean);
+  localStorage.setItem('st_preset', JSON.stringify(lines));
+  closePresetManager();
+  alert(`Preset saved with ${lines.length} stocks.`);
+}
+function resetPreset() {
+  document.getElementById('presetEditor').value = DEFAULT_PRESET.join('\n');
+}
+
+// ═══════════════════ SCREENER — PARALLEL FETCH ═══════════════════
+async function runScreener() {
+  if (!watchlist.length) { alert('Add symbols to your watchlist first.'); return; }
+  const btn = document.getElementById('screenBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loader"></span> Fetching...';
+  document.getElementById('screenerResults').style.display = 'block';
+
+  const total = watchlist.length;
+  let done = 0;
+  document.getElementById('screenerBody').innerHTML =
+    `<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--text3);">
+      ⏳ Fetching <span id="fetchProgress">0</span>/${total} stocks in parallel...
+    </td></tr>`;
+
+  // Fetch all in parallel with concurrency limit of 5
+  const results = [];
+  const BATCH = 5;
+  for (let i = 0; i < watchlist.length; i += BATCH) {
+    const batch = watchlist.slice(i, i + BATCH);
+    const settled = await Promise.allSettled(batch.map(sym => fetchStockData(sym)));
+    settled.forEach(r => { if (r.status === 'fulfilled' && r.value) results.push(r.value); });
+    done += batch.length;
+    const el = document.getElementById('fetchProgress');
+    if (el) el.textContent = Math.min(done, total);
+  }
+
+  results.sort((a,b) => b.score - a.score);
+  renderScreenerResults(results);
+  btn.disabled = false;
+  btn.innerHTML = '▶ Run Screen';
+  document.getElementById('screenerMeta').textContent =
+    `${results.length}/${total} stocks screened · ${new Date().toLocaleTimeString('en-IN')}`;
+}
+
+async function fetchStockData(symbol) {
+  const nseSymbol = symbol + '.NS';
+  // Direct Yahoo Finance — works reliably on https:// (GitHub Pages)
+  // Uses v8 chart API: 6 months of daily OHLCV data
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${nseSymbol}?interval=1d&range=6mo&events=div`;
+
+  let raw;
+  try {
+    const resp = await fetch(url, {
+      signal: AbortSignal.timeout(8000),
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    raw = await resp.json();
+  } catch(e) {
+    // Fallback: try query2 endpoint (Yahoo has two servers)
+    try {
+      const url2 = url.replace('query1', 'query2');
+      const resp2 = await fetch(url2, { signal: AbortSignal.timeout(8000) });
+      if (!resp2.ok) throw new Error('Both Yahoo endpoints failed');
+      raw = await resp2.json();
+    } catch(e2) {
+      throw new Error('Yahoo Finance unavailable: ' + e2.message);
+    }
+  }
+
+  const chart = raw?.chart?.result?.[0];
+  if (!chart) return null;
+
+  const q       = chart.indicators.quote[0];
+  const closes  = (q.close  || []).map(v => (v == null ? null : v)).filter(v => v !== null);
+  const volumes = (q.volume || []).map(v => v || 0);
+  if (closes.length < 55) return null;
+
+  const price     = closes[closes.length - 1];
+  const prevClose = closes[closes.length - 2];
+  const changePct = ((price - prevClose) / prevClose * 100);
+  const ema20     = calcEMA(closes, 20);
+  const ema50     = calcEMA(closes, 50);
+  const rsi       = calcRSI(closes, 14);
+
+  const vols     = volumes.filter(v => v > 0);
+  const avgVol20 = vols.slice(-21, -1).reduce((a, b) => a + b, 0) / 20;
+  const lastVol  = vols[vols.length - 1] || 0;
+  const volSpike = avgVol20 > 0 ? lastVol / avgVol20 : 0;
+
+  const high52        = Math.max(...closes);
+  const pctFrom52High = ((high52 - price) / high52 * 100);
+
+  let score = 0;
+  const signals = {};
+  if (rsi >= 55 && rsi <= 70)  { score += 20; signals.rsi = 'pass'; }
+  else if (rsi > 70)           { signals.rsi = 'overbought'; }
+  else                         { signals.rsi = 'fail'; }
+  if (price > ema20)           { score += 20; signals.ema20 = 'pass'; } else { signals.ema20 = 'fail'; }
+  if (price > ema50)           { score += 20; signals.ema50 = 'pass'; } else { signals.ema50 = 'fail'; }
+  if (volSpike >= 1.5)         { score += 20; signals.vol = 'pass'; }
+  else if (volSpike >= 1.0)    { signals.vol = 'neutral'; }
+  else                         { signals.vol = 'fail'; }
+  if (pctFrom52High <= 15)     { score += 20; signals.high52 = 'pass'; } else { signals.high52 = 'fail'; }
+
+  const fullName = NSE_STOCKS[symbol] || '';
+  return { symbol, fullName, price, changePct, rsi, ema20, volSpike, pctFrom52High, score, signals };
+}
+
+function calcEMA(data, period) {
+  const k = 2 / (period + 1);
+  let ema = data.slice(0, period).reduce((a,b) => a+b, 0) / period;
+  for (let i = period; i < data.length; i++) {
+    ema = data[i] * k + ema * (1 - k);
+  }
+  return ema;
+}
+
+function calcRSI(data, period = 14) {
+  let gains = 0, losses = 0;
+  for (let i = data.length - period; i < data.length; i++) {
+    const diff = data[i] - data[i-1];
+    if (diff > 0) gains += diff;
+    else losses -= diff;
+  }
+  if (losses === 0) return 100;
+  const rs = (gains / period) / (losses / period);
+  return 100 - (100 / (1 + rs));
+}
+
+function renderScreenerResults(results) {
+  const tbody = document.getElementById('screenerBody');
+  if (!results.length) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--text3);">No data could be fetched. Check your internet connection.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = results.map(r => {
+    const scoreColor = r.score >= 70 ? 'var(--green)' : r.score >= 50 ? 'var(--orange)' : 'var(--red)';
+    const changeColor = r.changePct >= 0 ? 'var(--green)' : 'var(--red)';
+
+    const sigHTML = [
+      `<span class="sig sig-${r.signals.rsi === 'pass' ? 'pass' : r.signals.rsi === 'overbought' ? 'neutral' : 'fail'}">RSI</span>`,
+      `<span class="sig sig-${r.signals.ema20}">20E</span>`,
+      `<span class="sig sig-${r.signals.ema50}">50E</span>`,
+      `<span class="sig sig-${r.signals.vol}">VOL</span>`,
+      `<span class="sig sig-${r.signals.high52}">52W</span>`
+    ].join('');
+
+    const barColor = r.score >= 70 ? '#1e7a4e' : r.score >= 50 ? '#d4780a' : '#c0392b';
+
+    return `<tr>
+      <td><strong class="mono">${r.symbol}</strong>${r.fullName ? `<br/><span style="font-size:10px;color:var(--text3);font-weight:400;">${r.fullName}</span>` : ''}</td>
+      <td class="mono">₹${r.price.toFixed(2)}</td>
+      <td class="mono" style="color:${changeColor}">${r.changePct >= 0 ? '+' : ''}${r.changePct.toFixed(2)}%</td>
+      <td class="mono">${r.rsi.toFixed(1)}</td>
+      <td class="mono">${r.volSpike.toFixed(2)}×</td>
+      <td class="mono" style="color:${r.signals.ema20==='pass'?'var(--green)':'var(--red)'}">${r.signals.ema20==='pass'?'✓ Above':'✗ Below'}</td>
+      <td class="mono">${r.pctFrom52High.toFixed(1)}% below</td>
+      <td><div class="signal-row">${sigHTML}</div></td>
+      <td>
+        <div class="score-bar-wrap">
+          <div class="score-bar"><div class="score-bar-fill" style="width:${r.score}%;background:${barColor};"></div></div>
+          <div class="score-num" style="color:${scoreColor};">${r.score}</div>
+        </div>
+      </td>
+      <td>
+        <button class="btn btn-sm btn-secondary" onclick="prefillRisk('${r.symbol}',${r.price.toFixed(2)})">⚖️ Calc</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function prefillRisk(sym, price) {
+  document.getElementById('r_symbol').value = sym;
+  document.getElementById('r_entry').value = price;
+  document.getElementById('r_sl').value = (price * 0.95).toFixed(2);
+  document.getElementById('r_target').value = (price * 1.10).toFixed(2);
+  calcRisk();
+  const tabs = document.querySelectorAll('.tab-btn');
+  switchTab('risk', tabs[1]);
+}
+
+// ═══════════════════ RISK CALCULATOR ═══════════════════
+function calcRisk() {
+  const capital = +document.getElementById('r_capital').value || 0;
+  const riskPct = +document.getElementById('r_riskPct').value || 2;
+  const entry = +document.getElementById('r_entry').value || 0;
+  const sl = +document.getElementById('r_sl').value || 0;
+  const target = +document.getElementById('r_target').value || 0;
+
+  if (!entry || !sl || entry <= sl) {
+    document.getElementById('r_qty').textContent = '—';
+    return;
+  }
+
+  const maxLoss = capital * riskPct / 100;
+  const riskPerShare = entry - sl;
+  const qty = Math.floor(maxLoss / riskPerShare);
+  const deployed = qty * entry;
+  const actualLoss = qty * riskPerShare;
+
+  document.getElementById('r_qty').textContent = qty || '—';
+  document.getElementById('r_deployed').textContent = qty ? '₹' + deployed.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '—';
+  document.getElementById('r_maxloss').textContent = qty ? '₹' + actualLoss.toFixed(0) : '—';
+
+  let rr = '—', profitAmt = '—', verdictHTML = '';
+  if (target && qty) {
+    const profit = qty * (target - entry);
+    const rrRatio = profit / actualLoss;
+    rr = '1 : ' + rrRatio.toFixed(2);
+    profitAmt = '₹' + profit.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+    if (rrRatio >= 2) {
+      verdictHTML = `<span style="color:var(--green);">✅ Good trade setup. R:R ≥ 1:2 — meets minimum standard.</span>`;
+    } else if (rrRatio >= 1.5) {
+      verdictHTML = `<span style="color:var(--orange);">⚠️ Acceptable setup. Try widening target or tightening SL for better R:R.</span>`;
+    } else {
+      verdictHTML = `<span style="color:var(--red);">❌ Poor R:R. Don't take this trade. Move your target or skip it.</span>`;
+    }
+  }
+
+  document.getElementById('r_profit').textContent = profitAmt;
+  document.getElementById('r_rr').textContent = rr;
+  document.getElementById('r_verdict').innerHTML = verdictHTML || '<span style="color:var(--text3);">Enter a target price to see trade verdict.</span>';
+
+  // Allocation
+  if (qty && deployed) {
+    const pctUsed = (deployed / capital * 100).toFixed(1);
+    document.getElementById('r_allocation').innerHTML = `
+      You'd deploy <strong>₹${deployed.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} (${pctUsed}%)</strong> of your capital on this trade.<br/>
+      Remaining capital: <strong>₹${(capital - deployed).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</strong> — keep 50%+ in reserve.<br/>
+      Max concurrent trades at this size: <strong>${Math.floor(capital / deployed)}</strong>
+    `;
+  }
+}
+
+function sendToJournal() {
+  const sym = document.getElementById('r_symbol').value.trim().toUpperCase();
+  const entry = document.getElementById('r_entry').value;
+  const sl = document.getElementById('r_sl').value;
+  const target = document.getElementById('r_target').value;
+  const capital = +document.getElementById('r_capital').value || 25000;
+  const riskPct = +document.getElementById('r_riskPct').value || 2;
+
+  if (!sym || !entry || !sl) { alert('Fill in Symbol, Entry and SL first.'); return; }
+
+  const riskPerShare = entry - sl;
+  const maxLoss = capital * riskPct / 100;
+  const qty = Math.floor(maxLoss / riskPerShare);
+
+  document.getElementById('j_sym').value = sym;
+  document.getElementById('j_entry').value = entry;
+  document.getElementById('j_sl').value = sl;
+  document.getElementById('j_tgt').value = target;
+  document.getElementById('j_qty').value = qty;
+  document.getElementById('j_date').value = new Date().toISOString().split('T')[0];
+
+  const tabs = document.querySelectorAll('.tab-btn');
+  switchTab('journal', tabs[2]);
+  renderJournal();
+}
+
+// ═══════════════════ JOURNAL ═══════════════════
+function saveTrades() { localStorage.setItem('st_trades', JSON.stringify(trades)); }
+
+function addTrade() {
+  const sym = document.getElementById('j_sym').value.trim().toUpperCase();
+  const entry = parseFloat(document.getElementById('j_entry').value);
+  const sl = parseFloat(document.getElementById('j_sl').value);
+  const tgt = parseFloat(document.getElementById('j_tgt').value);
+  const qty = parseInt(document.getElementById('j_qty').value);
+  const date = document.getElementById('j_date').value;
+  const exit = parseFloat(document.getElementById('j_exit').value);
+  const exitDate = document.getElementById('j_exitdate').value;
+  const notes = document.getElementById('j_notes').value.trim();
+
+  if (!sym || !entry || !sl || !qty || !date) { alert('Fill in Symbol, Entry, SL, Qty and Date.'); return; }
+
+  const trade = {
+    id: Date.now(),
+    sym, entry, sl, tgt: tgt || null, qty, date,
+    exit: exit || null, exitDate: exitDate || null, notes
+  };
+
+  trades.unshift(trade);
+  saveTrades();
+  renderJournal();
+
+  // Clear form
+  ['j_sym','j_entry','j_sl','j_tgt','j_qty','j_date','j_exit','j_exitdate','j_notes'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+}
+
+function deleteTrade(id) {
+  if (!confirm('Delete this trade?')) return;
+  trades = trades.filter(t => t.id !== id);
+  saveTrades();
+  renderJournal();
+}
+
+function updateExit(id) {
+  const exit = parseFloat(prompt('Enter exit price:'));
+  if (!exit) return;
+  const exitDate = prompt('Exit date (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
+  const t = trades.find(t => t.id === id);
+  if (t) { t.exit = exit; t.exitDate = exitDate; saveTrades(); renderJournal(); }
+}
+
+function renderJournal() {
+  const filter = document.getElementById('j_filter').value;
+  let filtered = trades;
+
+  if (filter === 'open') filtered = trades.filter(t => !t.exit);
+  else if (filter === 'closed') filtered = trades.filter(t => t.exit);
+  else if (filter === 'win') filtered = trades.filter(t => t.exit && t.exit > t.entry);
+  else if (filter === 'loss') filtered = trades.filter(t => t.exit && t.exit < t.entry);
+
+  // Stats
+  const closed = trades.filter(t => t.exit);
+  const wins = closed.filter(t => t.exit > t.entry);
+  const totalPnL = closed.reduce((sum, t) => sum + (t.exit - t.entry) * t.qty, 0);
+  const open = trades.filter(t => !t.exit);
+
+  document.getElementById('j_total').textContent = trades.length;
+  document.getElementById('j_winrate').textContent = closed.length ? Math.round(wins.length/closed.length*100)+'%' : '0%';
+  document.getElementById('j_pnl').textContent = '₹' + totalPnL.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  document.getElementById('j_pnl').style.color = totalPnL >= 0 ? 'var(--green)' : 'var(--red)';
+  document.getElementById('j_open').textContent = open.length;
+
+  const tbody = document.getElementById('journalBody');
+  const empty = document.getElementById('journalEmpty');
+
+  if (!filtered.length) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  tbody.innerHTML = filtered.map(t => {
+    const pnl = t.exit ? (t.exit - t.entry) * t.qty : null;
+    const pnlStr = pnl !== null ? (pnl >= 0 ? '+₹' : '-₹') + Math.abs(pnl).toFixed(0) : '—';
+    const pnlColor = pnl === null ? '' : pnl >= 0 ? 'color:var(--green);' : 'color:var(--red);';
+    const rr = t.tgt && t.sl ? ((t.tgt - t.entry) / (t.entry - t.sl)).toFixed(2) : '—';
+    let status, statusClass;
+    if (!t.exit) { status = '⏳ Open'; statusClass = 'status-open'; }
+    else if (t.exit > t.entry) { status = '✅ Win'; statusClass = 'status-win'; }
+    else { status = '❌ Loss'; statusClass = 'status-loss'; }
+
+    return `<tr>
+      <td><strong class="mono">${t.sym}</strong></td>
+      <td class="mono">${t.date}</td>
+      <td class="mono">₹${t.entry.toFixed(2)}</td>
+      <td class="mono">₹${t.sl.toFixed(2)}</td>
+      <td class="mono">${t.tgt ? '₹'+t.tgt.toFixed(2) : '—'}</td>
+      <td class="mono">${t.qty}</td>
+      <td class="mono">${t.exit ? '₹'+t.exit.toFixed(2) : '—'}</td>
+      <td class="mono" style="${pnlColor}font-weight:600;">${pnlStr}</td>
+      <td class="mono">${rr !== '—' ? '1:'+rr : '—'}</td>
+      <td><span class="${statusClass}">${status}</span></td>
+      <td style="max-width:140px;font-size:12px;color:var(--text2);">${t.notes || '—'}</td>
+      <td>
+        <div style="display:flex;gap:4px;">
+          ${!t.exit ? `<button class="btn btn-sm btn-green" onclick="updateExit(${t.id})">Exit</button>` : ''}
+          <button class="btn btn-sm btn-danger" onclick="deleteTrade(${t.id})">Del</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function exportJournal() {
+  if (!trades.length) { alert('No trades to export.'); return; }
+  const headers = ['Symbol','Entry Date','Entry','SL','Target','Qty','Exit','Exit Date','P&L','Notes'];
+  const rows = trades.map(t => [
+    t.sym, t.date, t.entry, t.sl, t.tgt||'', t.qty,
+    t.exit||'', t.exitDate||'',
+    t.exit ? ((t.exit-t.entry)*t.qty).toFixed(2) : '',
+    '"'+(t.notes||'').replace(/"/g,'')+'"'
+  ]);
+  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'SwingTrader_Journal_' + new Date().toISOString().split('T')[0] + '.csv';
+  a.click();
+}
+
+// ═══════════════════ INIT ═══════════════════
+renderWatchlist();
+renderJournal();
+calcRisk();
+document.getElementById('j_date').value = new Date().toISOString().split('T')[0];
+
+// Close preset modal on backdrop click
+document.getElementById('presetModal').addEventListener('click', function(e) {
+  if (e.target === this) closePresetManager();
+});
+</script>
+</body>
+</html>
