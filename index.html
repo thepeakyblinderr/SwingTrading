@@ -619,7 +619,14 @@
     <div class="stat-box"><div class="stat-value" id="j_open">0</div><div class="stat-label">Open Trades</div></div>
   </div>
 
-  <!-- Add Trade Form -->
+  <!-- Trade Monitor -->
+  <div id="tradeMonitorWrap" style="display:none;margin-bottom:16px;">
+    <div class="section-head">
+      <div class="section-title">📡 Trade Monitor</div>
+      <div style="font-size:12px;color:var(--text3);">Enter current price to get live action</div>
+    </div>
+    <div id="tradeMonitor"></div>
+  </div>
   <div class="card">
     <div class="card-title">➕ Log New Trade</div>
     <div class="trade-form">
@@ -1932,6 +1939,158 @@ function sendToJournal() {
   renderJournal();
 }
 
+// ═══════════════════ TRADE MONITOR ═══════════════════
+function renderTradeMonitor() {
+  const open = trades.filter(t => !t.exit);
+  const wrap = document.getElementById('tradeMonitorWrap');
+  const container = document.getElementById('tradeMonitor');
+  if (!open.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+
+  container.innerHTML = open.map(t => {
+    const entryDate  = new Date(t.date);
+    const today      = new Date();
+    const msPerDay   = 86400000;
+    // Count trading days (Mon–Fri only)
+    let tradingDays  = 0;
+    let d = new Date(entryDate);
+    while (d <= today) {
+      const dow = d.getDay();
+      if (dow !== 0 && dow !== 6) tradingDays++;
+      d = new Date(d.getTime() + msPerDay);
+    }
+    tradingDays = Math.max(0, tradingDays - 1);
+
+    const profitZone = t.tgt ? (t.tgt - t.entry) : null;
+    const riskZone   = t.entry - t.sl;
+
+    // SL ladder targets
+    const sl50pct  = t.entry;                                          // breakeven
+    const sl75pct  = t.tgt ? (t.entry + (profitZone * 0.5)) : null;  // lock 50% profit
+    const price50  = t.tgt ? (t.entry + profitZone * 0.5)  : null;   // price at 50%
+    const price75  = t.tgt ? (t.entry + profitZone * 0.75) : null;   // price at 75%
+    const price95  = t.tgt ? (t.entry + profitZone * 0.95) : null;   // near target
+
+    // Day zone
+    const dayColor  = tradingDays <= 5 ? 'var(--green)' : tradingDays <= 10 ? 'var(--accent2)' : tradingDays <= 15 ? 'var(--orange)' : 'var(--red)';
+    const dayLabel  = tradingDays <= 5 ? 'Patient zone' : tradingDays <= 10 ? 'Watch zone' : tradingDays <= 15 ? 'Action zone' : '⚠️ TIME STOP';
+    const dayBg     = tradingDays <= 5 ? 'var(--green-bg)' : tradingDays <= 10 ? '#e8f0fd' : tradingDays <= 15 ? 'var(--orange-bg)' : 'var(--red-bg)';
+
+    const monitorId = 'mon_' + t.id;
+
+    return '<div class="card" style="margin-bottom:12px;">'
+      + '<div style="padding:12px 16px;border-bottom:1px solid var(--border);">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">'
+      + '<div style="display:flex;align-items:center;gap:10px;">'
+      + '<strong class="mono" style="font-size:15px;">' + t.sym + '</strong>'
+      + '<span style="font-size:11px;padding:2px 8px;border-radius:20px;background:' + dayBg + ';color:' + dayColor + ';font-weight:600;">Day ' + tradingDays + ' · ' + dayLabel + '</span>'
+      + '</div>'
+      + '<div style="display:flex;align-items:center;gap:8px;">'
+      + '<label style="font-size:12px;color:var(--text2);font-weight:500;text-transform:none;letter-spacing:0;">Current price ₹</label>'
+      + '<input type="number" id="' + monitorId + '" placeholder="e.g. ' + (t.tgt ? Math.round((t.entry + t.tgt)/2) : t.entry + 10) + '" '
+      + 'style="width:100px;" oninput="updateMonitor(' + t.id + ',' + t.entry + ',' + t.sl + ',' + (t.tgt||'null') + ',' + tradingDays + ',this.value)"/>'
+      + '</div>'
+      + '</div>'
+      + '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--text2);">'
+      + '<span>Entry <strong class="mono">₹' + t.entry.toFixed(2) + '</strong></span>'
+      + '<span>SL <strong class="mono" style="color:var(--red);">₹' + t.sl.toFixed(2) + '</strong></span>'
+      + (t.tgt ? '<span>Target <strong class="mono" style="color:var(--green);">₹' + t.tgt.toFixed(2) + '</strong></span>' : '')
+      + '<span>Qty <strong class="mono">' + t.qty + '</strong></span>'
+      + '</div>'
+      + '</div>'
+
+      // SL ladder — always visible
+      + '<div style="padding:12px 16px;border-bottom:1px solid var(--border);">'
+      + '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:8px;">SL Ladder</div>'
+      + '<div style="display:grid;gap:5px;">'
+      + ladderRow('0%',   'Entry — current SL',                    '₹' + t.sl.toFixed(2),         'At risk ₹' + Math.round(riskZone * t.qty),            'var(--surface2)', 'var(--text2)')
+      + (price50 ? ladderRow('50%',  'Price reaches ₹' + price50.toFixed(0) + ' → move SL to entry', '₹' + sl50pct.toFixed(2) + ' (breakeven)', 'Risk = ₹0',                         'var(--green-bg)', 'var(--green)') : '')
+      + (price75 && sl75pct ? ladderRow('75%',  'Price reaches ₹' + price75.toFixed(0) + ' → move SL here',   '₹' + sl75pct.toFixed(2),              'Locks ₹' + Math.round((sl75pct - t.entry) * t.qty) + ' profit', 'var(--green-bg)', 'var(--green)') : '')
+      + (price95 ? ladderRow('95%',  'Price reaches ₹' + price95.toFixed(0) + ' → cancel SL, place sell',     '₹' + (t.tgt||0).toFixed(2),           'Full profit ₹' + (t.tgt ? Math.round(profitZone * t.qty) : '—'), 'var(--green-bg)', 'var(--green)') : '')
+      + '</div>'
+      + '</div>'
+
+      // Live action panel
+      + '<div id="action_' + t.id + '" style="padding:12px 16px;">'
+      + '<div style="font-size:12px;color:var(--text3);">↑ Enter current price above to see your action</div>'
+      + '</div>'
+
+      + '</div>';
+  }).join('');
+}
+
+function ladderRow(pct, trigger, newSL, outcome, bg, color) {
+  return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:' + bg + ';border-radius:6px;">'
+    + '<span style="font-family:\'DM Mono\',monospace;font-size:11px;font-weight:600;min-width:30px;color:' + color + ';">' + pct + '</span>'
+    + '<div style="flex:1;font-size:11px;color:var(--text2);">' + trigger + '</div>'
+    + '<div style="text-align:right;font-size:11px;">'
+    + '<div style="font-family:\'DM Mono\',monospace;font-weight:600;color:' + color + ';">' + newSL + '</div>'
+    + '<div style="color:var(--text3);">' + outcome + '</div>'
+    + '</div>'
+    + '</div>';
+}
+
+function updateMonitor(id, entry, sl, tgt, days, curPriceStr) {
+  const cur = parseFloat(curPriceStr);
+  const panel = document.getElementById('action_' + id);
+  if (!panel || isNaN(cur) || cur <= 0) return;
+
+  const riskZone   = entry - sl;
+  const profitZone = tgt ? tgt - entry : null;
+  const t = trades.find(t => t.id === id);
+  const qty = t ? t.qty : 0;
+
+  // Progress %
+  const progress = profitZone ? Math.max(0, ((cur - entry) / profitZone) * 100) : null;
+  const pnlNow   = (cur - entry) * qty;
+  const pnlPct   = ((cur - entry) / entry * 100);
+
+  let action = '', actionBg = '', actionColor = '', actionBorder = '';
+
+  if (cur <= sl) {
+    action = '🔴 SL TRIGGERED — Exit immediately in Groww. Go to Orders, if SL sell already executed you\'re done. If not, sell at market now.';
+    actionBg = 'var(--red-bg)'; actionColor = 'var(--red)'; actionBorder = 'var(--red)';
+  } else if (tgt && cur >= tgt * 0.98) {
+    action = '🎯 Near target — Cancel your SL order in Groww → place Limit Sell at ₹' + tgt.toFixed(2) + ' for ' + qty + ' shares. Take the planned profit.';
+    actionBg = 'var(--green-bg)'; actionColor = 'var(--green)'; actionBorder = 'var(--green)';
+  } else if (progress !== null && progress >= 75) {
+    const newSL = (entry + profitZone * 0.5).toFixed(2);
+    action = '✅ At 75% of target — Move SL to ₹' + newSL + ' in Groww (locks ₹' + Math.round((newSL - entry) * qty) + ' profit). Update SL order: trigger = ₹' + newSL + ', limit = ₹' + (parseFloat(newSL) - 2).toFixed(2) + '.';
+    actionBg = 'var(--green-bg)'; actionColor = 'var(--green)'; actionBorder = 'var(--green)';
+  } else if (progress !== null && progress >= 50) {
+    action = '✅ At 50% of target — Move SL to entry price ₹' + entry.toFixed(2) + ' in Groww. Cancel current SL, place new SL with trigger = ₹' + entry.toFixed(2) + ', limit = ₹' + (entry - 2).toFixed(2) + '. You are now RISK-FREE.';
+    actionBg = 'var(--green-bg)'; actionColor = 'var(--green)'; actionBorder = 'var(--green)';
+  } else if (days > 15) {
+    action = '⏰ TIME STOP — Day ' + days + '. This setup has run its course. Exit Monday morning at market price. Sell ' + qty + ' shares of ' + (t ? t.sym : '') + ' at market open.';
+    actionBg = 'var(--red-bg)'; actionColor = 'var(--red)'; actionBorder = 'var(--red)';
+  } else if (days >= 11) {
+    if (progress !== null && progress > 20) {
+      action = '⚠️ Day ' + days + ' with partial progress (' + progress.toFixed(0) + '%). Consider selling 50% now (₹' + Math.round(pnlNow/2) + ' locked). Let rest run with SL at breakeven (₹' + entry.toFixed(2) + ').';
+    } else {
+      action = '⚠️ Day ' + days + ' — Action zone. Stock not progressing. Prepare to exit if no movement by day 15. Check: is RSI above 50? Is price above 20 EMA on TradingView?';
+    }
+    actionBg = 'var(--orange-bg)'; actionColor = 'var(--orange)'; actionBorder = 'var(--orange)';
+  } else if (cur < entry) {
+    const slPct = ((entry - cur) / riskZone * 100).toFixed(0);
+    action = '📉 Stock below entry by ₹' + (entry - cur).toFixed(2) + ' (' + slPct + '% toward SL). Hold — SL at ₹' + sl.toFixed(2) + ' is protecting you. Do NOT exit early — let SL do its job.';
+    actionBg = 'var(--surface2)'; actionColor = 'var(--text2)'; actionBorder = 'var(--border)';
+  } else {
+    const daysLeft = Math.max(0, 15 - days);
+    action = '⏳ Day ' + days + ' — Progressing (' + (progress !== null ? progress.toFixed(0) + '% toward target' : '₹' + (cur - entry).toFixed(2) + ' above entry') + '). Hold patiently. ' + daysLeft + ' trading days left before time stop.';
+    actionBg = 'var(--surface2)'; actionColor = 'var(--text2)'; actionBorder = 'var(--border)';
+  }
+
+  const pnlColor = pnlNow >= 0 ? 'var(--green)' : 'var(--red)';
+  const pnlSign  = pnlNow >= 0 ? '+' : '';
+
+  panel.innerHTML = ''
+    + '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;">'
+    + '<span>Unrealised P&L: <strong style="color:' + pnlColor + ';font-family:\'DM Mono\',monospace;">' + pnlSign + '₹' + Math.round(pnlNow) + ' (' + pnlSign + pnlPct.toFixed(1) + '%)</strong></span>'
+    + (progress !== null ? '<span>Progress: <strong style="font-family:\'DM Mono\',monospace;">' + progress.toFixed(0) + '% of target</strong></span>' : '')
+    + '</div>'
+    + '<div style="padding:10px 12px;background:' + actionBg + ';border-left:3px solid ' + actionBorder + ';border-radius:8px;font-size:12px;color:' + actionColor + ';line-height:1.6;">' + action + '</div>';
+}
+
 // ═══════════════════ JOURNAL ═══════════════════
 function saveTrades() { localStorage.setItem('st_trades', JSON.stringify(trades)); }
 
@@ -1980,6 +2139,7 @@ function updateExit(id) {
 }
 
 function renderJournal() {
+  renderTradeMonitor();
   const filter = document.getElementById('j_filter').value;
   let filtered = trades;
 
