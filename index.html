@@ -682,89 +682,411 @@
 
 <!-- ═══════════════════════════════════════════════ GUIDE ═══════════════════════════════════════════════ -->
 <div id="tab-guide" class="tab-panel">
-  <div class="grid-2">
-    <div>
-      <div class="card">
-        <div class="card-title">📖 Momentum Swing Trading — Beginner's Playbook</div>
-        <div>
-          <div class="guide-step">
-            <div class="step-num">1</div>
-            <div>
-              <div class="step-title">Find the Trend</div>
-              <div class="step-desc">Price must be above its 20 EMA and 50 EMA on the daily chart. Never buy a falling stock — trade with the trend, not against it.</div>
+
+  <!-- Guide sub-tabs -->
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;" id="guideTabs">
+    <button class="btn btn-primary btn-sm" onclick="showGuide('g_playbook',this)">📖 Playbook</button>
+    <button class="btn btn-secondary btn-sm" onclick="showGuide('g_entry',this)">🎯 Entry Rules</button>
+    <button class="btn btn-secondary btn-sm" onclick="showGuide('g_exit',this)">🚪 Exit Rules</button>
+    <button class="btn btn-secondary btn-sm" onclick="showGuide('g_weekly',this)">📅 Weekly Review</button>
+    <button class="btn btn-secondary btn-sm" onclick="showGuide('g_groww',this)">📱 Groww Guide</button>
+    <button class="btn btn-secondary btn-sm" onclick="showGuide('g_sim',this)">🎬 Simulation</button>
+  </div>
+
+  <!-- ── PLAYBOOK ── -->
+  <div id="g_playbook" class="g-panel">
+    <div class="grid-2">
+      <div>
+        <div class="card">
+          <div class="card-title">📖 Momentum Swing Trading — Beginner Playbook</div>
+          <div>
+            <div class="guide-step">
+              <div class="step-num">1</div>
+              <div><div class="step-title">Find the Trend</div>
+              <div class="step-desc">Price must be above 20 EMA and 50 EMA on daily chart. Never buy a falling stock — trade with the trend.</div></div>
             </div>
-          </div>
-          <div class="guide-step">
-            <div class="step-num">2</div>
-            <div>
-              <div class="step-title">Check RSI Momentum</div>
-              <div class="step-desc">RSI (14) between 55–70 is the sweet spot. Above 70 = overbought (risk of reversal). Below 50 = weak momentum. Avoid both extremes.</div>
+            <div class="guide-step">
+              <div class="step-num">2</div>
+              <div><div class="step-title">Check RSI Momentum</div>
+              <div class="step-desc">RSI (14) between 55–70 is the sweet spot. Above 70 = overbought. Below 50 = weak. Avoid both extremes.</div></div>
             </div>
-          </div>
-          <div class="guide-step">
-            <div class="step-num">3</div>
-            <div>
-              <div class="step-title">Confirm with Volume</div>
-              <div class="step-desc">Volume should be 1.5x+ the 20-day average on the breakout day. High volume = smart money participation. Low volume breakouts often fail.</div>
+            <div class="guide-step">
+              <div class="step-num">3</div>
+              <div><div class="step-title">Confirm with Volume</div>
+              <div class="step-desc">Volume should be 1.5x+ the 20-day average on breakout day. Low volume breakouts fail.</div></div>
             </div>
-          </div>
-          <div class="guide-step">
-            <div class="step-num">4</div>
-            <div>
-              <div class="step-title">Set Entry, SL & Target</div>
-              <div class="step-desc">Buy on breakout or next day open. SL below recent swing low (3–5 days). Target = 2× to 3× the SL distance (minimum 1:2 R:R). Use the Risk Calculator.</div>
+            <div class="guide-step">
+              <div class="step-num">4</div>
+              <div><div class="step-title">Set Entry, SL &amp; Target</div>
+              <div class="step-desc">Buy on breakout. SL below recent swing low. Target = 2x–3x the SL distance. Minimum 1:2 R:R.</div></div>
             </div>
-          </div>
-          <div class="guide-step">
-            <div class="step-num">5</div>
-            <div>
-              <div class="step-title">Trail & Exit Discipline</div>
-              <div class="step-desc">Once up 50% of target, trail SL to breakeven. Exit at target OR if RSI crosses below 50 OR price closes below 20 EMA. <strong>Never hold losers hoping for recovery.</strong></div>
+            <div class="guide-step">
+              <div class="step-num">5</div>
+              <div><div class="step-title">Trail &amp; Exit</div>
+              <div class="step-desc">At 50% of target → move SL to breakeven. Exit at target OR RSI below 50 OR close below 20 EMA.</div></div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
-
-    <div>
-      <div class="card">
-        <div class="card-title">⚠️ Rules for <span id="g_capital">₹25K</span> Capital</div>
-        <div style="display:grid;gap:10px;font-size:13px;color:var(--text2);">
-          <div class="info-box">📌 Risk max <strong id="g_riskAmt">₹500</strong> per trade (2% of capital). This lets you survive 10+ losing trades in a row.</div>
-          <div style="padding:10px;background:var(--green-bg);border-radius:8px;color:var(--green);border:1px solid #b8e0cc;">
-            ✅ Max 2 open trades at once. Don't over-diversify with <span id="g_capital2">₹25K</span> — focus!
-          </div>
-          <div style="padding:10px;background:var(--red-bg);border-radius:8px;color:var(--red);border:1px solid #f5c6c2;">
-            ❌ Avoid stocks above <strong id="g_maxPrice">₹2,000</strong>/share — you can't get adequate quantity.
-          </div>
-          <div style="padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
-            🎯 <strong>Best price range:</strong> <span id="g_priceRange">₹50–₹800</span>/share for meaningful quantity with <span id="g_capital3">₹25K</span>.
-          </div>
-          <div style="padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
-            ⏱️ <strong>Hold period:</strong> 5–15 trading days. Review every Friday.
-          </div>
-          <div style="padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
-            📅 <strong>Market timings:</strong> NSE 9:15 AM – 3:30 PM IST. Best entry: 9:30–10:30 AM or 2:00–3:00 PM.
+        <div class="card">
+          <div class="card-title">📊 Understanding the Score</div>
+          <div style="display:grid;gap:8px;font-size:13px;color:var(--text2);">
+            <div><span class="badge badge-green">RSI 55–70</span> &nbsp;Momentum without being overbought (+20 pts)</div>
+            <div><span class="badge badge-blue">Above 20 EMA</span> &nbsp;Short-term trend is up (+20 pts)</div>
+            <div><span class="badge badge-blue">Above 50 EMA</span> &nbsp;Medium-term trend is up (+20 pts)</div>
+            <div><span class="badge badge-orange">Vol Spike 1.5x+</span> &nbsp;Breakout with volume confirmation (+20 pts)</div>
+            <div><span class="badge badge-gold">Near 52W High</span> &nbsp;Price in breakout zone within 15% of high (+20 pts)</div>
+            <div style="margin-top:4px;padding:8px;background:var(--surface2);border-radius:6px;"><strong>Score 70+</strong> = Check on TradingView before entering.</div>
           </div>
         </div>
       </div>
-
-      <div class="card">
-        <div class="card-title">📊 Understanding the Score</div>
-        <div style="display:grid;gap:8px;font-size:13px;color:var(--text2);">
-          <div><span class="badge badge-green">RSI 55-70</span> &nbsp;Momentum without being overbought (+20 pts)</div>
-          <div><span class="badge badge-blue">Above 20 EMA</span> &nbsp;Short-term trend is up (+20 pts)</div>
-          <div><span class="badge badge-blue">Above 50 EMA</span> &nbsp;Medium-term trend is up (+20 pts)</div>
-          <div><span class="badge badge-orange">Vol Spike 1.5x+</span> &nbsp;Breakout with volume confirmation (+20 pts)</div>
-          <div><span class="badge badge-gold">Near 52W High</span> &nbsp;Price in breakout zone within 15% of high (+20 pts)</div>
-          <div style="margin-top:4px;padding:8px;background:var(--surface2);border-radius:6px;">
-            <strong>Score ≥ 70</strong> = Take a closer look on TradingView before entering.
+      <div>
+        <div class="card">
+          <div class="card-title">⚠️ Rules for <span id="g_capital">₹25K</span> Capital</div>
+          <div style="display:grid;gap:10px;font-size:13px;color:var(--text2);">
+            <div class="info-box">📌 Risk max <strong id="g_riskAmt">₹500</strong> per trade (2% of capital). Survive 10+ losing trades in a row.</div>
+            <div style="padding:10px;background:var(--green-bg);border-radius:8px;color:var(--green);border:1px solid #b8e0cc;">✅ Max 2 open trades at once. Focus beats diversification at <span id="g_capital2">₹25K</span>.</div>
+            <div style="padding:10px;background:var(--red-bg);border-radius:8px;color:var(--red);border:1px solid #f5c6c2;">❌ Avoid stocks above <strong id="g_maxPrice">₹2,000</strong>/share — can't get adequate quantity.</div>
+            <div style="padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">🎯 <strong>Best price range:</strong> <span id="g_priceRange">₹50–₹800</span>/share for <span id="g_capital3">₹25K</span>.</div>
+            <div style="padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">⏱️ <strong>Hold:</strong> 5–15 trading days. Review every Friday &amp; Sunday.</div>
+            <div style="padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">📅 <strong>Market:</strong> NSE 9:15 AM–3:30 PM IST. Best entry: 9:30–10:30 AM or 2–3 PM.</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">🔄 Full Trade Workflow</div>
+          <div style="font-size:13px;color:var(--text2);display:grid;gap:6px;">
+            <div style="display:flex;align-items:center;gap:8px;"><span style="width:22px;height:22px;background:var(--accent);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">1</span> Discover → find hot sector this week</div>
+            <div style="display:flex;align-items:center;gap:8px;"><span style="width:22px;height:22px;background:var(--accent);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">2</span> Screener → score 70+ stocks</div>
+            <div style="display:flex;align-items:center;gap:8px;"><span style="width:22px;height:22px;background:var(--accent);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">3</span> TradingView → confirm chart looks clean</div>
+            <div style="display:flex;align-items:center;gap:8px;"><span style="width:22px;height:22px;background:var(--accent);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">4</span> Risk Calc → check R:R ≥ 1:2</div>
+            <div style="display:flex;align-items:center;gap:8px;"><span style="width:22px;height:22px;background:var(--accent);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">5</span> Groww → Buy (CNC) + SL order immediately</div>
+            <div style="display:flex;align-items:center;gap:8px;"><span style="width:22px;height:22px;background:var(--accent);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">6</span> Journal → log trade + write reason</div>
+            <div style="display:flex;align-items:center;gap:8px;"><span style="width:22px;height:22px;background:var(--accent);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">7</span> Sunday review → trail SL or plan exit</div>
           </div>
         </div>
       </div>
     </div>
   </div>
+
+  <!-- ── ENTRY RULES ── -->
+  <div id="g_entry" class="g-panel" style="display:none;">
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">🎯 Entry Triggers — Wait for ONE of these</div>
+        <div style="display:grid;gap:10px;font-size:13px;color:var(--text2);">
+          <div style="padding:10px;background:var(--green-bg);border-radius:8px;border:1px solid #b8e0cc;color:var(--green);">
+            <strong>Breakout</strong><br/>Price closes above a recent resistance level (3–5 day high) with volume 1.5x+. Buy next morning open.
+          </div>
+          <div style="padding:10px;background:var(--green-bg);border-radius:8px;border:1px solid #b8e0cc;color:var(--green);">
+            <strong>EMA Pullback</strong><br/>Stock dips to 20 EMA on low volume then bounces with a green candle. Buy on the bounce candle.
+          </div>
+          <div style="padding:10px;background:var(--green-bg);border-radius:8px;border:1px solid #b8e0cc;color:var(--green);">
+            <strong>Gap Up</strong><br/>Stock opens 2%+ above previous close with high volume. Buy after 15 minutes if price holds.
+          </div>
+          <div style="padding:10px;background:var(--red-bg);border-radius:8px;border:1px solid #f5c6c2;color:var(--red);">
+            <strong>Never buy</strong> just because score is 70+. Wait for an actual trigger candle on the chart.
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">📍 Stop-Loss Placement Guide</div>
+        <div style="display:grid;gap:10px;font-size:13px;color:var(--text2);">
+          <div style="padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
+            🕯️ <strong>Candle SL (best):</strong> Below the low of the last 3–5 days. Respects market structure.
+          </div>
+          <div style="padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
+            📉 <strong>EMA SL:</strong> Below the 20 EMA. Works well for pullback entries.
+          </div>
+          <div style="padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
+            📏 <strong>% SL:</strong> Fixed 4–6% below entry. Simple for beginners.
+          </div>
+          <div style="padding:10px;background:var(--orange-bg);border-radius:8px;border:1px solid #f0c070;color:var(--orange);">
+            ⚠️ If your SL needs to be more than 8% away, the setup is too risky. Skip it.
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:0;">
+      <div class="card-title">🚫 When NOT to enter</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;color:var(--text2);">
+        <div style="padding:8px 10px;background:var(--red-bg);border-radius:8px;color:var(--red);font-size:12px;">RSI above 75 — already overbought</div>
+        <div style="padding:8px 10px;background:var(--red-bg);border-radius:8px;color:var(--red);font-size:12px;">Monday after a big Friday gap up</div>
+        <div style="padding:8px 10px;background:var(--red-bg);border-radius:8px;color:var(--red);font-size:12px;">Earnings within 5 days</div>
+        <div style="padding:8px 10px;background:var(--red-bg);border-radius:8px;color:var(--red);font-size:12px;">Budget / RBI policy week</div>
+        <div style="padding:8px 10px;background:var(--red-bg);border-radius:8px;color:var(--red);font-size:12px;">R:R below 1:1.5</div>
+        <div style="padding:8px 10px;background:var(--red-bg);border-radius:8px;color:var(--red);font-size:12px;">Already have 2 open trades</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── EXIT RULES ── -->
+  <div id="g_exit" class="g-panel" style="display:none;">
+    <div class="card">
+      <div class="card-title">🚪 Exit Rules — Decide BEFORE you enter</div>
+      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px;">3 mandatory exits — no flexibility</div>
+      <div style="display:grid;gap:8px;margin-bottom:14px;">
+        <div style="padding:10px;background:var(--red-bg);border-radius:8px;border-left:3px solid var(--red);color:var(--text);">
+          <strong style="color:var(--red);">SL hit</strong> — Exit immediately. Groww auto-sells. Never cancel your SL hoping it recovers.
+        </div>
+        <div style="padding:10px;background:var(--orange-bg);border-radius:8px;border-left:3px solid var(--orange);color:var(--text);">
+          <strong style="color:var(--orange);">Close below 20 EMA</strong> — Exit next morning open. Momentum broken even if SL not hit.
+        </div>
+        <div style="padding:10px;background:var(--orange-bg);border-radius:8px;border-left:3px solid var(--orange);color:var(--text);">
+          <strong style="color:var(--orange);">RSI drops below 50</strong> — Trend reversing. Exit even if you're in profit.
+        </div>
+      </div>
+      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px;">Trailing SL ladder — protect profits</div>
+      <div style="display:grid;gap:6px;font-size:13px;">
+        <div style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--surface2);border-radius:8px;">
+          <span style="font-family:'DM Mono',monospace;font-size:12px;font-weight:600;min-width:36px;color:var(--text3);">0%</span>
+          <span>Entry → SL at planned level. Risk = <strong id="g_riskAmt2">₹500</strong></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--green-bg);border-radius:8px;color:var(--green);">
+          <span style="font-family:'DM Mono',monospace;font-size:12px;font-weight:600;min-width:36px;">50%</span>
+          <span>Halfway to target → move SL to entry price. Risk = ₹0 now.</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--green-bg);border-radius:8px;color:var(--green);">
+          <span style="font-family:'DM Mono',monospace;font-size:12px;font-weight:600;min-width:36px;">75%</span>
+          <span>75% of target → move SL to lock in 50% of profit.</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--green-bg);border-radius:8px;color:var(--green);">
+          <span style="font-family:'DM Mono',monospace;font-size:12px;font-weight:600;min-width:36px;">100%</span>
+          <span>Target hit → cancel SL, place limit sell. Exit clean.</span>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">⏳ What to do if target not reached</div>
+      <div style="display:grid;gap:8px;font-size:13px;color:var(--text2);">
+        <div style="padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
+          <strong>Days 1–5:</strong> Stock going sideways or slightly down — normal. Hold if price above 20 EMA.
+        </div>
+        <div style="padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
+          <strong>Days 6–10:</strong> Still no move — ask: is RSI above 50? Above 20 EMA? If both yes, hold. If no, exit.
+        </div>
+        <div style="padding:10px;background:var(--orange-bg);border-radius:8px;border:1px solid #f0c070;color:var(--orange);">
+          <strong>Days 11–15:</strong> Take partial profit (sell 50%). Let rest run with SL at breakeven.
+        </div>
+        <div style="padding:10px;background:var(--red-bg);border-radius:8px;border:1px solid #f5c6c2;color:var(--red);">
+          <strong>Day 15+ with no progress:</strong> Time stop — exit. Dead capital. Deploy in a fresh setup.
+        </div>
+        <div style="padding:10px;background:var(--green-bg);border-radius:8px;border:1px solid #b8e0cc;color:var(--green);">
+          <strong>Near target (within 2%):</strong> Place limit sell order now. Don't wait — take the planned profit.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── WEEKLY REVIEW ── -->
+  <div id="g_weekly" class="g-panel" style="display:none;">
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">📅 Sunday Evening Review (20–30 min)</div>
+        <div style="display:grid;gap:10px;font-size:13px;color:var(--text2);">
+          <div style="font-size:12px;font-weight:600;color:var(--text);">Part 1 — Open trade health check (5 min each)</div>
+          <div class="guide-step">
+            <div class="step-num">1</div>
+            <div><div class="step-title">Is price above 20 EMA?</div>
+            <div class="step-desc">Open TradingView → daily chart → EMA 20. Friday's candle above the line? Yes = hold. No = exit Monday open.</div></div>
+          </div>
+          <div class="guide-step">
+            <div class="step-num">2</div>
+            <div><div class="step-title">Is RSI above 50?</div>
+            <div class="step-desc">Add RSI(14) indicator. Above 50 = momentum intact. Below 50 = plan exit.</div></div>
+          </div>
+          <div class="guide-step">
+            <div class="step-num">3</div>
+            <div><div class="step-title">Where vs target?</div>
+            <div class="step-desc">At 50% → move SL to entry. At 75% → lock in 50% profit. Near target → place sell order. Day 15+ → exit Monday.</div></div>
+          </div>
+          <div style="font-size:12px;font-weight:600;color:var(--text);margin-top:4px;">Part 2 — Find new setups (10 min)</div>
+          <div style="font-size:12px;">Discover tab → Refresh Heat → note top 2 sectors → add to watchlist → Screener → Run Screen → shortlist 70+ scores → confirm on TradingView → pre-fill Risk Calc.</div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="card-title">✅ Sunday Checklist</div>
+          <div id="guideChecklist" style="display:grid;gap:6px;font-size:13px;">
+            <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;"><input type="checkbox" style="margin-top:2px;width:auto;"/> Reviewed all open trades on TradingView (EMA + RSI)</label>
+            <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;"><input type="checkbox" style="margin-top:2px;width:auto;"/> Updated trailing SL in Groww if needed</label>
+            <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;"><input type="checkbox" style="margin-top:2px;width:auto;"/> Refreshed Discover heat — noted top 2 sectors</label>
+            <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;"><input type="checkbox" style="margin-top:2px;width:auto;"/> Ran screener — shortlisted 2–3 candidates</label>
+            <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;"><input type="checkbox" style="margin-top:2px;width:auto;"/> Confirmed candidates on TradingView chart</label>
+            <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;"><input type="checkbox" style="margin-top:2px;width:auto;"/> R:R ≥ 1:2 on all new setups</label>
+            <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;"><input type="checkbox" style="margin-top:2px;width:auto;"/> Max 2 open trades — capital check done</label>
+            <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;"><input type="checkbox" style="margin-top:2px;width:auto;"/> Any Day 15+ trades with no progress? Exit Monday.</label>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">📍 Friday 3:20 PM (2 min check)</div>
+          <div style="font-size:13px;color:var(--text2);display:grid;gap:8px;">
+            <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">Is SL order still active in Groww? Check Orders tab.</div>
+            <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">RSI still above 50 on my open trades?</div>
+            <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">Am I within 2–3% of target? Place sell order.</div>
+            <div style="padding:8px 10px;background:var(--orange-bg);border-radius:8px;border:1px solid #f0c070;color:var(--orange);">During the week: do NOT check during the day. Your SL handles it.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── GROWW GUIDE ── -->
+  <div id="g_groww" class="g-panel" style="display:none;">
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">📱 Buying a Stock on Groww</div>
+        <div>
+          <div class="guide-step"><div class="step-num">1</div><div>
+            <div class="step-title">Search the stock</div>
+            <div class="step-desc">Open Groww → search bar → type symbol (e.g. BEL) → tap from results.</div>
+          </div></div>
+          <div class="guide-step"><div class="step-num">2</div><div>
+            <div class="step-title">Tap Buy → choose Limit</div>
+            <div class="step-desc">Always use Limit for swing trades — sets your exact entry price. Avoid Market order.</div>
+          </div></div>
+          <div class="guide-step"><div class="step-num">3</div><div>
+            <div class="step-title">Select CNC (not MIS)</div>
+            <div class="step-desc">CNC = delivery, hold for days/weeks. MIS = intraday only, auto-closes at 3:20 PM. ALWAYS CNC for swings.</div>
+          </div></div>
+          <div class="guide-step"><div class="step-num">4</div><div>
+            <div class="step-title">Enter quantity &amp; price</div>
+            <div class="step-desc">Qty from Risk Calculator. Price = your planned entry. Tap Place Buy Order.</div>
+          </div></div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="card-title">🛡️ Setting Stop-Loss on Groww</div>
+          <div>
+            <div class="guide-step"><div class="step-num">5</div><div>
+              <div class="step-title">Immediately after buy executes</div>
+              <div class="step-desc">Go back to stock page → Sell → choose SL order type.</div>
+            </div></div>
+            <div class="guide-step"><div class="step-num">6</div><div>
+              <div class="step-title">SL vs SL-M</div>
+              <div class="step-desc"><strong>SL:</strong> Trigger price = your SL. Limit price = ₹2–3 below trigger.<br/><strong>SL-M:</strong> Only trigger price — sells at market. Simpler for liquid stocks.</div>
+            </div></div>
+            <div class="guide-step"><div class="step-num">7</div><div>
+              <div class="step-title">Verify both orders active</div>
+              <div class="step-desc">Orders tab → buy should show Executed, SL sell should show Open. If SL is missing, place it again.</div>
+            </div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">💰 Booking Profit on Groww</div>
+          <div>
+            <div class="guide-step"><div class="step-num">8</div><div>
+              <div class="step-title">Cancel SL order first</div>
+              <div class="step-desc">Orders tab → find open SL sell → Cancel. Do this BEFORE placing sell order or you'll have duplicate sells.</div>
+            </div></div>
+            <div class="guide-step"><div class="step-num">9</div><div>
+              <div class="step-title">Place Limit sell at target</div>
+              <div class="step-desc">Stock page → Sell → Limit → target price → qty → Place Sell Order. Done.</div>
+            </div></div>
+            <div class="guide-step"><div class="step-num">10</div><div>
+              <div class="step-title">Log exit in Journal</div>
+              <div class="step-desc">SwingTrader → Journal → find trade → tap Exit → enter exit price. P&amp;L auto-calculates.</div>
+            </div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">⚡ Key Terms — CNC vs MIS vs SL vs SL-M</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
+        <div style="padding:8px 10px;background:var(--green-bg);border-radius:8px;color:var(--green);border:1px solid #b8e0cc;"><strong>CNC</strong> — Cash &amp; Carry. Hold for days/weeks. Always use this for swings.</div>
+        <div style="padding:8px 10px;background:var(--red-bg);border-radius:8px;color:var(--red);border:1px solid #f5c6c2;"><strong>MIS</strong> — Intraday only. Auto-closes 3:20 PM. Never use for swing trades.</div>
+        <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);"><strong>SL</strong> — Stop Loss Limit. Trigger + Limit price. May not execute in fast crash.</div>
+        <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);"><strong>SL-M</strong> — Stop Loss Market. Trigger only. Always executes. Best for liquid midcaps.</div>
+        <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);"><strong>T+1</strong> — Shares settle next trading day. You can still sell same day (BTST).</div>
+        <div style="padding:8px 10px;background:var(--orange-bg);border-radius:8px;border:1px solid #f0c070;color:var(--orange);"><strong>BTST</strong> — Buy Today Sell Tomorrow. Allowed in India. Groww handles automatically.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SIMULATION ── -->
+  <div id="g_sim" class="g-panel" style="display:none;">
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-title">🎬 Real Trade Walkthrough — BEL Oct–Nov 2024</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:10px;">A complete example using actual past prices showing every step of the tool in action.</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;" id="simTabs">
+        <button class="btn btn-primary btn-sm" onclick="showSim(0,this)">1. Discover</button>
+        <button class="btn btn-secondary btn-sm" onclick="showSim(1,this)">2. Screener</button>
+        <button class="btn btn-secondary btn-sm" onclick="showSim(2,this)">3. Risk Calc</button>
+        <button class="btn btn-secondary btn-sm" onclick="showSim(3,this)">4. Buy on Groww</button>
+        <button class="btn btn-secondary btn-sm" onclick="showSim(4,this)">5. Journal</button>
+        <button class="btn btn-secondary btn-sm" onclick="showSim(5,this)">6. Profit!</button>
+      </div>
+      <div id="sim0" class="sim-panel">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:8px;font-weight:600;text-transform:uppercase;">Sunday 13 Oct 2024 — You open Discover, click Refresh Heat</div>
+        <div style="display:grid;gap:6px;font-size:13px;">
+          <div style="padding:8px 12px;background:var(--green-bg);border-radius:8px;color:var(--green);border:1px solid #b8e0cc;display:flex;justify-content:space-between;"><span>🛡️ PSU · Defence <strong>🔥 Hottest</strong></span><span style="font-family:'DM Mono',monospace;">+4.8%</span></div>
+          <div style="padding:8px 12px;background:var(--green-bg);border-radius:8px;color:var(--green);border:1px solid #b8e0cc;display:flex;justify-content:space-between;"><span>🚂 Railways</span><span style="font-family:'DM Mono',monospace;">+3.1%</span></div>
+          <div style="padding:8px 12px;background:var(--red-bg);border-radius:8px;color:var(--red);border:1px solid #f5c6c2;display:flex;justify-content:space-between;"><span>💻 IT · Tech</span><span style="font-family:'DM Mono',monospace;">-1.4%</span></div>
+        </div>
+        <div class="info-box" style="margin-top:10px;">You tap <strong>+ Add all PSU · Defence</strong> to watchlist. Then head to Screener.</div>
+      </div>
+      <div id="sim1" class="sim-panel" style="display:none;">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:8px;font-weight:600;text-transform:uppercase;">Monday 14 Oct 2024 — Screener result for BEL</div>
+        <div style="display:grid;gap:4px;font-size:13px;">
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">Price</span><span style="font-family:'DM Mono',monospace;">₹282.40</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">RSI (14)</span><span style="font-family:'DM Mono',monospace;color:var(--green);">63.2 ✓</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">Vol Spike</span><span style="font-family:'DM Mono',monospace;color:var(--green);">2.1× ✓</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">vs 20 EMA</span><span style="font-family:'DM Mono',monospace;color:var(--green);">Above ✓</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;"><span style="color:var(--text2);">Score</span><span style="font-family:'DM Mono',monospace;font-size:15px;color:var(--green);font-weight:700;">80 / 100</span></div>
+        </div>
+        <div style="padding:8px 10px;background:var(--green-bg);border-radius:8px;color:var(--green);font-size:12px;margin-top:8px;">4 of 5 signals pass. You click ⚖️ Calc on BEL row.</div>
+      </div>
+      <div id="sim2" class="sim-panel" style="display:none;">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:8px;font-weight:600;text-transform:uppercase;">Risk Calculator — auto-filled from screener</div>
+        <div style="display:grid;gap:4px;font-size:13px;margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">Entry</span><span style="font-family:'DM Mono',monospace;">₹282.40</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">Stop-Loss</span><span style="font-family:'DM Mono',monospace;color:var(--red);">₹268.00</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">Target</span><span style="font-family:'DM Mono',monospace;color:var(--green);">₹312.00</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">Qty to buy</span><span style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;">34 shares</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">Max loss</span><span style="font-family:'DM Mono',monospace;color:var(--red);">₹490</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;"><span style="color:var(--text2);">R:R</span><span style="font-family:'DM Mono',monospace;color:var(--green);font-weight:700;">1 : 2.05 ✓</span></div>
+        </div>
+        <div style="padding:8px 10px;background:var(--green-bg);border-radius:8px;color:var(--green);font-size:12px;">R:R passes 1:2 minimum. You tap Send to Journal.</div>
+      </div>
+      <div id="sim3" class="sim-panel" style="display:none;">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:8px;font-weight:600;text-transform:uppercase;">Mon 14 Oct · 9:42 AM — Groww orders</div>
+        <div style="display:grid;gap:6px;font-size:12px;">
+          <div style="padding:8px 10px;background:var(--green-bg);border-radius:8px;color:var(--green);border:1px solid #b8e0cc;">9:42 AM — Buy Limit placed: BEL · CNC · 34 qty · ₹282.40</div>
+          <div style="padding:8px 10px;background:var(--green-bg);border-radius:8px;color:var(--green);border:1px solid #b8e0cc;">9:44 AM — Buy executed ✓ · ₹9,601 deployed</div>
+          <div style="padding:8px 10px;background:var(--orange-bg);border-radius:8px;color:var(--orange);border:1px solid #f0c070;">9:46 AM — SL placed immediately: Trigger ₹268 · Limit ₹266 · 34 qty</div>
+          <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">9:47 AM — SL active ✓ You can close the app now.</div>
+        </div>
+      </div>
+      <div id="sim4" class="sim-panel" style="display:none;">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:8px;font-weight:600;text-transform:uppercase;">Trade logged · 12 days later — 26 Oct</div>
+        <div style="display:grid;gap:4px;font-size:13px;margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">Symbol</span><span style="font-family:'DM Mono',monospace;">BEL</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">Entry</span><span style="font-family:'DM Mono',monospace;">₹282.40 · 14 Oct</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">Current price</span><span style="font-family:'DM Mono',monospace;color:var(--green);">₹306.80</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">Unrealised P&amp;L</span><span style="font-family:'DM Mono',monospace;color:var(--green);">+₹828</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;"><span style="color:var(--text2);">Action</span><span style="color:var(--orange);font-size:12px;">At 50% target → move SL to ₹282</span></div>
+        </div>
+        <div style="padding:8px 10px;background:var(--orange-bg);border-radius:8px;color:var(--orange);font-size:12px;">You update SL in Groww from ₹268 → ₹282. Now risk-free trade.</div>
+      </div>
+      <div id="sim5" class="sim-panel" style="display:none;">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:8px;font-weight:600;text-transform:uppercase;">4 Nov 2024 — BEL at ₹311.50, near target</div>
+        <div style="display:grid;gap:6px;font-size:12px;margin-bottom:10px;">
+          <div style="padding:8px 10px;background:var(--orange-bg);border-radius:8px;color:var(--orange);">2:15 PM — Cancel SL order in Groww Orders tab first</div>
+          <div style="padding:8px 10px;background:var(--green-bg);border-radius:8px;color:var(--green);">2:17 PM — Limit sell: ₹311.50 · CNC · 34 qty</div>
+          <div style="padding:8px 10px;background:var(--green-bg);border-radius:8px;color:var(--green);">2:19 PM — Sold ✓ ₹10,591 received</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;">
+          <div style="padding:10px;background:var(--green-bg);border-radius:8px;text-align:center;color:var(--green);border:1px solid #b8e0cc;"><div style="font-size:20px;font-weight:600;">+₹991</div><div style="font-size:11px;margin-top:2px;">Net profit</div></div>
+          <div style="padding:10px;background:var(--green-bg);border-radius:8px;text-align:center;color:var(--green);border:1px solid #b8e0cc;"><div style="font-size:20px;font-weight:600;">21 days</div><div style="font-size:11px;margin-top:2px;">Hold period</div></div>
+          <div style="padding:10px;background:var(--green-bg);border-radius:8px;text-align:center;color:var(--green);border:1px solid #b8e0cc;"><div style="font-size:20px;font-weight:600;">+10.3%</div><div style="font-size:11px;margin-top:2px;">Trade return</div></div>
+          <div style="padding:10px;background:var(--green-bg);border-radius:8px;text-align:center;color:var(--green);border:1px solid #b8e0cc;"><div style="font-size:20px;font-weight:600;">1:2.02</div><div style="font-size:11px;margin-top:2px;">Actual R:R</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
+
 <!-- ═══════════════════════════════════════════════ DISCOVER ═══════════════════════════════════════════════ -->
 <div id="tab-discover" class="tab-panel">
   <div class="card" style="margin-bottom:16px;">
@@ -1203,6 +1525,20 @@ function addAllSector(idx) {
   renderSectorHeat();
 }
 
+function showGuide(id, btn) {
+  document.querySelectorAll('.g-panel').forEach(p => p.style.display = 'none');
+  document.getElementById(id).style.display = 'block';
+  document.querySelectorAll('#guideTabs button').forEach(b => b.className = 'btn btn-secondary btn-sm');
+  btn.className = 'btn btn-primary btn-sm';
+}
+
+function showSim(idx, btn) {
+  document.querySelectorAll('.sim-panel').forEach(p => p.style.display = 'none');
+  document.getElementById('sim' + idx).style.display = 'block';
+  document.querySelectorAll('#simTabs button').forEach(b => b.className = 'btn btn-secondary btn-sm');
+  btn.className = 'btn btn-primary btn-sm';
+}
+
 function updateGuideRules(capital) {
   const c = capital || 25000;
   const riskAmt  = Math.round(c * 0.02);
@@ -1216,6 +1552,7 @@ function updateGuideRules(capital) {
   set('g_capital2',  capLabel);
   set('g_capital3',  capLabel);
   set('g_riskAmt',   '₹' + riskAmt.toLocaleString('en-IN'));
+  set('g_riskAmt2',  '₹' + riskAmt.toLocaleString('en-IN'));
   set('g_maxPrice',  '₹' + maxPrice.toLocaleString('en-IN'));
   set('g_priceRange','₹' + minPrice + '–₹' + maxPriceRange);
 }
