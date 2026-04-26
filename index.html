@@ -585,6 +585,15 @@
 
 <!-- ═══════════════════════════════════════════════ RISK CALCULATOR ═══════════════════════════════════════════════ -->
 <div id="tab-risk" class="tab-panel">
+
+  <!-- Capital Dashboard -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-title">💰 Capital Dashboard</div>
+    <div id="capitalDashboard">
+      <div style="font-size:12px;color:var(--text3);">Calculating...</div>
+    </div>
+  </div>
+
   <div class="grid-2">
     <div>
       <div class="card">
@@ -1264,7 +1273,7 @@ function switchTab(name, btn) {
   if (btn) btn.classList.add('active');
   if (name === 'journal') renderJournal();
   if (name === 'discover') { if (!discoverLoaded) runDiscover(); else renderSectorHeat(); }
-  if (name === 'risk') renderSundayPlans();
+  if (name === 'risk') { renderSundayPlans(); renderCapitalDashboard(); }
 }
 
 // ═══════════════════ AUTOCOMPLETE ═══════════════════
@@ -2447,12 +2456,98 @@ function calcRisk() {
   }
 }
 
-// ═══════════════════ SUNDAY PLANS / TRADE PLANNER ═══════════════════
+// ═══════════════════ CAPITAL DASHBOARD ═══════════════════
+function renderCapitalDashboard() {
+  const el = document.getElementById('capitalDashboard');
+  if (!el) return;
+
+  const totalCapital = parseFloat(localStorage.getItem('st_settings')
+    ? JSON.parse(localStorage.getItem('st_settings')).capital || 25000
+    : 25000);
+
+  // Capital locked in open trades
+  const openTrades    = trades.filter(t => !t.exit);
+  const lockedTrades  = openTrades.reduce((sum, t) => sum + (t.entry * t.qty), 0);
+  const riskInTrades  = openTrades.reduce((sum, t) => sum + ((t.entry - t.sl) * t.qty), 0);
+
+  // Capital earmarked in pending plans
+  const pendingPlans  = plans.filter(p => p.status === 'pending');
+  const lockedPlans   = pendingPlans.reduce((sum, p) => sum + (p.entry * p.qty), 0);
+  const riskInPlans   = pendingPlans.reduce((sum, p) => sum + ((p.entry - p.sl) * p.qty), 0);
+
+  const totalLocked   = lockedTrades + lockedPlans;
+  const totalRisk     = riskInTrades + riskInPlans;
+  const available     = Math.max(0, totalCapital - totalLocked);
+  const usedPct       = Math.min(100, (totalLocked / totalCapital * 100));
+  const availPct      = 100 - usedPct;
+
+  // Bar segments
+  const tradePct = (lockedTrades / totalCapital * 100).toFixed(1);
+  const planPct  = (lockedPlans  / totalCapital * 100).toFixed(1);
+  const freePct  = Math.max(0, 100 - parseFloat(tradePct) - parseFloat(planPct)).toFixed(1);
+
+  const fmt = (n) => '₹' + Math.round(n).toLocaleString('en-IN');
+
+  // How many more trades can we take?
+  const avgPerTrade   = totalLocked > 0 && (openTrades.length + pendingPlans.length) > 0
+    ? totalLocked / (openTrades.length + pendingPlans.length)
+    : totalCapital * 0.38; // assume ~38% per trade as default
+  const moreTrades    = avgPerTrade > 0 ? Math.floor(available / avgPerTrade) : '—';
+
+  el.innerHTML = ''
+    // Capital bar
+    + '<div style="height:10px;border-radius:5px;overflow:hidden;display:flex;margin-bottom:10px;background:var(--border);">'
+    + (tradePct > 0 ? '<div style="width:' + tradePct + '%;background:#c8722a;" title="In trades"></div>' : '')
+    + (planPct  > 0 ? '<div style="width:' + planPct  + '%;background:#2a6bc8;" title="In plans"></div>'  : '')
+    + (freePct  > 0 ? '<div style="width:' + freePct  + '%;background:var(--green);" title="Available"></div>' : '')
+    + '</div>'
+
+    // Legend
+    + '<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:11px;margin-bottom:12px;">'
+    + '<span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#c8722a;flex-shrink:0;"></span>Open trades</span>'
+    + '<span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#2a6bc8;flex-shrink:0;"></span>Saved plans</span>'
+    + '<span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--green);flex-shrink:0;"></span>Available</span>'
+    + '</div>'
+
+    // Stats grid
+    + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">'
+    + statBox('Total Capital',    fmt(totalCapital),  'var(--text)')
+    + statBox('In Open Trades',   fmt(lockedTrades),  '#c8722a',  openTrades.length + ' trade' + (openTrades.length !== 1 ? 's' : ''))
+    + statBox('In Saved Plans',   fmt(lockedPlans),   '#2a6bc8',  pendingPlans.length + ' plan' + (pendingPlans.length !== 1 ? 's' : ''))
+    + statBox('Available Now',    fmt(available),     available > totalCapital * 0.3 ? 'var(--green)' : 'var(--orange)')
+    + '</div>'
+
+    // Risk summary
+    + (totalRisk > 0 ? '<div style="margin-top:10px;padding:8px 12px;background:var(--red-bg);border-radius:8px;font-size:12px;color:var(--red);border:1px solid #f5c6c2;">'
+    + '⚠️ Total capital at risk: <strong>' + fmt(totalRisk) + '</strong> across all open trades + plans'
+    + ' (' + (totalRisk / totalCapital * 100).toFixed(1) + '% of capital)'
+    + '</div>' : '')
+
+    // Advice
+    + '<div style="margin-top:8px;padding:8px 12px;background:var(--surface2);border-radius:8px;font-size:12px;color:var(--text2);">'
+    + (available < totalCapital * 0.2
+      ? '🔴 Less than 20% capital free. Do not open new trades until existing ones close.'
+      : available < totalCapital * 0.4
+      ? '🟡 ' + fmt(available) + ' available. Room for ' + moreTrades + ' more trade at current size. Max 2 open at once.'
+      : '🟢 ' + fmt(available) + ' available (' + freePct + '%). You can take up to ' + moreTrades + ' more trade' + (moreTrades !== 1 ? 's' : '') + ' at current size.')
+    + '</div>';
+}
+
+function statBox(label, value, color, sub) {
+  return '<div style="background:var(--surface2);border-radius:8px;padding:10px;text-align:center;">'
+    + '<div style="font-size:11px;color:var(--text3);margin-bottom:3px;">' + label + '</div>'
+    + '<div style="font-size:17px;font-weight:600;color:' + color + ';font-family:\'DM Mono\',monospace;">' + value + '</div>'
+    + (sub ? '<div style="font-size:10px;color:var(--text3);margin-top:2px;">' + sub + '</div>' : '')
+    + '</div>';
+}
+
+
 let plans = JSON.parse(localStorage.getItem('st_plans') || '[]');
 
 function savePlans() {
   localStorage.setItem('st_plans', JSON.stringify(plans));
   autoSync();
+  renderCapitalDashboard();
 }
 
 function saveSundayPlan() {
@@ -2839,7 +2934,7 @@ function updateMonitor(id, entry, sl, tgt, days, curPriceStr) {
 }
 
 // ═══════════════════ JOURNAL ═══════════════════
-function saveTrades() { localStorage.setItem('st_trades', JSON.stringify(trades)); autoSync(); }
+function saveTrades() { localStorage.setItem('st_trades', JSON.stringify(trades)); autoSync(); renderCapitalDashboard(); }
 
 function addTrade() {
   const sym = document.getElementById('j_sym').value.trim().toUpperCase();
@@ -2975,6 +3070,7 @@ loadSettings();
 renderWatchlist();
 renderJournal();
 renderSundayPlans();
+renderCapitalDashboard();
 calcRisk();
 document.getElementById('j_date').value = new Date().toISOString().split('T')[0];
 
