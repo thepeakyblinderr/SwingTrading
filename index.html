@@ -1282,6 +1282,27 @@
         </div>
       </div>
     </div>
+
+    <!-- Sector Notes -->
+    <div style="margin-top:4px;">
+      <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px;">⛏️ Sector-specific notes — Metals &amp; Mining</div>
+      <div class="card">
+        <div class="card-body">
+          <div style="display:grid;gap:8px;font-size:13px;color:var(--text2);">
+            <div><strong style="color:var(--text);">What drives it:</strong> Global commodity prices (steel, aluminium, copper), China demand, Indian infrastructure spending, govt capex budgets.</div>
+            <div><strong style="color:var(--text);">Swing pattern:</strong> Metals move in strong 2–4 week waves when commodity prices shift. When China announces stimulus or Indian govt raises capex — metals sector moves as a whole.</div>
+            <div><strong style="color:var(--text);">Stocks in the app:</strong> JSPL, SAIL (steel), NMDC, MOIL (mining), NATIONALUM (aluminium), HINDCOPPER (copper). All PSU/semi-PSU, liquid, ₹80–₹250 range — perfect for ₹25K.</div>
+            <div style="display:grid;gap:4px;">
+              <div style="padding:6px 10px;background:var(--green-bg);border-radius:6px;font-size:12px;color:var(--green);">Best time to buy: When steel/iron ore prices rising + RSI 55–65 + above 20 EMA</div>
+              <div style="padding:6px 10px;background:var(--red-bg);border-radius:6px;font-size:12px;color:var(--red);">Avoid: When China economic data is weak — metals sector falls hard</div>
+              <div style="padding:6px 10px;background:var(--orange-bg);border-radius:6px;font-size:12px;color:var(--orange);">Watch for: Budget announcements on infrastructure — immediate sector catalyst</div>
+            </div>
+            <div><strong style="color:var(--text);">ATR note:</strong> Metals stocks tend to have ATR% of 2–3.5% — medium volatility. Use 1.5× ATR SL for NMDC/MOIL (lower vol), 2× ATR for JSPL/SAIL (higher vol).</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- ── MY LEARNINGS ── -->
@@ -1367,7 +1388,9 @@ const NSE_STOCKS = {
   'ABSLAMC':'Aditya Birla Sun Life AMC','ANGELONE':'Angel One','CDSL':'CDSL',
   'BSE':'BSE Ltd','MCX':'Multi Commodity Exchange','CAMS':'CAMS',
   'HINDCOPPER':'Hindustan Copper','NATIONALUM':'National Aluminium','NMDC':'NMDC Ltd',
-  'MOIL':'MOIL Ltd','GMRAIRPORT':'GMR Airports','IRB':'IRB Infrastructure',
+  'MOIL':'MOIL Ltd','JSPL':'Jindal Steel & Power','SAIL':'Steel Authority of India',
+  'TATASTEEL':'Tata Steel','JSWSTEEL':'JSW Steel','HINDALCO':'Hindalco Industries',
+  'VEDL':'Vedanta Ltd','COALINDIA':'Coal India','GMRAIRPORT':'GMR Airports',
   'PNBHOUSING':'PNB Housing Finance','CANFINHOME':'Can Fin Homes','REPCO':'Repco Home Finance',
 };
 
@@ -1553,6 +1576,14 @@ const SECTOR_BASKETS = [
     {sym:'APTUS',     name:'Aptus Value Housing'},
     {sym:'CANFINHOME',name:'Can Fin Homes'},
     {sym:'REPCO',     name:'Repco Home Finance'},
+  ]},
+  { name: '⛏️ Metals · Mining',   emoji:'⛏️', stocks: [
+    {sym:'JSPL',       name:'Jindal Steel & Power'},
+    {sym:'SAIL',       name:'Steel Authority of India'},
+    {sym:'NMDC',       name:'NMDC Ltd'},
+    {sym:'MOIL',       name:'MOIL Ltd'},
+    {sym:'NATIONALUM', name:'National Aluminium'},
+    {sym:'HINDCOPPER', name:'Hindustan Copper'},
   ]},
 ];
 
