@@ -671,8 +671,24 @@
           <button class="btn btn-primary" onclick="sendToJournal()" style="width:100%;">📒 Add to Trade Journal</button>
         </div>
       </div>
+
+      <div class="card">
+        <div class="card-title">📋 Save as Sunday Plan</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Lock in your plan from Sunday. On Monday morning enter the actual open price to get instant go/no-go.</div>
+        <button class="btn btn-secondary" onclick="saveSundayPlan()" style="width:100%;">💾 Save Plan for Monday</button>
+      </div>
     </div>
   </div>
+
+  <!-- Sunday Plans List -->
+  <div id="sundayPlansWrap" style="margin-top:16px;">
+    <div class="section-head">
+      <div class="section-title">📋 Monday Plans</div>
+      <div style="font-size:12px;color:var(--text3);">Enter Monday open price → get go/no-go instantly</div>
+    </div>
+    <div id="sundayPlansList"></div>
+  </div>
+
 </div>
 
 <!-- ═══════════════════════════════════════════════ JOURNAL ═══════════════════════════════════════════════ -->
@@ -1248,6 +1264,7 @@ function switchTab(name, btn) {
   if (btn) btn.classList.add('active');
   if (name === 'journal') renderJournal();
   if (name === 'discover') { if (!discoverLoaded) runDiscover(); else renderSectorHeat(); }
+  if (name === 'risk') renderSundayPlans();
 }
 
 // ═══════════════════ AUTOCOMPLETE ═══════════════════
@@ -1801,6 +1818,7 @@ function buildPayload() {
     preset:    JSON.parse(localStorage.getItem('st_preset')    || 'null'),
     trades:    JSON.parse(localStorage.getItem('st_trades')    || '[]'),
     settings:  JSON.parse(localStorage.getItem('st_settings')  || '{}'),
+    plans:     JSON.parse(localStorage.getItem('st_plans')     || '[]'),
   };
 }
 
@@ -1809,8 +1827,10 @@ function applyPayload(payload) {
   if (payload.preset)    localStorage.setItem('st_preset',    JSON.stringify(payload.preset));
   if (payload.trades)    localStorage.setItem('st_trades',    JSON.stringify(payload.trades));
   if (payload.settings)  localStorage.setItem('st_settings',  JSON.stringify(payload.settings));
+  if (payload.plans)     localStorage.setItem('st_plans',     JSON.stringify(payload.plans));
   watchlist = JSON.parse(localStorage.getItem('st_watchlist') || '[]');
   trades    = JSON.parse(localStorage.getItem('st_trades')    || '[]');
+  plans     = JSON.parse(localStorage.getItem('st_plans')     || '[]');
   loadSettings(); renderWatchlist(); renderJournal(); calcRisk();
   localStorage.setItem('st_lastSync', Date.now().toString());
   document.getElementById('syncLastSync').textContent = 'Last synced: ' + new Date().toLocaleString('en-IN');
@@ -2164,10 +2184,12 @@ function renderScreenerResults(results) {
     const scoreColor  = r.score >= 70 ? 'var(--green)' : r.score >= 50 ? 'var(--orange)' : 'var(--red)';
     const changeColor = r.changePct >= 0 ? 'var(--green)' : 'var(--red)';
     const barColor    = r.score >= 70 ? '#1e7a4e' : r.score >= 50 ? '#d4780a' : '#c0392b';
+    // If RSI overbought, score is high from other signals but RSI itself is a warning
+    const obWarning   = r.signals.rsi === 'overbought';
     const chgSign     = r.changePct >= 0 ? '+' : '';
     const ema20txt    = r.signals.ema20 === 'pass' ? '✓ Above' : '✗ Below';
     const ema20col    = r.signals.ema20 === 'pass' ? 'var(--green)' : 'var(--red)';
-    const rsiClass    = r.signals.rsi === 'pass' ? 'pass' : r.signals.rsi === 'overbought' ? 'neutral' : 'fail';
+    const rsiClass    = r.signals.rsi === 'pass' ? 'pass' : 'fail';
 
     const sigHTML = '<span class="sig sig-' + rsiClass + '">RSI</span>'
       + '<span class="sig sig-' + r.signals.ema20 + '">20E</span>'
@@ -2180,7 +2202,10 @@ function renderScreenerResults(results) {
       + (r.fullName ? '<br/><span style="font-size:10px;color:var(--text3);">' + r.fullName + '</span>' : '') + '</td>'
       + '<td class="mono">₹' + r.price.toFixed(2) + '</td>'
       + '<td class="mono" style="color:' + changeColor + '">' + chgSign + r.changePct.toFixed(2) + '%</td>'
-      + '<td class="mono">' + r.rsi.toFixed(1) + '</td>'
+      + '<td class="mono" style="color:' + (r.rsi >= 70 ? 'var(--red)' : r.rsi >= 55 ? 'var(--green)' : 'var(--text3)') + ';">'
+      + r.rsi.toFixed(1)
+      + (r.rsi >= 70 ? ' <span style="font-size:9px;background:var(--red-bg);color:var(--red);padding:1px 4px;border-radius:3px;font-family:sans-serif;">OB</span>' : '')
+      + '</td>'
       + '<td class="mono">' + r.volSpike.toFixed(2) + '×</td>'
       + '<td class="mono" style="color:' + ema20col + '">' + ema20txt + '</td>'
       + '<td class="mono">' + r.pctFrom52High.toFixed(1) + '% below</td>'
@@ -2194,6 +2219,7 @@ function renderScreenerResults(results) {
       + '</tr>'
       + '<tr id="chart_' + idx + '" style="display:none;">'
       + '<td colspan="10" style="padding:0;background:var(--surface2);">'
+      + (obWarning ? '<div style="padding:8px 16px;background:var(--red-bg);color:var(--red);font-size:12px;border-bottom:1px solid var(--border);">⚠️ RSI ' + r.rsi.toFixed(1) + ' — Overbought. Score is high from other signals but RSI warns this stock has run too far. Wait for RSI to pull back below 70 before entering.</div>' : '')
       + '<div style="padding:12px 16px;" id="chartWrap_' + idx + '"></div>'
       + '</td></tr>';
   }).join('');
@@ -2419,6 +2445,161 @@ function calcRisk() {
       Max concurrent trades at this size: <strong>${Math.floor(capital / deployed)}</strong>
     `;
   }
+}
+
+// ═══════════════════ SUNDAY PLANS / TRADE PLANNER ═══════════════════
+let plans = JSON.parse(localStorage.getItem('st_plans') || '[]');
+
+function savePlans() {
+  localStorage.setItem('st_plans', JSON.stringify(plans));
+  autoSync();
+}
+
+function saveSundayPlan() {
+  const sym     = document.getElementById('r_symbol').value.trim().toUpperCase();
+  const entry   = parseFloat(document.getElementById('r_entry').value);
+  const sl      = parseFloat(document.getElementById('r_sl').value);
+  const target  = parseFloat(document.getElementById('r_target').value);
+  const capital = parseFloat(document.getElementById('r_capital').value) || 25000;
+  const riskPct = parseFloat(document.getElementById('r_riskPct').value) || 2;
+
+  if (!sym)   { alert('Enter a symbol first.'); return; }
+  if (!entry) { alert('Enter an entry price first.'); return; }
+  if (!sl)    { alert('Enter a stop-loss price first.'); return; }
+
+  const riskPerShare = entry - sl;
+  const maxLoss      = capital * riskPct / 100;
+  const qty          = riskPerShare > 0 ? Math.floor(maxLoss / riskPerShare) : 0;
+  const rr           = target ? ((target - entry) / riskPerShare).toFixed(2) : null;
+
+  const plan = {
+    id: Date.now(),
+    sym, entry, sl, target: target || null, qty, rr,
+    capital, riskPct,
+    savedOn: new Date().toLocaleDateString('en-IN', { weekday:'short', day:'numeric', month:'short' }),
+    status: 'pending' // pending | go | nogo | executed | skipped
+  };
+
+  plans.unshift(plan);
+  savePlans();
+  renderSundayPlans();
+  alert('Plan saved for ' + sym + '! On Monday morning, enter the open price below to get your go/no-go decision.');
+}
+
+function deletePlan(id) {
+  plans = plans.filter(p => p.id !== id);
+  savePlans();
+  renderSundayPlans();
+}
+
+function markPlan(id, status) {
+  const p = plans.find(p => p.id === id);
+  if (p) { p.status = status; savePlans(); renderSundayPlans(); }
+}
+
+function checkMonday(id) {
+  const openPrice = parseFloat(document.getElementById('mon_' + id).value);
+  const resultEl  = document.getElementById('monResult_' + id);
+  const p         = plans.find(p => p.id === id);
+  if (!p || isNaN(openPrice) || openPrice <= 0) return;
+
+  const riskPerShare = p.entry - p.sl;
+  const newRisk      = openPrice - p.sl;
+  const newRR        = p.target ? ((p.target - openPrice) / newRisk).toFixed(2) : null;
+  const gapPct       = ((openPrice - p.entry) / p.entry * 100).toFixed(1);
+  const capital      = p.capital || 25000;
+  const maxLoss      = capital * (p.riskPct || 2) / 100;
+  const newQty       = newRisk > 0 ? Math.floor(maxLoss / newRisk) : 0;
+
+  let verdict, bg, color, action;
+
+  if (openPrice <= p.sl) {
+    verdict = '🔴 NO-GO — Opened below your SL';
+    bg = 'var(--red-bg)'; color = 'var(--red)';
+    action = 'Stock opened at ₹' + openPrice + ', below your SL of ₹' + p.sl + '. Setup is invalid. Do NOT buy. Skip this trade.';
+  } else if (openPrice > p.entry * 1.03) {
+    const rrNum = parseFloat(newRR);
+    if (newRR && rrNum >= 1.5) {
+      verdict = '⚠️ CAUTION — Gapped up ' + gapPct + '%';
+      bg = 'var(--orange-bg)'; color = 'var(--orange)';
+      action = 'Opened ₹' + (openPrice - p.entry).toFixed(0) + ' above plan. R:R is now 1:' + newRR + ' — still acceptable. Adjust qty to ' + newQty + ' shares. Buy at ₹' + openPrice.toFixed(2) + ', SL stays at ₹' + p.sl + '.';
+    } else {
+      verdict = '🔴 NO-GO — Gapped up too much (' + gapPct + '%)';
+      bg = 'var(--red-bg)'; color = 'var(--red)';
+      action = 'R:R has dropped to 1:' + (newRR || '?') + ' — below minimum 1:1.5. Skip this trade. Wait for a pullback to ₹' + p.entry.toFixed(0) + ' range before re-evaluating.';
+    }
+  } else if (openPrice < p.entry * 0.97) {
+    verdict = '⚠️ CAUTION — Gapped down ' + Math.abs(gapPct) + '%';
+    bg = 'var(--orange-bg)'; color = 'var(--orange)';
+    action = 'Opened below your planned entry. Still above SL so setup is valid. New entry: ₹' + openPrice.toFixed(2) + '. Recalculate — R:R is now 1:' + (newRR || '?') + '. Adjust qty to ' + newQty + ' shares.';
+  } else {
+    verdict = '✅ GO — Clean open, execute as planned';
+    bg = 'var(--green-bg)'; color = 'var(--green)';
+    action = 'Opened near your plan (gap: ' + gapPct + '%). Buy ' + newQty + ' shares of ' + p.sym + ' at ₹' + openPrice.toFixed(2) + '. SL: ₹' + p.sl + '. Target: ' + (p.target ? '₹' + p.target : 'as planned') + '. Place SL order immediately after buy fills.';
+  }
+
+  resultEl.innerHTML = '<div style="padding:10px 12px;border-radius:8px;background:' + bg + ';border-left:3px solid ' + color + ';margin-top:8px;">'
+    + '<div style="font-size:13px;font-weight:600;color:' + color + ';margin-bottom:4px;">' + verdict + '</div>'
+    + '<div style="font-size:12px;color:' + color + ';line-height:1.6;opacity:0.85;">' + action + '</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:6px;margin-top:8px;">'
+    + '<button class="btn btn-sm btn-green" onclick="markPlan(' + id + ',\'executed\')">✓ Executed</button>'
+    + '<button class="btn btn-sm btn-danger" onclick="markPlan(' + id + ',\'skipped\')">✗ Skipped</button>'
+    + '</div>';
+}
+
+function renderSundayPlans() {
+  const wrap = document.getElementById('sundayPlansList');
+  if (!wrap) return;
+
+  const active  = plans.filter(p => p.status === 'pending');
+  const done    = plans.filter(p => p.status !== 'pending');
+
+  if (!plans.length) {
+    wrap.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text3);font-size:13px;">No plans saved yet. Use the Risk Calculator on Sunday evening and click "Save Plan for Monday".</div>';
+    return;
+  }
+
+  const renderPlan = (p) => {
+    const isDone    = p.status !== 'pending';
+    const statusTag = p.status === 'executed'
+      ? '<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:var(--green-bg);color:var(--green);font-weight:600;">Executed</span>'
+      : p.status === 'skipped'
+      ? '<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:var(--red-bg);color:var(--red);font-weight:600;">Skipped</span>'
+      : '<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:var(--orange-bg);color:var(--orange);font-weight:600;">Pending</span>';
+
+    return '<div class="card" style="margin-bottom:10px;' + (isDone ? 'opacity:0.65;' : '') + '">'
+      + '<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">'
+      + '<div style="display:flex;align-items:center;gap:8px;">'
+      + '<strong class="mono" style="font-size:14px;">' + p.sym + '</strong>'
+      + statusTag
+      + '</div>'
+      + '<div style="display:flex;align-items:center;gap:6px;">'
+      + '<span style="font-size:11px;color:var(--text3);">Planned ' + p.savedOn + '</span>'
+      + '<button class="btn btn-sm btn-danger" onclick="deletePlan(' + p.id + ')">✕</button>'
+      + '</div>'
+      + '</div>'
+      + '<div style="padding:10px 14px;">'
+      + '<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;margin-bottom:10px;">'
+      + '<span>Entry <strong class="mono">₹' + p.entry + '</strong></span>'
+      + '<span>SL <strong class="mono" style="color:var(--red);">₹' + p.sl + '</strong></span>'
+      + (p.target ? '<span>Target <strong class="mono" style="color:var(--green);">₹' + p.target + '</strong></span>' : '')
+      + '<span>Qty <strong class="mono">' + p.qty + '</strong></span>'
+      + (p.rr ? '<span>R:R <strong class="mono" style="color:' + (parseFloat(p.rr)>=2?'var(--green)':'var(--orange)') + ';">1:' + p.rr + '</strong></span>' : '')
+      + '</div>'
+      + (isDone ? '' :
+        '<div style="display:flex;align-items:center;gap:8px;">'
+        + '<label style="font-size:12px;color:var(--text2);white-space:nowrap;font-weight:500;text-transform:none;letter-spacing:0;">Monday open ₹</label>'
+        + '<input type="number" id="mon_' + p.id + '" placeholder="Enter open price" style="flex:1;" oninput="checkMonday(' + p.id + ')"/>'
+        + '</div>'
+        + '<div id="monResult_' + p.id + '"></div>'
+      )
+      + '</div>'
+      + '</div>';
+  };
+
+  wrap.innerHTML = active.map(renderPlan).join('')
+    + (done.length ? '<div style="font-size:11px;color:var(--text3);margin:12px 0 6px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Completed plans</div>' + done.map(renderPlan).join('') : '');
 }
 
 function sendToJournal() {
@@ -2735,6 +2916,7 @@ if (watchlist.length === 0) {
 loadSettings();
 renderWatchlist();
 renderJournal();
+renderSundayPlans();
 calcRisk();
 document.getElementById('j_date').value = new Date().toISOString().split('T')[0];
 
