@@ -2494,7 +2494,47 @@ function deletePlan(id) {
 
 function markPlan(id, status) {
   const p = plans.find(p => p.id === id);
-  if (p) { p.status = status; savePlans(); renderSundayPlans(); }
+  if (!p) return;
+
+  if (status === 'executed') {
+    // Get the actual open price they entered if available
+    const monInput  = document.getElementById('mon_' + id);
+    const execPrice = monInput ? (parseFloat(monInput.value) || p.entry) : p.entry;
+
+    // Check if already logged in journal
+    const alreadyLogged = trades.some(t => t.planId === id);
+    if (!alreadyLogged) {
+      const trade = {
+        id:       Date.now(),
+        planId:   id,
+        sym:      p.sym,
+        entry:    execPrice,
+        sl:       p.sl,
+        tgt:      p.target || null,
+        qty:      p.qty,
+        date:     new Date().toISOString().split('T')[0],
+        exit:     null,
+        exitDate: null,
+        notes:    'From Sunday plan · Planned entry ₹' + p.entry + (execPrice !== p.entry ? ' · Executed at ₹' + execPrice : '')
+      };
+      trades.unshift(trade);
+      saveTrades();
+      renderJournal();
+    }
+  }
+
+  p.status = status;
+  savePlans();
+  renderSundayPlans();
+
+  if (status === 'executed') {
+    // Switch to journal so they can see the trade monitor immediately
+    const tabs = document.querySelectorAll('.tab-btn');
+    switchTab('journal', tabs[2]);
+    setTimeout(() => {
+      alert('Trade logged in Journal! Scroll up to see the Trade Monitor with your 50%/75% SL ladder.');
+    }, 300);
+  }
 }
 
 function checkMonday(id) {
@@ -2587,6 +2627,24 @@ function renderSundayPlans() {
       + '<span>Qty <strong class="mono">' + p.qty + '</strong></span>'
       + (p.rr ? '<span>R:R <strong class="mono" style="color:' + (parseFloat(p.rr)>=2?'var(--green)':'var(--orange)') + ';">1:' + p.rr + '</strong></span>' : '')
       + '</div>'
+      + (p.target ? (function() {
+          const profit  = p.target - p.entry;
+          const p50price  = (p.entry + profit * 0.5).toFixed(0);
+          const p75price  = (p.entry + profit * 0.75).toFixed(0);
+          const sl50  = p.entry.toFixed(0);
+          const sl75  = (p.entry + profit * 0.5).toFixed(0);
+          return '<div style="display:grid;gap:4px;margin-bottom:10px;">'
+            + '<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);">SL Ladder</div>'
+            + '<div style="display:flex;gap:6px;font-size:11px;">'
+            + '<span style="padding:3px 8px;background:var(--surface2);border-radius:6px;font-family:\'DM Mono\',monospace;">0% · SL ₹' + p.sl + '</span>'
+            + '<span style="padding:3px 8px;background:var(--green-bg);color:var(--green);border-radius:6px;font-family:\'DM Mono\',monospace;">50% @ ₹' + p50price + ' → SL to ₹' + sl50 + '</span>'
+            + '</div>'
+            + '<div style="display:flex;gap:6px;font-size:11px;">'
+            + '<span style="padding:3px 8px;background:var(--green-bg);color:var(--green);border-radius:6px;font-family:\'DM Mono\',monospace;">75% @ ₹' + p75price + ' → SL to ₹' + sl75 + '</span>'
+            + '<span style="padding:3px 8px;background:var(--green-bg);color:var(--green);border-radius:6px;font-family:\'DM Mono\',monospace;">Target ₹' + p.target + '</span>'
+            + '</div>'
+            + '</div>';
+        })() : '')
       + (isDone ? '' :
         '<div style="display:flex;align-items:center;gap:8px;">'
         + '<label style="font-size:12px;color:var(--text2);white-space:nowrap;font-weight:500;text-transform:none;letter-spacing:0;">Monday open ₹</label>'
