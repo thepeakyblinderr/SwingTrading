@@ -406,10 +406,72 @@
 
 <header class="app-header">
   <div class="logo">Swing<span>Trader</span> NSE</div>
-  <div class="header-badge" onclick="openSettings()" style="cursor:pointer;" title="Click to edit">
-    ✏️ <span id="badgeText">Midcap · Smallcap · ₹25K Capital</span>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <button class="btn btn-secondary btn-sm" onclick="openSync()" title="Sync data across devices" style="font-size:12px;">🔄 Sync</button>
+    <div class="header-badge" onclick="openSettings()" style="cursor:pointer;" title="Click to edit">
+      ✏️ <span id="badgeText">Midcap · Smallcap · ₹25K Capital</span>
+    </div>
   </div>
 </header>
+
+<!-- Sync Modal -->
+<div id="syncModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:500;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);border-radius:var(--radius);padding:24px;max-width:480px;width:92%;box-shadow:var(--shadow-lg);max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+      <div style="font-family:'Playfair Display',serif;font-size:18px;font-weight:700;">🔄 Gist Sync</div>
+      <button class="btn btn-secondary btn-sm" onclick="closeSyncModal()">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:16px;" id="syncGistStatus">Not connected</div>
+
+    <!-- Credentials -->
+    <div id="syncCredPanel">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px;">Connect your Gist</div>
+      <div style="display:grid;gap:10px;margin-bottom:12px;">
+        <div>
+          <label>GitHub Token</label>
+          <input type="password" id="sync_token" placeholder="ghp_xxxxxxxxxxxx"/>
+          <div style="font-size:11px;color:var(--text3);margin-top:3px;">Same token you use in other apps</div>
+        </div>
+        <div>
+          <label>Gist ID <span style="font-weight:400;color:var(--text3);">— leave blank to auto-create</span></label>
+          <input type="text" id="sync_gistId" placeholder="Leave blank → we'll create one for you" style="font-family:'DM Mono',monospace;font-size:12px;"/>
+          <div style="font-size:11px;color:var(--text3);margin-top:3px;">Or paste existing Gist ID if you already have one</div>
+        </div>
+      </div>
+      <div style="display:grid;gap:8px;">
+        <button class="btn btn-primary btn-sm" onclick="connectGist()" id="connectBtn">🔗 Connect</button>
+      </div>
+      <div id="createGistProgress" style="display:none;font-size:12px;color:var(--text2);text-align:center;padding:8px;">Creating Gist...</div>
+    </div>
+
+    <!-- Actions — shown after credentials saved -->
+    <div id="syncActionPanel" style="display:none;">
+      <div style="display:grid;gap:10px;margin-bottom:12px;">
+
+        <div style="padding:12px;background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border);">
+          <div style="font-size:13px;font-weight:600;margin-bottom:4px;">📤 Push to Gist</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:8px;">Saves your current data (watchlist, journal, settings) to Gist. Overwrites what's there.</div>
+          <button class="btn btn-primary btn-sm" onclick="gistPush()" style="width:100%;" id="pushBtn">📤 Push Now</button>
+        </div>
+
+        <div style="padding:12px;background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border);">
+          <div style="font-size:13px;font-weight:600;margin-bottom:4px;">📥 Pull from Gist</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:8px;">Loads data from Gist onto this device. Replaces your current local data.</div>
+          <button class="btn btn-secondary btn-sm" onclick="gistPull()" style="width:100%;" id="pullBtn">📥 Pull Now</button>
+        </div>
+
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:10px;text-align:center;" id="syncLastSync"></div>
+      <button class="btn btn-secondary btn-sm" onclick="showGistCredPanel()" style="width:100%;font-size:11px;">✏️ Edit Gist ID / Token</button>
+    </div>
+
+    <div id="syncMsg" style="display:none;margin-top:10px;padding:10px 12px;border-radius:8px;font-size:12px;text-align:center;"></div>
+
+    <div style="margin-top:12px;background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px;font-size:11px;color:var(--text3);">
+      💡 Same Gist ID and token you use in other apps. SwingTrader saves to <strong>swingtrader.json</strong> inside your Gist — won't touch other files.
+    </div>
+  </div>
+</div>
 
 <!-- Settings Modal -->
 <div id="settingsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:500;align-items:center;justify-content:center;">
@@ -1564,6 +1626,208 @@ function updateGuideRules(capital) {
   set('g_priceRange','₹' + minPrice + '–₹' + maxPriceRange);
 }
 
+// ═══════════════════ GIST SYNC ═══════════════════
+const GIST_FILE = 'swingtrader.json';
+
+function getSyncCreds() {
+  return {
+    gistId: localStorage.getItem('st_gistId') || '',
+    token:  localStorage.getItem('st_token')  || '',
+  };
+}
+
+function openSync() {
+  const { gistId, token } = getSyncCreds();
+  const hasCreds = gistId && token;
+  document.getElementById('syncCredPanel').style.display   = hasCreds ? 'none'  : 'block';
+  document.getElementById('syncActionPanel').style.display = hasCreds ? 'block' : 'none';
+  if (hasCreds) {
+    document.getElementById('sync_gistId').value = gistId;
+    document.getElementById('sync_token').value  = token;
+    const last = localStorage.getItem('st_lastSync');
+    document.getElementById('syncLastSync').textContent = last
+      ? 'Last synced: ' + new Date(parseInt(last)).toLocaleString('en-IN')
+      : 'Never synced on this device';
+    document.getElementById('syncGistStatus').textContent = 'Connected · Gist ' + gistId.slice(0,8) + '...';
+  } else {
+    document.getElementById('sync_gistId').value = '';
+    document.getElementById('sync_token').value  = '';
+    document.getElementById('syncGistStatus').textContent = 'Not connected';
+  }
+  document.getElementById('syncMsg').style.display = 'none';
+  document.getElementById('syncModal').style.display = 'flex';
+}
+
+function closeSyncModal() {
+  document.getElementById('syncModal').style.display = 'none';
+}
+
+function showGistCredPanel() {
+  const { gistId, token } = getSyncCreds();
+  document.getElementById('sync_token').value  = token;
+  document.getElementById('sync_gistId').value = gistId;
+  document.getElementById('syncCredPanel').style.display   = 'block';
+  document.getElementById('syncActionPanel').style.display = 'none';
+  document.getElementById('createGistProgress').style.display = 'none';
+}
+
+async function connectGist() {
+  const token  = document.getElementById('sync_token').value.trim();
+  const gistId = document.getElementById('sync_gistId').value.trim();
+  if (!token) { showSyncMsg('Enter your GitHub token first.', false); return; }
+
+  const btn = document.getElementById('connectBtn');
+  btn.disabled = true;
+
+  if (gistId) {
+    // Use existing Gist ID — just save and verify
+    btn.textContent = 'Verifying...';
+    try {
+      const resp = await fetch('https://api.github.com/gists/' + gistId, {
+        headers: { 'Authorization': 'token ' + token }
+      });
+      if (!resp.ok) throw new Error('Could not access Gist. Check your ID and token.');
+      saveCredAndSwitch(gistId, token);
+      showSyncMsg('✓ Connected to existing Gist!', true);
+    } catch(e) {
+      showSyncMsg(e.message, false);
+    }
+  } else {
+    // Auto-create a new Gist
+    btn.textContent = 'Creating Gist...';
+    document.getElementById('createGistProgress').style.display = 'block';
+    try {
+      const resp = await fetch('https://api.github.com/gists', {
+        method: 'POST',
+        headers: { 'Authorization': 'token ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: 'SwingTrader NSE — Sync Data',
+          public: false,
+          files: { [GIST_FILE]: { content: JSON.stringify({ v: 2, ts: Date.now(), note: 'Created by SwingTrader NSE' }, null, 2) } }
+        })
+      });
+      if (!resp.ok) {
+        const err = await resp.json();
+        throw new Error(err.message || 'Failed to create Gist. Check your token has gist scope.');
+      }
+      const gist = await resp.json();
+      const newId = gist.id;
+      document.getElementById('sync_gistId').value = newId;
+      saveCredAndSwitch(newId, token);
+      showSyncMsg('✓ New Gist created and connected! ID: ' + newId.slice(0,12) + '...', true);
+    } catch(e) {
+      showSyncMsg(e.message, false);
+    }
+    document.getElementById('createGistProgress').style.display = 'none';
+  }
+
+  btn.disabled = false;
+  btn.textContent = '🔗 Connect';
+}
+
+function saveCredAndSwitch(gistId, token) {
+  localStorage.setItem('st_gistId', gistId);
+  localStorage.setItem('st_token',  token);
+  document.getElementById('syncCredPanel').style.display   = 'none';
+  document.getElementById('syncActionPanel').style.display = 'block';
+  document.getElementById('syncGistStatus').textContent    = 'Connected · Gist ' + gistId.slice(0,8) + '...';
+  const last = localStorage.getItem('st_lastSync');
+  document.getElementById('syncLastSync').textContent = last
+    ? 'Last synced: ' + new Date(parseInt(last)).toLocaleString('en-IN')
+    : 'Never synced on this device';
+}
+
+function saveGistCredentials() { connectGist(); } // kept for compat
+
+function buildPayload() {
+  return {
+    v: 2,
+    ts: Date.now(),
+    watchlist: JSON.parse(localStorage.getItem('st_watchlist') || '[]'),
+    preset:    JSON.parse(localStorage.getItem('st_preset')    || 'null'),
+    trades:    JSON.parse(localStorage.getItem('st_trades')    || '[]'),
+    settings:  JSON.parse(localStorage.getItem('st_settings')  || '{}'),
+  };
+}
+
+function applyPayload(payload) {
+  if (payload.watchlist) localStorage.setItem('st_watchlist', JSON.stringify(payload.watchlist));
+  if (payload.preset)    localStorage.setItem('st_preset',    JSON.stringify(payload.preset));
+  if (payload.trades)    localStorage.setItem('st_trades',    JSON.stringify(payload.trades));
+  if (payload.settings)  localStorage.setItem('st_settings',  JSON.stringify(payload.settings));
+  watchlist = JSON.parse(localStorage.getItem('st_watchlist') || '[]');
+  trades    = JSON.parse(localStorage.getItem('st_trades')    || '[]');
+  loadSettings(); renderWatchlist(); renderJournal(); calcRisk();
+  localStorage.setItem('st_lastSync', Date.now().toString());
+  document.getElementById('syncLastSync').textContent = 'Last synced: ' + new Date().toLocaleString('en-IN');
+}
+
+async function gistPush() {
+  const { gistId, token } = getSyncCreds();
+  if (!gistId || !token) { showSyncMsg('Set up Gist credentials first.', false); return; }
+  const btn = document.getElementById('pushBtn');
+  btn.disabled = true; btn.textContent = 'Pushing...';
+  try {
+    const payload = buildPayload();
+    const resp = await fetch('https://api.github.com/gists/' + gistId, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'token ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(payload, null, 2) } } })
+    });
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.message || 'HTTP ' + resp.status);
+    }
+    localStorage.setItem('st_lastSync', Date.now().toString());
+    document.getElementById('syncLastSync').textContent = 'Last synced: ' + new Date().toLocaleString('en-IN');
+    showSyncMsg('✓ Pushed successfully! ' + payload.trades.length + ' trades and ' + payload.watchlist.length + ' stocks saved to Gist.', true);
+  } catch(e) {
+    showSyncMsg('Push failed: ' + e.message, false);
+  }
+  btn.disabled = false; btn.textContent = '📤 Push Now';
+}
+
+async function gistPull() {
+  const { gistId, token } = getSyncCreds();
+  if (!gistId || !token) { showSyncMsg('Set up Gist credentials first.', false); return; }
+  const btn = document.getElementById('pullBtn');
+  btn.disabled = true; btn.textContent = 'Pulling...';
+  try {
+    const resp = await fetch('https://api.github.com/gists/' + gistId, {
+      headers: { 'Authorization': 'token ' + token }
+    });
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.message || 'HTTP ' + resp.status);
+    }
+    const gist = await resp.json();
+    if (!gist.files || !gist.files[GIST_FILE]) {
+      throw new Error('swingtrader.json not found in this Gist. Push from another device first.');
+    }
+    const payload = JSON.parse(gist.files[GIST_FILE].content);
+    const tradeCount = payload.trades ? payload.trades.length : 0;
+    const wlCount    = payload.watchlist ? payload.watchlist.length : 0;
+    const savedDate  = payload.ts ? new Date(payload.ts).toLocaleString('en-IN') : 'unknown';
+    if (!confirm('Pull data from Gist?\n\nSaved on: ' + savedDate + '\n• ' + wlCount + ' watchlist stocks\n• ' + tradeCount + ' journal trades\n\nThis replaces your current local data.')) {
+      btn.disabled = false; btn.textContent = '📥 Pull Now'; return;
+    }
+    applyPayload(payload);
+    showSyncMsg('✓ Pulled successfully! ' + tradeCount + ' trades and ' + wlCount + ' stocks loaded from Gist.', true);
+  } catch(e) {
+    showSyncMsg('Pull failed: ' + e.message, false);
+  }
+  btn.disabled = false; btn.textContent = '📥 Pull Now';
+}
+
+function showSyncMsg(text, success) {
+  const msg = document.getElementById('syncMsg');
+  msg.textContent = text;
+  msg.style.display = 'block';
+  msg.style.background = success ? 'var(--green-bg)' : 'var(--red-bg)';
+  msg.style.color = success ? 'var(--green)' : 'var(--red)';
+  msg.style.border = '1px solid ' + (success ? '#b8e0cc' : '#f5c6c2');
+}
+
 function loadSettings() {
   const s = JSON.parse(localStorage.getItem('st_settings') || '{}');
   const capital  = s.capital  || 25000;
@@ -1749,9 +2013,29 @@ async function fetchStockData(symbol) {
 
   const chart   = raw.chart.result[0];
   const q       = chart.indicators.quote[0];
-  const closes  = (q.close  || []).filter(v => v != null);
-  const volumes = (q.volume || []).map(v => v || 0);
+  const allCloses  = (q.close  || []);
+  const allOpens   = (q.open   || []);
+  const allHighs   = (q.high   || []);
+  const allLows    = (q.low    || []);
+  const allVolumes = (q.volume || []);
+  const allTimestamps = (chart.timestamp || []);
+
+  // Filter to valid candles only (close must exist)
+  const validIdx = allCloses.map((v,i) => v != null ? i : -1).filter(i => i >= 0);
+  const closes   = validIdx.map(i => allCloses[i]);
+  const opens    = validIdx.map(i => allOpens[i]  || allCloses[i]);
+  const highs    = validIdx.map(i => allHighs[i]  || allCloses[i]);
+  const lows     = validIdx.map(i => allLows[i]   || allCloses[i]);
+  const volumes  = validIdx.map(i => allVolumes[i] || 0);
+  const timestamps = validIdx.map(i => allTimestamps[i] || 0);
+
   if (closes.length < 55) return null;
+
+  // Use last 60 candles for chart
+  const chartCandles = closes.slice(-60).map((c, i) => {
+    const idx = closes.length - 60 + i;
+    return { c, o: opens[idx], h: highs[idx], l: lows[idx], v: volumes[idx], ts: timestamps[idx] };
+  });
 
   const price     = closes[closes.length - 1];
   const prevClose = closes[closes.length - 2];
@@ -1779,7 +2063,7 @@ async function fetchStockData(symbol) {
   if (pctFrom52High <= 15)     { score += 20; signals.high52 = 'pass'; } else { signals.high52 = 'fail'; }
 
   const fullName = NSE_STOCKS[symbol] || '';
-  return { symbol, fullName, price, changePct, rsi, ema20, volSpike, pctFrom52High, score, signals };
+  return { symbol, fullName, price, changePct, rsi, ema20, volSpike, pctFrom52High, score, signals, chartCandles, closes };
 }
 
 // Stub — no longer needed but kept to avoid reference errors
@@ -1806,47 +2090,211 @@ function calcRSI(data, period = 14) {
   return 100 - (100 / (1 + rs));
 }
 
+let _screenerResults = [];
+
 function renderScreenerResults(results) {
+  _screenerResults = results;
   const tbody = document.getElementById('screenerBody');
   if (!results.length) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--text3);">No data could be fetched. Check your internet connection.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--text3);">No data could be fetched. Check your internet connection.</td></tr>';
     return;
   }
 
-  tbody.innerHTML = results.map(r => {
-    const scoreColor = r.score >= 70 ? 'var(--green)' : r.score >= 50 ? 'var(--orange)' : 'var(--red)';
+  tbody.innerHTML = results.map((r, idx) => {
+    const scoreColor  = r.score >= 70 ? 'var(--green)' : r.score >= 50 ? 'var(--orange)' : 'var(--red)';
     const changeColor = r.changePct >= 0 ? 'var(--green)' : 'var(--red)';
+    const barColor    = r.score >= 70 ? '#1e7a4e' : r.score >= 50 ? '#d4780a' : '#c0392b';
+    const chgSign     = r.changePct >= 0 ? '+' : '';
+    const ema20txt    = r.signals.ema20 === 'pass' ? '✓ Above' : '✗ Below';
+    const ema20col    = r.signals.ema20 === 'pass' ? 'var(--green)' : 'var(--red)';
+    const rsiClass    = r.signals.rsi === 'pass' ? 'pass' : r.signals.rsi === 'overbought' ? 'neutral' : 'fail';
 
-    const sigHTML = [
-      `<span class="sig sig-${r.signals.rsi === 'pass' ? 'pass' : r.signals.rsi === 'overbought' ? 'neutral' : 'fail'}">RSI</span>`,
-      `<span class="sig sig-${r.signals.ema20}">20E</span>`,
-      `<span class="sig sig-${r.signals.ema50}">50E</span>`,
-      `<span class="sig sig-${r.signals.vol}">VOL</span>`,
-      `<span class="sig sig-${r.signals.high52}">52W</span>`
-    ].join('');
+    const sigHTML = '<span class="sig sig-' + rsiClass + '">RSI</span>'
+      + '<span class="sig sig-' + r.signals.ema20 + '">20E</span>'
+      + '<span class="sig sig-' + r.signals.ema50 + '">50E</span>'
+      + '<span class="sig sig-' + r.signals.vol + '">VOL</span>'
+      + '<span class="sig sig-' + r.signals.high52 + '">52W</span>';
 
-    const barColor = r.score >= 70 ? '#1e7a4e' : r.score >= 50 ? '#d4780a' : '#c0392b';
-
-    return `<tr>
-      <td><strong class="mono">${r.symbol}</strong>${r.fullName ? `<br/><span style="font-size:10px;color:var(--text3);font-weight:400;">${r.fullName}</span>` : ''}</td>
-      <td class="mono">₹${r.price.toFixed(2)}</td>
-      <td class="mono" style="color:${changeColor}">${r.changePct >= 0 ? '+' : ''}${r.changePct.toFixed(2)}%</td>
-      <td class="mono">${r.rsi.toFixed(1)}</td>
-      <td class="mono">${r.volSpike.toFixed(2)}×</td>
-      <td class="mono" style="color:${r.signals.ema20==='pass'?'var(--green)':'var(--red)'}">${r.signals.ema20==='pass'?'✓ Above':'✗ Below'}</td>
-      <td class="mono">${r.pctFrom52High.toFixed(1)}% below</td>
-      <td><div class="signal-row">${sigHTML}</div></td>
-      <td>
-        <div class="score-bar-wrap">
-          <div class="score-bar"><div class="score-bar-fill" style="width:${r.score}%;background:${barColor};"></div></div>
-          <div class="score-num" style="color:${scoreColor};">${r.score}</div>
-        </div>
-      </td>
-      <td>
-        <button class="btn btn-sm btn-secondary" onclick="prefillRisk('${r.symbol}',${r.price.toFixed(2)})">⚖️ Calc</button>
-      </td>
-    </tr>`;
+    return '<tr id="row_' + idx + '">'
+      + '<td><strong class="mono">' + r.symbol + '</strong>'
+      + (r.fullName ? '<br/><span style="font-size:10px;color:var(--text3);">' + r.fullName + '</span>' : '') + '</td>'
+      + '<td class="mono">₹' + r.price.toFixed(2) + '</td>'
+      + '<td class="mono" style="color:' + changeColor + '">' + chgSign + r.changePct.toFixed(2) + '%</td>'
+      + '<td class="mono">' + r.rsi.toFixed(1) + '</td>'
+      + '<td class="mono">' + r.volSpike.toFixed(2) + '×</td>'
+      + '<td class="mono" style="color:' + ema20col + '">' + ema20txt + '</td>'
+      + '<td class="mono">' + r.pctFrom52High.toFixed(1) + '% below</td>'
+      + '<td><div class="signal-row">' + sigHTML + '</div></td>'
+      + '<td><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill" style="width:' + r.score + '%;background:' + barColor + ';"></div></div>'
+      + '<div class="score-num" style="color:' + scoreColor + ';">' + r.score + '</div></div></td>'
+      + '<td><div style="display:flex;gap:4px;">'
+      + '<button class="btn btn-sm btn-secondary" onclick="toggleChart(' + idx + ')">📈</button>'
+      + '<button class="btn btn-sm btn-secondary" onclick="prefillRisk(\'' + r.symbol + '\',' + r.price.toFixed(2) + ')">⚖️</button>'
+      + '</div></td>'
+      + '</tr>'
+      + '<tr id="chart_' + idx + '" style="display:none;">'
+      + '<td colspan="10" style="padding:0;background:var(--surface2);">'
+      + '<div style="padding:12px 16px;" id="chartWrap_' + idx + '"></div>'
+      + '</td></tr>';
   }).join('');
+}
+
+function toggleChart(idx) {
+  const row = document.getElementById('chart_' + idx);
+  const wrap = document.getElementById('chartWrap_' + idx);
+  if (!row) return;
+  if (row.style.display === 'none') {
+    row.style.display = '';
+    if (!wrap.hasChildNodes()) drawChart(idx, wrap);
+  } else {
+    row.style.display = 'none';
+  }
+}
+
+function drawChart(idx, container) {
+  const r = _screenerResults[idx];
+  if (!r || !r.chartCandles || r.chartCandles.length < 10) {
+    container.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:8px;">No chart data available.</div>';
+    return;
+  }
+
+  const candles = r.chartCandles;
+  const W = container.offsetWidth || 600;
+  const H = 200;
+  const VBAR_H = 36;
+  const PAD_L = 48; const PAD_R = 10; const PAD_T = 12; const PAD_B = 20;
+  const plotW = W - PAD_L - PAD_R;
+  const plotH = H - PAD_T - PAD_B - VBAR_H;
+
+  const prices = candles.flatMap(c => [c.h, c.l]);
+  const minP = Math.min(...prices);
+  const maxP = Math.max(...prices);
+  const priceRange = maxP - minP || 1;
+
+  const maxVol = Math.max(...candles.map(c => c.v)) || 1;
+
+  const n = candles.length;
+  const candleW = Math.max(2, Math.floor(plotW / n) - 1);
+  const gap = Math.floor(plotW / n);
+
+  // EMA arrays over closes
+  const closes = candles.map(c => c.c);
+  const ema20arr = calcEMAArray(closes, 20);
+  const ema50arr = calcEMAArray(closes, 50);
+
+  // Suggested SL & target based on recent swing low
+  const recentLows = candles.slice(-10).map(c => c.l);
+  const suggestSL  = Math.min(...recentLows) * 0.995;
+  const suggestTgt = r.price + (r.price - suggestSL) * 2;
+
+  function px(i) { return PAD_L + i * gap + gap / 2; }
+  function py(price) { return PAD_T + plotH - ((price - minP) / priceRange * plotH); }
+  function vy(vol)   { return H - PAD_B - (vol / maxVol * VBAR_H); }
+
+  let svg = '<svg width="100%" viewBox="0 0 ' + W + ' ' + H + '" style="display:block;border-radius:6px;background:var(--surface);">';
+
+  // Grid lines
+  for (let i = 0; i <= 4; i++) {
+    const y = PAD_T + (plotH / 4) * i;
+    const price = maxP - (priceRange / 4) * i;
+    svg += '<line x1="' + PAD_L + '" y1="' + y.toFixed(1) + '" x2="' + (W - PAD_R) + '" y2="' + y.toFixed(1) + '" stroke="var(--border)" stroke-width="0.5"/>';
+    svg += '<text x="' + (PAD_L - 4) + '" y="' + (y + 3).toFixed(1) + '" text-anchor="end" font-size="9" fill="var(--text3)" font-family="DM Mono,monospace">₹' + price.toFixed(0) + '</text>';
+  }
+
+  // Volume bars
+  candles.forEach((c, i) => {
+    const x = px(i) - candleW / 2;
+    const vh = H - PAD_B - vy(c.v);
+    const vcol = c.c >= c.o ? '#1e7a4e44' : '#c0392b44';
+    svg += '<rect x="' + x.toFixed(1) + '" y="' + vy(c.v).toFixed(1) + '" width="' + candleW + '" height="' + vh.toFixed(1) + '" fill="' + vcol + '"/>';
+  });
+
+  // Candles
+  candles.forEach((c, i) => {
+    const x   = px(i);
+    const col = c.c >= c.o ? '#1e7a4e' : '#c0392b';
+    const top    = py(Math.max(c.o, c.c));
+    const bot    = py(Math.min(c.o, c.c));
+    const bodyH  = Math.max(1, bot - top);
+    // Wick
+    svg += '<line x1="' + x.toFixed(1) + '" y1="' + py(c.h).toFixed(1) + '" x2="' + x.toFixed(1) + '" y2="' + py(c.l).toFixed(1) + '" stroke="' + col + '" stroke-width="0.8"/>';
+    // Body
+    svg += '<rect x="' + (x - candleW / 2).toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + candleW + '" height="' + bodyH.toFixed(1) + '" fill="' + col + '"/>';
+  });
+
+  // EMA 20
+  let ema20path = '';
+  ema20arr.forEach((v, i) => {
+    if (v == null) return;
+    ema20path += (ema20path === '' ? 'M' : 'L') + px(i).toFixed(1) + ',' + py(v).toFixed(1) + ' ';
+  });
+  if (ema20path) svg += '<path d="' + ema20path + '" fill="none" stroke="#c8722a" stroke-width="1.2" opacity="0.9"/>';
+
+  // EMA 50
+  let ema50path = '';
+  ema50arr.forEach((v, i) => {
+    if (v == null) return;
+    ema50path += (ema50path === '' ? 'M' : 'L') + px(i).toFixed(1) + ',' + py(v).toFixed(1) + ' ';
+  });
+  if (ema50path) svg += '<path d="' + ema50path + '" fill="none" stroke="#2a6bc8" stroke-width="1.2" opacity="0.9"/>';
+
+  // Current price line
+  svg += '<line x1="' + PAD_L + '" y1="' + py(r.price).toFixed(1) + '" x2="' + (W - PAD_R) + '" y2="' + py(r.price).toFixed(1) + '" stroke="var(--text2)" stroke-width="0.8" stroke-dasharray="3,2"/>';
+
+  // Suggest SL line
+  if (suggestSL > minP) {
+    svg += '<line x1="' + PAD_L + '" y1="' + py(suggestSL).toFixed(1) + '" x2="' + (W - PAD_R) + '" y2="' + py(suggestSL).toFixed(1) + '" stroke="#c0392b" stroke-width="0.8" stroke-dasharray="4,3" opacity="0.7"/>';
+    svg += '<text x="' + (W - PAD_R - 2) + '" y="' + (py(suggestSL) - 2).toFixed(1) + '" text-anchor="end" font-size="8" fill="#c0392b" font-family="DM Mono,monospace">SL ₹' + suggestSL.toFixed(0) + '</text>';
+  }
+
+  // Suggest Target line
+  if (suggestTgt < maxP * 1.1) {
+    const ty = py(Math.min(suggestTgt, maxP));
+    svg += '<line x1="' + PAD_L + '" y1="' + ty.toFixed(1) + '" x2="' + (W - PAD_R) + '" y2="' + ty.toFixed(1) + '" stroke="#1e7a4e" stroke-width="0.8" stroke-dasharray="4,3" opacity="0.7"/>';
+    svg += '<text x="' + (W - PAD_R - 2) + '" y="' + (ty - 2).toFixed(1) + '" text-anchor="end" font-size="8" fill="#1e7a4e" font-family="DM Mono,monospace">TGT ₹' + suggestTgt.toFixed(0) + '</text>';
+  }
+
+  svg += '</svg>';
+
+  // Legend + action row
+  const slAmt   = (r.price - suggestSL).toFixed(2);
+  const tgtAmt  = (suggestTgt - r.price).toFixed(2);
+  const rrRatio = (parseFloat(tgtAmt) / parseFloat(slAmt)).toFixed(2);
+
+  container.innerHTML = svg
+    + '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:11px;align-items:center;">'
+    + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:16px;height:2px;background:#c8722a;"></span> 20 EMA</span>'
+    + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:16px;height:2px;background:#2a6bc8;"></span> 50 EMA</span>'
+    + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:16px;height:1px;background:var(--text2);border-top:1px dashed var(--text2);"></span> Current</span>'
+    + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:16px;height:1px;border-top:1px dashed #c0392b;"></span> Suggest SL</span>'
+    + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:16px;height:1px;border-top:1px dashed #1e7a4e;"></span> Suggest Target</span>'
+    + '<span style="margin-left:auto;font-weight:600;color:' + (parseFloat(rrRatio) >= 2 ? 'var(--green)' : 'var(--orange)') + ';">R:R ' + rrRatio + '</span>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">'
+    + '<button class="btn btn-sm btn-secondary" onclick="prefillRiskWithSL(\'' + r.symbol + '\',' + r.price.toFixed(2) + ',' + suggestSL.toFixed(2) + ',' + suggestTgt.toFixed(2) + ')">⚖️ Use these levels in Risk Calc</button>'
+    + '</div>';
+}
+
+function calcEMAArray(data, period) {
+  const k = 2 / (period + 1);
+  const result = new Array(data.length).fill(null);
+  let ema = data.slice(0, period).reduce((a, b) => a + b, 0) / period;
+  result[period - 1] = ema;
+  for (let i = period; i < data.length; i++) {
+    ema = data[i] * k + ema * (1 - k);
+    result[i] = ema;
+  }
+  return result;
+}
+
+function prefillRiskWithSL(sym, price, sl, tgt) {
+  document.getElementById('r_symbol').value = sym;
+  document.getElementById('r_entry').value  = price;
+  document.getElementById('r_sl').value     = sl;
+  document.getElementById('r_target').value = tgt;
+  calcRisk();
+  const tabs = document.querySelectorAll('.tab-btn');
+  switchTab('risk', tabs[2]);
 }
 
 function prefillRisk(sym, price) {
@@ -2235,6 +2683,9 @@ document.getElementById('presetModal').addEventListener('click', function(e) {
 });
 document.getElementById('settingsModal').addEventListener('click', function(e) {
   if (e.target === this) closeSettings();
+});
+document.getElementById('syncModal').addEventListener('click', function(e) {
+  if (e.target === this) closeSyncModal();
 });
 </script>
 </body>
