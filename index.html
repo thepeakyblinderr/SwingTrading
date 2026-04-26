@@ -2229,7 +2229,7 @@ function renderScreenerResults(results) {
       + '<tr id="chart_' + idx + '" style="display:none;">'
       + '<td colspan="10" style="padding:0;background:var(--surface2);">'
       + (obWarning ? '<div style="padding:8px 16px;background:var(--red-bg);color:var(--red);font-size:12px;border-bottom:1px solid var(--border);">⚠️ RSI ' + r.rsi.toFixed(1) + ' — Overbought. Score is high from other signals but RSI warns this stock has run too far. Wait for RSI to pull back below 70 before entering.</div>' : '')
-      + '<div style="padding:12px 16px;" id="chartWrap_' + idx + '"></div>'
+      + '<div style="padding:16px 20px;" id="chartWrap_' + idx + '"></div>'
       + '</td></tr>';
   }).join('');
 }
@@ -2253,11 +2253,12 @@ function drawChart(idx, container) {
     return;
   }
 
-  const candles = r.chartCandles;
-  const W = container.offsetWidth || 600;
-  const H = 200;
-  const VBAR_H = 36;
-  const PAD_L = 48; const PAD_R = 10; const PAD_T = 12; const PAD_B = 20;
+  // Use last 45 candles — less cramped, more readable
+  const candles = r.chartCandles.slice(-45);
+  const W = Math.max(container.offsetWidth || 600, 320);
+  const H = 280;           // taller chart
+  const VBAR_H = 48;       // taller volume section
+  const PAD_L = 54; const PAD_R = 14; const PAD_T = 16; const PAD_B = 24;
   const plotW = W - PAD_L - PAD_R;
   const plotH = H - PAD_T - PAD_B - VBAR_H;
 
@@ -2269,8 +2270,8 @@ function drawChart(idx, container) {
   const maxVol = Math.max(...candles.map(c => c.v)) || 1;
 
   const n = candles.length;
-  const candleW = Math.max(2, Math.floor(plotW / n) - 1);
-  const gap = Math.floor(plotW / n);
+  const gap     = Math.floor(plotW / n);
+  const candleW = Math.max(3, gap - 2); // minimum 3px wide, with 2px gap between
 
   // EMA arrays over closes
   const closes = candles.map(c => c.c);
@@ -2288,12 +2289,12 @@ function drawChart(idx, container) {
 
   let svg = '<svg width="100%" viewBox="0 0 ' + W + ' ' + H + '" style="display:block;border-radius:6px;background:var(--surface);">';
 
-  // Grid lines
-  for (let i = 0; i <= 4; i++) {
-    const y = PAD_T + (plotH / 4) * i;
-    const price = maxP - (priceRange / 4) * i;
+  // Grid lines — 5 horizontal lines
+  for (let i = 0; i <= 5; i++) {
+    const y = PAD_T + (plotH / 5) * i;
+    const price = maxP - (priceRange / 5) * i;
     svg += '<line x1="' + PAD_L + '" y1="' + y.toFixed(1) + '" x2="' + (W - PAD_R) + '" y2="' + y.toFixed(1) + '" stroke="var(--border)" stroke-width="0.5"/>';
-    svg += '<text x="' + (PAD_L - 4) + '" y="' + (y + 3).toFixed(1) + '" text-anchor="end" font-size="9" fill="var(--text3)" font-family="DM Mono,monospace">₹' + price.toFixed(0) + '</text>';
+    svg += '<text x="' + (PAD_L - 6) + '" y="' + (y + 3).toFixed(1) + '" text-anchor="end" font-size="10" fill="var(--text3)" font-family="DM Mono,monospace">₹' + price.toFixed(0) + '</text>';
   }
 
   // Volume bars
@@ -2323,7 +2324,7 @@ function drawChart(idx, container) {
     if (v == null) return;
     ema20path += (ema20path === '' ? 'M' : 'L') + px(i).toFixed(1) + ',' + py(v).toFixed(1) + ' ';
   });
-  if (ema20path) svg += '<path d="' + ema20path + '" fill="none" stroke="#c8722a" stroke-width="1.2" opacity="0.9"/>';
+  if (ema20path) svg += '<path d="' + ema20path + '" fill="none" stroke="#c8722a" stroke-width="1.8" opacity="0.95"/>';
 
   // EMA 50
   let ema50path = '';
@@ -2331,22 +2332,29 @@ function drawChart(idx, container) {
     if (v == null) return;
     ema50path += (ema50path === '' ? 'M' : 'L') + px(i).toFixed(1) + ',' + py(v).toFixed(1) + ' ';
   });
-  if (ema50path) svg += '<path d="' + ema50path + '" fill="none" stroke="#2a6bc8" stroke-width="1.2" opacity="0.9"/>';
+  if (ema50path) svg += '<path d="' + ema50path + '" fill="none" stroke="#2a6bc8" stroke-width="1.8" opacity="0.95"/>';
+
+  // EMA inline labels at end of line
+  const last20 = ema20arr.filter(v => v != null).pop();
+  const last50 = ema50arr.filter(v => v != null).pop();
+  if (last20) svg += '<text x="' + (PAD_L + 28) + '" y="' + (py(last20) - 4).toFixed(1) + '" font-size="10" fill="#c8722a" font-family="DM Mono,monospace" font-weight="600">20E</text>';
+  if (last50) svg += '<text x="' + (PAD_L + 28) + '" y="' + (py(last50) + 12).toFixed(1) + '" font-size="10" fill="#2a6bc8" font-family="DM Mono,monospace" font-weight="600">50E</text>';
 
   // Current price line
-  svg += '<line x1="' + PAD_L + '" y1="' + py(r.price).toFixed(1) + '" x2="' + (W - PAD_R) + '" y2="' + py(r.price).toFixed(1) + '" stroke="var(--text2)" stroke-width="0.8" stroke-dasharray="3,2"/>';
+  svg += '<line x1="' + PAD_L + '" y1="' + py(r.price).toFixed(1) + '" x2="' + (W - PAD_R) + '" y2="' + py(r.price).toFixed(1) + '" stroke="var(--text2)" stroke-width="1" stroke-dasharray="4,3"/>';
+  svg += '<text x="' + (W - PAD_R - 2) + '" y="' + (py(r.price) - 4).toFixed(1) + '" text-anchor="end" font-size="10" fill="var(--text2)" font-family="DM Mono,monospace">₹' + r.price.toFixed(0) + '</text>';
 
   // Suggest SL line
   if (suggestSL > minP) {
-    svg += '<line x1="' + PAD_L + '" y1="' + py(suggestSL).toFixed(1) + '" x2="' + (W - PAD_R) + '" y2="' + py(suggestSL).toFixed(1) + '" stroke="#c0392b" stroke-width="0.8" stroke-dasharray="4,3" opacity="0.7"/>';
-    svg += '<text x="' + (W - PAD_R - 2) + '" y="' + (py(suggestSL) - 2).toFixed(1) + '" text-anchor="end" font-size="8" fill="#c0392b" font-family="DM Mono,monospace">SL ₹' + suggestSL.toFixed(0) + '</text>';
+    svg += '<line x1="' + PAD_L + '" y1="' + py(suggestSL).toFixed(1) + '" x2="' + (W - PAD_R) + '" y2="' + py(suggestSL).toFixed(1) + '" stroke="#c0392b" stroke-width="1.2" stroke-dasharray="5,3" opacity="0.8"/>';
+    svg += '<text x="' + (W - PAD_R - 2) + '" y="' + (py(suggestSL) - 3).toFixed(1) + '" text-anchor="end" font-size="10" fill="#c0392b" font-family="DM Mono,monospace">SL ₹' + suggestSL.toFixed(0) + '</text>';
   }
 
   // Suggest Target line
   if (suggestTgt < maxP * 1.1) {
     const ty = py(Math.min(suggestTgt, maxP));
-    svg += '<line x1="' + PAD_L + '" y1="' + ty.toFixed(1) + '" x2="' + (W - PAD_R) + '" y2="' + ty.toFixed(1) + '" stroke="#1e7a4e" stroke-width="0.8" stroke-dasharray="4,3" opacity="0.7"/>';
-    svg += '<text x="' + (W - PAD_R - 2) + '" y="' + (ty - 2).toFixed(1) + '" text-anchor="end" font-size="8" fill="#1e7a4e" font-family="DM Mono,monospace">TGT ₹' + suggestTgt.toFixed(0) + '</text>';
+    svg += '<line x1="' + PAD_L + '" y1="' + ty.toFixed(1) + '" x2="' + (W - PAD_R) + '" y2="' + ty.toFixed(1) + '" stroke="#1e7a4e" stroke-width="1.2" stroke-dasharray="5,3" opacity="0.8"/>';
+    svg += '<text x="' + (W - PAD_R - 2) + '" y="' + (ty - 3).toFixed(1) + '" text-anchor="end" font-size="10" fill="#1e7a4e" font-family="DM Mono,monospace">TGT ₹' + suggestTgt.toFixed(0) + '</text>';
   }
 
   svg += '</svg>';
