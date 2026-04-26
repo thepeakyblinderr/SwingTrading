@@ -268,6 +268,7 @@
   /* LOADER */
   .loader { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
   /* SCREENER */
   .screener-controls { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 16px; }
@@ -407,7 +408,10 @@
 <header class="app-header">
   <div class="logo">Swing<span>Trader</span> NSE</div>
   <div style="display:flex;align-items:center;gap:8px;">
-    <button class="btn btn-secondary btn-sm" onclick="openSync()" title="Sync data across devices" style="font-size:12px;">🔄 Sync</button>
+    <div id="syncStatusPill" onclick="openSync()" title="Sync status" style="display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;background:var(--surface2);border:1px solid var(--border);cursor:pointer;font-size:11px;font-weight:600;transition:all 0.2s;">
+      <span id="syncDot" style="width:7px;height:7px;border-radius:50%;background:var(--text3);flex-shrink:0;"></span>
+      <span id="syncPillText">Sync</span>
+    </div>
     <div class="header-badge" onclick="openSettings()" style="cursor:pointer;" title="Click to edit">
       ✏️ <span id="badgeText">Midcap · Smallcap · ₹25K Capital</span>
     </div>
@@ -1628,6 +1632,55 @@ function updateGuideRules(capital) {
 
 // ═══════════════════ GIST SYNC ═══════════════════
 const GIST_FILE = 'swingtrader.json';
+let _syncTimer = null;
+
+// Status: 'idle' | 'syncing' | 'ok' | 'error' | 'unsaved' | 'offline'
+function setSyncStatus(status, msg) {
+  const dot  = document.getElementById('syncDot');
+  const text = document.getElementById('syncPillText');
+  if (!dot || !text) return;
+  const map = {
+    idle:    { color: 'var(--text3)',   label: 'Sync'       },
+    syncing: { color: '#c8722a',        label: 'Syncing...' },
+    ok:      { color: 'var(--green)',   label: 'Synced'     },
+    error:   { color: 'var(--red)',     label: 'Sync failed'},
+    unsaved: { color: '#c8722a',        label: 'Unsaved'    },
+    offline: { color: 'var(--text3)',   label: 'Offline'    },
+  };
+  const s = map[status] || map.idle;
+  dot.style.background  = s.color;
+  text.style.color      = s.color;
+  text.textContent      = msg || s.label;
+  // Animate dot when syncing
+  dot.style.animation   = status === 'syncing' ? 'pulse 0.8s ease infinite' : 'none';
+}
+
+// Debounced auto-push — fires 3s after last change if Gist is connected
+function autoSync() {
+  const { gistId, token } = getSyncCreds();
+  if (!gistId || !token) return; // not set up, skip silently
+  setSyncStatus('unsaved');
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(async () => {
+    setSyncStatus('syncing');
+    try {
+      const payload = buildPayload();
+      const resp = await fetch('https://api.github.com/gists/' + gistId, {
+        method: 'PATCH',
+        headers: { 'Authorization': 'token ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(payload, null, 2) } } })
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      localStorage.setItem('st_lastSync', Date.now().toString());
+      setSyncStatus('ok');
+      document.getElementById('syncLastSync').textContent = 'Last synced: ' + new Date().toLocaleString('en-IN');
+      setTimeout(() => setSyncStatus('idle'), 3000);
+    } catch(e) {
+      setSyncStatus('error');
+      setTimeout(() => setSyncStatus('unsaved'), 4000);
+    }
+  }, 3000);
+}
 
 function getSyncCreds() {
   return {
@@ -1735,6 +1788,7 @@ function saveCredAndSwitch(gistId, token) {
   document.getElementById('syncLastSync').textContent = last
     ? 'Last synced: ' + new Date(parseInt(last)).toLocaleString('en-IN')
     : 'Never synced on this device';
+  setSyncStatus('idle');
 }
 
 function saveGistCredentials() { connectGist(); } // kept for compat
@@ -1767,6 +1821,7 @@ async function gistPush() {
   if (!gistId || !token) { showSyncMsg('Set up Gist credentials first.', false); return; }
   const btn = document.getElementById('pushBtn');
   btn.disabled = true; btn.textContent = 'Pushing...';
+  setSyncStatus('syncing');
   try {
     const payload = buildPayload();
     const resp = await fetch('https://api.github.com/gists/' + gistId, {
@@ -1780,8 +1835,12 @@ async function gistPush() {
     }
     localStorage.setItem('st_lastSync', Date.now().toString());
     document.getElementById('syncLastSync').textContent = 'Last synced: ' + new Date().toLocaleString('en-IN');
-    showSyncMsg('✓ Pushed successfully! ' + payload.trades.length + ' trades and ' + payload.watchlist.length + ' stocks saved to Gist.', true);
+    setSyncStatus('ok');
+    setTimeout(() => setSyncStatus('idle'), 3000);
+    showSyncMsg('✓ Pushed! ' + payload.trades.length + ' trades and ' + payload.watchlist.length + ' stocks saved.', true);
   } catch(e) {
+    setSyncStatus('error');
+    setTimeout(() => setSyncStatus('idle'), 4000);
     showSyncMsg('Push failed: ' + e.message, false);
   }
   btn.disabled = false; btn.textContent = '📤 Push Now';
@@ -1872,8 +1931,9 @@ function saveSettings() {
   document.getElementById('badgeText').textContent =
     `${universe} · ₹${Number(capital).toLocaleString('en-IN')} Capital`;
   closeSettings();
+  autoSync();
 }
-function saveWatchlist() { localStorage.setItem('st_watchlist', JSON.stringify(watchlist)); }
+function saveWatchlist() { localStorage.setItem('st_watchlist', JSON.stringify(watchlist)); autoSync(); }
 
 function renderWatchlist() {
   const wrap = document.getElementById('watchlistTags');
@@ -2540,7 +2600,7 @@ function updateMonitor(id, entry, sl, tgt, days, curPriceStr) {
 }
 
 // ═══════════════════ JOURNAL ═══════════════════
-function saveTrades() { localStorage.setItem('st_trades', JSON.stringify(trades)); }
+function saveTrades() { localStorage.setItem('st_trades', JSON.stringify(trades)); autoSync(); }
 
 function addTrade() {
   const sym = document.getElementById('j_sym').value.trim().toUpperCase();
@@ -2677,6 +2737,20 @@ renderWatchlist();
 renderJournal();
 calcRisk();
 document.getElementById('j_date').value = new Date().toISOString().split('T')[0];
+
+// Init sync pill
+const _initCreds = getSyncCreds();
+if (_initCreds.gistId && _initCreds.token) {
+  const _last = localStorage.getItem('st_lastSync');
+  setSyncStatus('idle');
+  if (_last) {
+    document.getElementById('syncPillText').textContent = 'Synced';
+    document.getElementById('syncDot').style.background = 'var(--green)';
+    document.getElementById('syncPillText').style.color = 'var(--green)';
+  }
+} else {
+  setSyncStatus('offline');
+}
 
 document.getElementById('presetModal').addEventListener('click', function(e) {
   if (e.target === this) closePresetManager();
