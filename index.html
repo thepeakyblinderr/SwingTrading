@@ -569,6 +569,7 @@
             <th>Vol Spike</th>
             <th>vs 20 EMA</th>
             <th>vs 52W High</th>
+            <th>ATR (14)</th>
             <th>Signals</th>
             <th>Score</th>
             <th>Action</th>
@@ -788,7 +789,9 @@
     <button class="btn btn-secondary btn-sm" onclick="showGuide('g_exit',this)">🚪 Exit Rules</button>
     <button class="btn btn-secondary btn-sm" onclick="showGuide('g_weekly',this)">📅 Weekly Review</button>
     <button class="btn btn-secondary btn-sm" onclick="showGuide('g_groww',this)">📱 Groww Guide</button>
+    <button class="btn btn-secondary btn-sm" onclick="showGuide('g_concepts',this)">🧠 Concepts</button>
     <button class="btn btn-secondary btn-sm" onclick="showGuide('g_sim',this)">🎬 Simulation</button>
+    <button class="btn btn-secondary btn-sm" onclick="showGuide('g_learnings',this)">✏️ My Learnings</button>
   </div>
 
   <!-- ── PLAYBOOK ── -->
@@ -1179,6 +1182,127 @@
           <div style="padding:10px;background:var(--green-bg);border-radius:8px;text-align:center;color:var(--green);border:1px solid #b8e0cc;"><div style="font-size:20px;font-weight:600;">+10.3%</div><div style="font-size:11px;margin-top:2px;">Trade return</div></div>
           <div style="padding:10px;background:var(--green-bg);border-radius:8px;text-align:center;color:var(--green);border:1px solid #b8e0cc;"><div style="font-size:20px;font-weight:600;">1:2.02</div><div style="font-size:11px;margin-top:2px;">Actual R:R</div></div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CONCEPTS ── -->
+  <div id="g_concepts" class="g-panel" style="display:none;">
+    <div style="font-size:12px;color:var(--text2);margin-bottom:14px;">Every indicator and concept used in this app — explained in plain English. Updated as new features are added.</div>
+    <div class="grid-2">
+      <div>
+        <div class="card" style="margin-bottom:12px;">
+          <div class="card-title">📊 RSI — Relative Strength Index</div>
+          <div style="display:grid;gap:8px;font-size:13px;color:var(--text2);">
+            <div><strong style="color:var(--text);">What it is:</strong> Measures how fast and how much a stock has moved up vs down over 14 days. Scale of 0–100.</div>
+            <div><strong style="color:var(--text);">How calculated:</strong> Compares average gains to average losses over 14 trading days. More up days = higher RSI.</div>
+            <div style="display:grid;gap:4px;">
+              <div style="padding:6px 10px;background:var(--red-bg);border-radius:6px;font-size:12px;color:var(--red);">Above 70 = Overbought — stock ran too far, avoid</div>
+              <div style="padding:6px 10px;background:var(--green-bg);border-radius:6px;font-size:12px;color:var(--green);">55–70 = Sweet spot — momentum entry zone ✓</div>
+              <div style="padding:6px 10px;background:var(--surface2);border-radius:6px;font-size:12px;">40–55 = Neutral — weak, wait</div>
+              <div style="padding:6px 10px;background:var(--red-bg);border-radius:6px;font-size:12px;color:var(--red);">Below 50 = Exit warning for open trades</div>
+            </div>
+            <div><strong style="color:var(--text);">In the app:</strong> Score capped at 60 if RSI above 70. Trade Monitor warns if RSI drops below 50.</div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:12px;">
+          <div class="card-title">📈 EMA — Exponential Moving Average</div>
+          <div style="display:grid;gap:8px;font-size:13px;color:var(--text2);">
+            <div><strong style="color:var(--text);">What it is:</strong> Smoothed average of closing prices, giving more weight to recent days. A curved line on the chart.</div>
+            <div style="display:grid;gap:4px;">
+              <div style="padding:6px 10px;background:var(--surface2);border-radius:6px;font-size:12px;display:flex;gap:8px;align-items:center;"><span style="width:20px;height:3px;background:#c8722a;border-radius:2px;flex-shrink:0;display:inline-block;"></span><strong>20 EMA</strong> — last 20 days ≈ 1 month. Short-term trend.</div>
+              <div style="padding:6px 10px;background:var(--surface2);border-radius:6px;font-size:12px;display:flex;gap:8px;align-items:center;"><span style="width:20px;height:3px;background:#2a6bc8;border-radius:2px;flex-shrink:0;display:inline-block;"></span><strong>50 EMA</strong> — last 50 days ≈ 2.5 months. Medium-term trend.</div>
+            </div>
+            <div style="display:grid;gap:4px;">
+              <div style="padding:6px 10px;background:var(--green-bg);border-radius:6px;font-size:12px;color:var(--green);">Price above both = uptrend ✓ safe entry</div>
+              <div style="padding:6px 10px;background:var(--red-bg);border-radius:6px;font-size:12px;color:var(--red);">Price below both = downtrend, score capped at 40</div>
+              <div style="padding:6px 10px;background:var(--orange-bg);border-radius:6px;font-size:12px;color:var(--orange);">Dip to 20 EMA + bounce = best entry signal</div>
+            </div>
+            <div><strong style="color:var(--text);">In the app:</strong> Both EMAs on chart in orange and blue. Trade Monitor checks 20 EMA weekly.</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">📦 Volume Spike</div>
+          <div style="display:grid;gap:8px;font-size:13px;color:var(--text2);">
+            <div><strong style="color:var(--text);">What it is:</strong> Today's volume vs 20-day average. A spike = unusual participation from big players.</div>
+            <div style="display:grid;gap:4px;">
+              <div style="padding:6px 10px;background:var(--green-bg);border-radius:6px;font-size:12px;color:var(--green);">1.5× or more = strong breakout ✓</div>
+              <div style="padding:6px 10px;background:var(--surface2);border-radius:6px;font-size:12px;">1.0–1.5× = moderate, acceptable</div>
+              <div style="padding:6px 10px;background:var(--red-bg);border-radius:6px;font-size:12px;color:var(--red);">Below 1× = weak, breakout likely to fail</div>
+            </div>
+            <div><strong style="color:var(--text);">In the app:</strong> Shown as multiplier (e.g. 2.1×) in screener. Volume bars on chart coloured green/red.</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:12px;">
+          <div class="card-title">📏 ATR — Average True Range</div>
+          <div style="display:grid;gap:8px;font-size:13px;color:var(--text2);">
+            <div><strong style="color:var(--text);">What it is:</strong> How much a stock typically moves in a single day, in rupees. The most accurate way to set a stop-loss.</div>
+            <div><strong style="color:var(--text);">How calculated:</strong> True Range each day = biggest of (High−Low), |High−Prev Close|, |Low−Prev Close|. ATR = average of last 14 days.</div>
+            <div><strong style="color:var(--text);">Why better than % SL:</strong> A 5% SL ignores actual volatility. ATR respects how each stock actually moves.</div>
+            <div style="display:grid;gap:4px;">
+              <div style="padding:6px 10px;background:var(--surface2);border-radius:6px;font-size:12px;"><strong>1.5× ATR SL</strong> — tighter, for low volatility stocks (ATR% below 2%)</div>
+              <div style="padding:6px 10px;background:var(--surface2);border-radius:6px;font-size:12px;"><strong>2× ATR SL</strong> — wider, for high volatility stocks (ATR% above 4%)</div>
+            </div>
+            <div style="padding:8px 10px;background:var(--orange-bg);border-radius:6px;font-size:12px;color:var(--orange);"><strong>Example:</strong> BEL ₹282, ATR ₹11<br/>1.5× ATR SL = ₹282 − ₹16.50 = ₹265.50<br/>Better than guessing 5% = ₹268</div>
+            <div style="display:grid;gap:4px;">
+              <div style="padding:6px 10px;background:var(--green-bg);border-radius:6px;font-size:12px;color:var(--green);">ATR% below 2% = low volatility, safer</div>
+              <div style="padding:6px 10px;background:var(--orange-bg);border-radius:6px;font-size:12px;color:var(--orange);">ATR% 2–4% = medium, normal for midcaps</div>
+              <div style="padding:6px 10px;background:var(--red-bg);border-radius:6px;font-size:12px;color:var(--red);">ATR% above 4% = high volatility, use 2× ATR SL</div>
+            </div>
+            <div><strong style="color:var(--text);">In the app:</strong> ATR column in screener. Chart shows 1.5× and 2× ATR SL levels below the candles.</div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:12px;">
+          <div class="card-title">📌 52-Week High Proximity</div>
+          <div style="display:grid;gap:8px;font-size:13px;color:var(--text2);">
+            <div><strong style="color:var(--text);">What it is:</strong> How far current price is from the highest price in the last 52 weeks.</div>
+            <div style="display:grid;gap:4px;">
+              <div style="padding:6px 10px;background:var(--green-bg);border-radius:6px;font-size:12px;color:var(--green);">Within 15% = breakout zone ✓ +20 pts</div>
+              <div style="padding:6px 10px;background:var(--surface2);border-radius:6px;font-size:12px;">15–30% below = recovery mode, weaker</div>
+              <div style="padding:6px 10px;background:var(--red-bg);border-radius:6px;font-size:12px;color:var(--red);">More than 30% below = beaten down, avoid</div>
+            </div>
+            <div><strong style="color:var(--text);">Why it matters:</strong> Stocks near their 52W high have proven they can reach that level. Breaking through attracts more buyers.</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">⚖️ Risk:Reward Ratio (R:R)</div>
+          <div style="display:grid;gap:8px;font-size:13px;color:var(--text2);">
+            <div><strong style="color:var(--text);">Formula:</strong> R:R = (Target − Entry) ÷ (Entry − SL)</div>
+            <div style="padding:8px 10px;background:var(--surface2);border-radius:6px;font-size:12px;">Entry ₹282, SL ₹268, Target ₹312<br/>Risk ₹14 · Reward ₹30 · R:R = <strong>1:2.14</strong></div>
+            <div style="display:grid;gap:4px;">
+              <div style="padding:6px 10px;background:var(--green-bg);border-radius:6px;font-size:12px;color:var(--green);">1:2 or better = take the trade ✓</div>
+              <div style="padding:6px 10px;background:var(--orange-bg);border-radius:6px;font-size:12px;color:var(--orange);">1:1.5 = borderline, adjust or skip</div>
+              <div style="padding:6px 10px;background:var(--red-bg);border-radius:6px;font-size:12px;color:var(--red);">Below 1:1.5 = skip</div>
+            </div>
+            <div><strong style="color:var(--text);">Key insight:</strong> Even with 50% win rate, 1:2 R:R means you profit. Wins make ₹1,000, losses cost ₹500 — you still come out ahead.</div>
+            <div><strong style="color:var(--text);">In the app:</strong> Risk Calculator shows R:R live. Chart shows R:R for suggested levels.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MY LEARNINGS ── -->
+  <div id="g_learnings" class="g-panel" style="display:none;">
+    <div class="card">
+      <div class="card-title">✏️ My Learnings — Personal Trade Notes</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Write down what you learn from each trade. Patterns, mistakes, what worked. This is more valuable than any indicator.</div>
+      <textarea id="learningsText" style="width:100%;min-height:220px;font-size:13px;line-height:1.7;" placeholder="e.g.&#10;- BEL Oct 2024: RSI breakout at 63 worked well. Volume spike was the key signal.&#10;- GRANULES loss: RSI dropped below 50 by day 3 — should have exited earlier.&#10;- Lesson: Don't enter when RSI already above 68, even if other signals pass.&#10;- Defence sector: when BEL moves, HAL and MAZDOCK tend to follow within 2–3 days."></textarea>
+      <div style="display:flex;gap:8px;margin-top:10px;align-items:center;">
+        <button class="btn btn-primary" onclick="saveLearnings()" style="flex:1;">💾 Save</button>
+        <div id="learningsSaved" style="font-size:12px;color:var(--green);display:none;">✓ Saved</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">💡 What to write after each trade</div>
+      <div style="display:grid;gap:6px;font-size:13px;color:var(--text2);">
+        <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;">📈 <strong>What worked:</strong> Which signal was most accurate?</div>
+        <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;">📉 <strong>What didn't:</strong> Any signal you ignored that you shouldn't have?</div>
+        <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;">😤 <strong>Emotions:</strong> Tempted to exit early? Hold a loser? Be honest.</div>
+        <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;">🔁 <strong>One change:</strong> What would you do differently next time?</div>
+        <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;">🧠 <strong>Sector pattern:</strong> Did sector heat predict individual stock move?</div>
       </div>
     </div>
   </div>
@@ -1629,6 +1753,22 @@ function showGuide(id, btn) {
   document.getElementById(id).style.display = 'block';
   document.querySelectorAll('#guideTabs button').forEach(b => b.className = 'btn btn-secondary btn-sm');
   btn.className = 'btn btn-primary btn-sm';
+  if (id === 'g_learnings') loadLearnings();
+}
+
+function saveLearnings() {
+  const text = document.getElementById('learningsText').value;
+  localStorage.setItem('st_learnings', text);
+  autoSync();
+  const msg = document.getElementById('learningsSaved');
+  msg.style.display = 'block';
+  setTimeout(() => msg.style.display = 'none', 2000);
+}
+
+function loadLearnings() {
+  const saved = localStorage.getItem('st_learnings') || '';
+  const el = document.getElementById('learningsText');
+  if (el) el.value = saved;
 }
 
 function showSim(idx, btn) {
@@ -1828,6 +1968,7 @@ function buildPayload() {
     trades:    JSON.parse(localStorage.getItem('st_trades')    || '[]'),
     settings:  JSON.parse(localStorage.getItem('st_settings')  || '{}'),
     plans:     JSON.parse(localStorage.getItem('st_plans')     || '[]'),
+    learnings: localStorage.getItem('st_learnings') || '',
   };
 }
 
@@ -1837,10 +1978,11 @@ function applyPayload(payload) {
   if (payload.trades)    localStorage.setItem('st_trades',    JSON.stringify(payload.trades));
   if (payload.settings)  localStorage.setItem('st_settings',  JSON.stringify(payload.settings));
   if (payload.plans)     localStorage.setItem('st_plans',     JSON.stringify(payload.plans));
+  if (payload.learnings) localStorage.setItem('st_learnings', payload.learnings || '');
   watchlist = JSON.parse(localStorage.getItem('st_watchlist') || '[]');
   trades    = JSON.parse(localStorage.getItem('st_trades')    || '[]');
   plans     = JSON.parse(localStorage.getItem('st_plans')     || '[]');
-  loadSettings(); renderWatchlist(); renderJournal(); calcRisk();
+  loadSettings(); renderWatchlist(); renderJournal(); renderSundayPlans(); renderCapitalDashboard(); calcRisk();
   localStorage.setItem('st_lastSync', Date.now().toString());
   document.getElementById('syncLastSync').textContent = 'Last synced: ' + new Date().toLocaleString('en-IN');
 }
@@ -2141,18 +2283,40 @@ async function fetchStockData(symbol) {
 
   let score = 0;
   const signals = {};
+
+  // RSI signal
   if (rsi >= 55 && rsi <= 70)  { score += 20; signals.rsi = 'pass'; }
   else if (rsi > 70)           { signals.rsi = 'overbought'; }
   else                         { signals.rsi = 'fail'; }
+
+  // EMA signals
   if (price > ema20)           { score += 20; signals.ema20 = 'pass'; } else { signals.ema20 = 'fail'; }
   if (price > ema50)           { score += 20; signals.ema50 = 'pass'; } else { signals.ema50 = 'fail'; }
+
+  // Volume signal
   if (volSpike >= 1.5)         { score += 20; signals.vol = 'pass'; }
   else if (volSpike >= 1.0)    { signals.vol = 'neutral'; }
   else                         { signals.vol = 'fail'; }
+
+  // 52W High proximity
   if (pctFrom52High <= 15)     { score += 20; signals.high52 = 'pass'; } else { signals.high52 = 'fail'; }
 
+  // ── Hard caps & penalties ──
+  // If RSI overbought — hard cap at 60. An overheated stock is not a valid entry
+  // regardless of how many other signals pass.
+  if (signals.rsi === 'overbought') score = Math.min(score, 60);
+
+  // If price below BOTH EMAs — this is a downtrend. Cap at 40.
+  if (signals.ema20 === 'fail' && signals.ema50 === 'fail') score = Math.min(score, 40);
+
+  // If RSI below 50 (weak momentum) — cap at 50
+  if (rsi < 50) score = Math.min(score, 50);
+
   const fullName = NSE_STOCKS[symbol] || '';
-  return { symbol, fullName, price, changePct, rsi, ema20, volSpike, pctFrom52High, score, signals, chartCandles, closes };
+  // ATR using last 60 candles (same as chart candles)
+  const atr = calcATR(chartCandles, 14);
+  const atrPct = atr ? (atr / price * 100) : null;
+  return { symbol, fullName, price, changePct, rsi, ema20, volSpike, pctFrom52High, score, signals, chartCandles, closes, atr, atrPct };
 }
 
 // Stub — no longer needed but kept to avoid reference errors
@@ -2177,6 +2341,24 @@ function calcRSI(data, period = 14) {
   if (losses === 0) return 100;
   const rs = (gains / period) / (losses / period);
   return 100 - (100 / (1 + rs));
+}
+
+function calcATR(candles, period = 14) {
+  // ATR = Average True Range over last N candles
+  // True Range = max of:
+  //   High - Low
+  //   |High - Previous Close|
+  //   |Low  - Previous Close|
+  if (candles.length < period + 1) return null;
+  const trs = [];
+  for (let i = 1; i < candles.length; i++) {
+    const h = candles[i].h, l = candles[i].l, pc = candles[i-1].c;
+    const tr = Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc));
+    trs.push(tr);
+  }
+  // Simple average of last N true ranges
+  const recent = trs.slice(-period);
+  return recent.reduce((a, b) => a + b, 0) / period;
 }
 
 let _screenerResults = [];
@@ -2218,6 +2400,9 @@ function renderScreenerResults(results) {
       + '<td class="mono">' + r.volSpike.toFixed(2) + '×</td>'
       + '<td class="mono" style="color:' + ema20col + '">' + ema20txt + '</td>'
       + '<td class="mono">' + r.pctFrom52High.toFixed(1) + '% below</td>'
+      + '<td class="mono">'
+      + (r.atr ? '₹' + r.atr.toFixed(1) + '<br/><span style="font-size:10px;color:var(--text3);">' + r.atrPct.toFixed(1) + '%</span>' : '—')
+      + '</td>'
       + '<td><div class="signal-row">' + sigHTML + '</div></td>'
       + '<td><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill" style="width:' + r.score + '%;background:' + barColor + ';"></div></div>'
       + '<div class="score-num" style="color:' + scoreColor + ';">' + r.score + '</div></div></td>'
@@ -2278,9 +2463,13 @@ function drawChart(idx, container) {
   const ema20arr = calcEMAArray(closes, 20);
   const ema50arr = calcEMAArray(closes, 50);
 
-  // Suggested SL & target based on recent swing low
+  // SL: use 1.5× ATR below current price if ATR available, else swing low
   const recentLows = candles.slice(-10).map(c => c.l);
-  const suggestSL  = Math.min(...recentLows) * 0.995;
+  const swingLowSL = Math.min(...recentLows) * 0.995;
+  const atrSL      = r.atr ? (r.price - r.atr * 1.5) : null;
+  // Use ATR SL if it's tighter than swing low SL (more precise)
+  const suggestSL  = atrSL && atrSL > swingLowSL ? atrSL : swingLowSL;
+  const slMethod   = atrSL && atrSL > swingLowSL ? 'ATR' : 'Swing';
   const suggestTgt = r.price + (r.price - suggestSL) * 2;
 
   function px(i) { return PAD_L + i * gap + gap / 2; }
@@ -2337,8 +2526,16 @@ function drawChart(idx, container) {
   // EMA inline labels at end of line
   const last20 = ema20arr.filter(v => v != null).pop();
   const last50 = ema50arr.filter(v => v != null).pop();
-  if (last20) svg += '<text x="' + (PAD_L + 28) + '" y="' + (py(last20) - 4).toFixed(1) + '" font-size="10" fill="#c8722a" font-family="DM Mono,monospace" font-weight="600">20E</text>';
-  if (last50) svg += '<text x="' + (PAD_L + 28) + '" y="' + (py(last50) + 12).toFixed(1) + '" font-size="10" fill="#2a6bc8" font-family="DM Mono,monospace" font-weight="600">50E</text>';
+  // Clamp labels within the price plot area (PAD_T to PAD_T + plotH)
+  const clamp = (y, min, max) => Math.min(Math.max(y, min), max);
+  if (last20) {
+    const ly = clamp(py(last20) - 4, PAD_T + 10, PAD_T + plotH - 4);
+    svg += '<text x="' + (PAD_L + 4) + '" y="' + ly.toFixed(1) + '" font-size="10" fill="#c8722a" font-family="DM Mono,monospace" font-weight="600">20E</text>';
+  }
+  if (last50) {
+    const ly = clamp(py(last50) + 12, PAD_T + 10, PAD_T + plotH - 4);
+    svg += '<text x="' + (PAD_L + 4) + '" y="' + ly.toFixed(1) + '" font-size="10" fill="#2a6bc8" font-family="DM Mono,monospace" font-weight="600">50E</text>';
+  }
 
   // Current price line
   svg += '<line x1="' + PAD_L + '" y1="' + py(r.price).toFixed(1) + '" x2="' + (W - PAD_R) + '" y2="' + py(r.price).toFixed(1) + '" stroke="var(--text2)" stroke-width="1" stroke-dasharray="4,3"/>';
@@ -2369,10 +2566,17 @@ function drawChart(idx, container) {
     + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:16px;height:2px;background:#c8722a;"></span> 20 EMA</span>'
     + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:16px;height:2px;background:#2a6bc8;"></span> 50 EMA</span>'
     + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:16px;height:1px;background:var(--text2);border-top:1px dashed var(--text2);"></span> Current</span>'
-    + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:16px;height:1px;border-top:1px dashed #c0392b;"></span> Suggest SL</span>'
-    + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:16px;height:1px;border-top:1px dashed #1e7a4e;"></span> Suggest Target</span>'
+    + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:16px;height:1px;border-top:1px dashed #c0392b;"></span> SL (' + slMethod + ')</span>'
+    + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:16px;height:1px;border-top:1px dashed #1e7a4e;"></span> Target</span>'
     + '<span style="margin-left:auto;font-weight:600;color:' + (parseFloat(rrRatio) >= 2 ? 'var(--green)' : 'var(--orange)') + ';">R:R ' + rrRatio + '</span>'
     + '</div>'
+    + (r.atr ? '<div style="margin-top:6px;padding:6px 10px;background:var(--surface2);border-radius:6px;font-size:11px;color:var(--text2);display:flex;gap:16px;flex-wrap:wrap;">'
+      + '<span>ATR(14): <strong style="font-family:\'DM Mono\',monospace;">₹' + r.atr.toFixed(1) + '</strong></span>'
+      + '<span>ATR%: <strong style="font-family:\'DM Mono\',monospace;">' + r.atrPct.toFixed(1) + '%</strong></span>'
+      + '<span>1.5× ATR SL: <strong style="font-family:\'DM Mono\',monospace;color:var(--red);">₹' + (r.price - r.atr * 1.5).toFixed(0) + '</strong></span>'
+      + '<span>2× ATR SL: <strong style="font-family:\'DM Mono\',monospace;color:var(--orange);">₹' + (r.price - r.atr * 2).toFixed(0) + '</strong></span>'
+      + '<span style="color:var(--text3);">Higher ATR% = more volatile stock</span>'
+      + '</div>' : '')
     + '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">'
     + '<button class="btn btn-sm btn-secondary" onclick="prefillRiskWithSL(\'' + r.symbol + '\',' + r.price.toFixed(2) + ',' + suggestSL.toFixed(2) + ',' + suggestTgt.toFixed(2) + ')">⚖️ Use these levels in Risk Calc</button>'
     + '</div>';
@@ -2407,7 +2611,7 @@ function prefillRisk(sym, price) {
   document.getElementById('r_target').value = (price * 1.10).toFixed(2);
   calcRisk();
   const tabs = document.querySelectorAll('.tab-btn');
-  switchTab('risk', tabs[1]);
+  switchTab('risk', tabs[2]);
 }
 
 // ═══════════════════ RISK CALCULATOR ═══════════════════
@@ -2633,7 +2837,7 @@ function markPlan(id, status) {
   if (status === 'executed') {
     // Switch to journal so they can see the trade monitor immediately
     const tabs = document.querySelectorAll('.tab-btn');
-    switchTab('journal', tabs[2]);
+    switchTab('journal', tabs[3]);
     setTimeout(() => {
       alert('Trade logged in Journal! Scroll up to see the Trade Monitor with your 50%/75% SL ladder.');
     }, 300);
@@ -2785,7 +2989,7 @@ function sendToJournal() {
   document.getElementById('j_date').value = new Date().toISOString().split('T')[0];
 
   const tabs = document.querySelectorAll('.tab-btn');
-  switchTab('journal', tabs[2]);
+  switchTab('journal', tabs[3]);
   renderJournal();
 }
 
