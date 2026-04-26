@@ -1338,12 +1338,36 @@
         <div style="font-size:13px;color:var(--text2);">Live sector heat — ranked by 5-day price performance.</div>
         <div style="font-size:11px;color:var(--text3);margin-top:2px;" id="discoverMeta">Not loaded yet · click Refresh to fetch</div>
       </div>
-      <button class="btn btn-primary" onclick="runDiscover()" id="discoverBtn">🔥 Refresh Heat</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary btn-sm" onclick="openSectorManager()">⚙️ Manage Sectors</button>
+        <button class="btn btn-primary" onclick="runDiscover()" id="discoverBtn">🔥 Refresh Heat</button>
+      </div>
     </div>
   </div>
   <div id="discoverSectors"></div>
   <div style="margin-top:12px;padding:10px 14px;background:var(--surface2);border-radius:var(--radius-sm);font-size:12px;color:var(--text3);">
-    💡 Sectors ranked hottest → coldest by avg 5-day return. Tap + to add any stock to your watchlist.
+    💡 Sectors ranked hottest → coldest by avg 5-day return. Tap + to add any stock to your watchlist. Use ⚙️ Manage Sectors to customise which stocks are tracked.
+  </div>
+</div>
+
+<!-- Sector Manager Modal -->
+<div id="sectorModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:500;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;">
+  <div style="background:var(--surface);border-radius:var(--radius);padding:24px;max-width:560px;width:100%;box-shadow:var(--shadow-lg);margin:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-family:'Playfair Display',serif;font-size:18px;font-weight:700;">⚙️ Manage Sectors</div>
+      <button class="btn btn-secondary btn-sm" onclick="closeSectorManager()">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:14px;">Add or remove stocks from each sector basket. Changes are saved permanently and sync via Gist. Click a sector to expand it.</div>
+
+    <div id="sectorManagerList"></div>
+
+    <div style="display:flex;gap:8px;margin-top:16px;">
+      <button class="btn btn-secondary btn-sm" onclick="resetSectorBaskets()" style="flex:1;">↺ Reset to Default</button>
+      <button class="btn btn-primary" onclick="closeSectorManager()" style="flex:1;">✓ Done</button>
+    </div>
+    <div style="margin-top:10px;padding:8px 12px;background:var(--surface2);border-radius:var(--radius-sm);font-size:11px;color:var(--text3);">
+      💡 Use NSE symbols only (e.g. JSPL, SAIL). Separate multiple stocks with commas. Changes take effect next time you click Refresh Heat.
+    </div>
   </div>
 </div>
 
@@ -1587,7 +1611,135 @@ const SECTOR_BASKETS = [
   ]},
 ];
 
-let discoverData = {}; // sym → {price, chg5d}
+// ═══════════════════ SECTOR MANAGER ═══════════════════
+function getCustomBaskets() {
+  const saved = localStorage.getItem('st_sectorBaskets');
+  return saved ? JSON.parse(saved) : null;
+}
+
+function getActiveSectorBaskets() {
+  // Returns custom baskets if saved, else default SECTOR_BASKETS
+  return getCustomBaskets() || SECTOR_BASKETS;
+}
+
+function saveSectorBaskets(baskets) {
+  localStorage.setItem('st_sectorBaskets', JSON.stringify(baskets));
+  autoSync();
+}
+
+function openSectorManager() {
+  renderSectorManagerList();
+  document.getElementById('sectorModal').style.display = 'flex';
+}
+
+function closeSectorManager() {
+  document.getElementById('sectorModal').style.display = 'none';
+  // Reset discover so next refresh uses updated baskets
+  discoverLoaded = false;
+  discoverData = {};
+}
+
+function resetSectorBaskets() {
+  if (!confirm('Reset all sectors to default? Your customisations will be lost.')) return;
+  localStorage.removeItem('st_sectorBaskets');
+  renderSectorManagerList();
+}
+
+function renderSectorManagerList() {
+  const baskets = getActiveSectorBaskets();
+  const list = document.getElementById('sectorManagerList');
+
+  list.innerHTML = baskets.map((basket, idx) => {
+    const syms = basket.stocks.map(s => s.sym).join(', ');
+    return '<div style="border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px;overflow:hidden;">'
+      + '<div style="padding:10px 14px;background:var(--surface2);display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="toggleSectorEdit(' + idx + ')">'
+      + '<div style="font-size:13px;font-weight:600;">' + basket.name + '</div>'
+      + '<div style="display:flex;align-items:center;gap:8px;">'
+      + '<span style="font-size:11px;color:var(--text3);">' + basket.stocks.length + ' stocks</span>'
+      + '<span style="font-size:11px;color:var(--text2);">▼</span>'
+      + '</div>'
+      + '</div>'
+      + '<div id="sectorEdit_' + idx + '" style="display:none;padding:12px 14px;">'
+      + '<div style="font-size:11px;color:var(--text3);margin-bottom:6px;">Edit stocks — NSE symbols separated by commas</div>'
+      + '<textarea id="sectorSyms_' + idx + '" style="width:100%;height:60px;font-family:\'DM Mono\',monospace;font-size:12px;resize:none;">' + syms + '</textarea>'
+      + '<div style="display:flex;gap:6px;margin-top:8px;">'
+      + '<button class="btn btn-primary btn-sm" onclick="saveSectorEdit(' + idx + ')">💾 Save</button>'
+      + '<button class="btn btn-danger btn-sm" onclick="deleteSector(' + idx + ')">🗑 Delete Sector</button>'
+      + '</div>'
+      + '</div>'
+      + '</div>';
+  }).join('')
+  + '<div style="margin-top:12px;">'
+  + '<div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--text);">+ Add New Sector</div>'
+  + '<div style="display:grid;gap:8px;">'
+  + '<div><label>Sector Name (include emoji)</label><input type="text" id="newSectorName" placeholder="e.g. 🌾 Agro · Fertilisers"/></div>'
+  + '<div><label>Stocks (comma separated NSE symbols)</label><textarea id="newSectorSyms" style="height:50px;font-family:\'DM Mono\',monospace;font-size:12px;resize:none;" placeholder="e.g. UPL, DHANUKA, RALLIS, BAYER, PIIND"></textarea></div>'
+  + '<button class="btn btn-secondary btn-sm" onclick="addNewSector()">+ Add Sector</button>'
+  + '</div>'
+  + '</div>';
+}
+
+function toggleSectorEdit(idx) {
+  const el = document.getElementById('sectorEdit_' + idx);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function saveSectorEdit(idx) {
+  const baskets = JSON.parse(JSON.stringify(getActiveSectorBaskets())); // deep copy
+  const raw = document.getElementById('sectorSyms_' + idx).value;
+  const syms = raw.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+  if (!syms.length) { alert('Add at least one stock symbol.'); return; }
+  baskets[idx].stocks = syms.map(sym => ({
+    sym,
+    name: NSE_STOCKS[sym] || sym
+  }));
+  saveSectorBaskets(baskets);
+  renderSectorManagerList();
+  // Close the edit panel
+  const el = document.getElementById('sectorEdit_' + idx);
+  if (el) el.style.display = 'none';
+  showSectorSaved('Sector updated! Click Refresh Heat to see new data.');
+}
+
+function deleteSector(idx) {
+  if (!confirm('Delete this sector? It will be removed from Discover.')) return;
+  const baskets = JSON.parse(JSON.stringify(getActiveSectorBaskets()));
+  baskets.splice(idx, 1);
+  saveSectorBaskets(baskets);
+  renderSectorManagerList();
+}
+
+function addNewSector() {
+  const name = document.getElementById('newSectorName').value.trim();
+  const raw  = document.getElementById('newSectorSyms').value;
+  const syms = raw.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+  if (!name) { alert('Enter a sector name.'); return; }
+  if (!syms.length) { alert('Add at least one stock symbol.'); return; }
+  const baskets = JSON.parse(JSON.stringify(getActiveSectorBaskets()));
+  baskets.push({
+    name,
+    emoji: name.match(/\p{Emoji}/u)?.[0] || '📊',
+    stocks: syms.map(sym => ({ sym, name: NSE_STOCKS[sym] || sym }))
+  });
+  saveSectorBaskets(baskets);
+  document.getElementById('newSectorName').value = '';
+  document.getElementById('newSectorSyms').value = '';
+  renderSectorManagerList();
+  showSectorSaved('New sector added! Click Refresh Heat to see it.');
+}
+
+function showSectorSaved(msg) {
+  const el = document.createElement('div');
+  el.textContent = msg;
+  el.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--green);color:white;padding:10px 20px;border-radius:20px;font-size:12px;font-weight:600;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.2);';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+
+
+let discoverData = {};
 let discoverLoaded = false;
 
 async function runDiscover() {
@@ -1600,7 +1752,9 @@ async function runDiscover() {
   container.innerHTML = `<div style="text-align:center;padding:32px;color:var(--text3);">⏳ Fetching price data for all sectors...</div>`;
 
   // Collect unique symbols
-  const allSyms = [...new Set(SECTOR_BASKETS.flatMap(b => b.stocks.map(s => s.sym)))];
+  // Use custom baskets if saved, else default
+  const activeSectors = getActiveSectorBaskets();
+  const allSyms = [...new Set(activeSectors.flatMap(b => b.stocks.map(s => s.sym)))];
 
   // Fetch all in parallel batches of 5
   const BATCH = 5;
@@ -1663,9 +1817,8 @@ let _scoredBaskets = [];
 
 function renderSectorHeat() {
   const container = document.getElementById('discoverSectors');
-
-  // Score each sector by avg 5d change of its stocks
-  const scored = SECTOR_BASKETS.map(basket => {
+  const activeSectors = getActiveSectorBaskets();
+  const scored = activeSectors.map(basket => {
     const results = basket.stocks
       .map(s => ({ ...s, data: discoverData[s.sym] || null }))
       .filter(s => s.data);
@@ -1998,8 +2151,9 @@ function buildPayload() {
     preset:    JSON.parse(localStorage.getItem('st_preset')    || 'null'),
     trades:    JSON.parse(localStorage.getItem('st_trades')    || '[]'),
     settings:  JSON.parse(localStorage.getItem('st_settings')  || '{}'),
-    plans:     JSON.parse(localStorage.getItem('st_plans')     || '[]'),
-    learnings: localStorage.getItem('st_learnings') || '',
+    plans:        JSON.parse(localStorage.getItem('st_plans')          || '[]'),
+    learnings:    localStorage.getItem('st_learnings') || '',
+    sectorBaskets: localStorage.getItem('st_sectorBaskets') ? JSON.parse(localStorage.getItem('st_sectorBaskets')) : null,
   };
 }
 
@@ -2008,8 +2162,9 @@ function applyPayload(payload) {
   if (payload.preset)    localStorage.setItem('st_preset',    JSON.stringify(payload.preset));
   if (payload.trades)    localStorage.setItem('st_trades',    JSON.stringify(payload.trades));
   if (payload.settings)  localStorage.setItem('st_settings',  JSON.stringify(payload.settings));
-  if (payload.plans)     localStorage.setItem('st_plans',     JSON.stringify(payload.plans));
-  if (payload.learnings) localStorage.setItem('st_learnings', payload.learnings || '');
+  if (payload.plans)         localStorage.setItem('st_plans',         JSON.stringify(payload.plans));
+  if (payload.learnings)     localStorage.setItem('st_learnings',     payload.learnings || '');
+  if (payload.sectorBaskets) localStorage.setItem('st_sectorBaskets', JSON.stringify(payload.sectorBaskets));
   watchlist = JSON.parse(localStorage.getItem('st_watchlist') || '[]');
   trades    = JSON.parse(localStorage.getItem('st_trades')    || '[]');
   plans     = JSON.parse(localStorage.getItem('st_plans')     || '[]');
@@ -3339,6 +3494,9 @@ document.getElementById('settingsModal').addEventListener('click', function(e) {
 });
 document.getElementById('syncModal').addEventListener('click', function(e) {
   if (e.target === this) closeSyncModal();
+});
+document.getElementById('sectorModal').addEventListener('click', function(e) {
+  if (e.target === this) closeSectorManager();
 });
 </script>
 </body>
