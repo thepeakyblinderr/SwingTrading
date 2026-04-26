@@ -1072,6 +1072,8 @@ async function fetchPriceData(symbol) {
   return { price, chg5d, chg1d };
 }
 
+let _scoredBaskets = [];
+
 function renderSectorHeat() {
   const container = document.getElementById('discoverSectors');
 
@@ -1088,6 +1090,7 @@ function renderSectorHeat() {
 
   // Sort hottest → coldest
   scored.sort((a, b) => b.avgChg - a.avgChg);
+  _scoredBaskets = scored;
 
   const maxAbs = Math.max(...scored.map(b => Math.abs(b.avgChg)), 1);
 
@@ -1097,38 +1100,45 @@ function renderSectorHeat() {
     const accentColor = isHot ? 'var(--green)' : isCold ? 'var(--red)' : 'var(--orange)';
     const bgColor     = isHot ? 'var(--green-bg)' : isCold ? 'var(--red-bg)' : 'var(--orange-bg)';
     const barWidth    = Math.min(Math.abs(basket.avgChg) / maxAbs * 100, 100).toFixed(1);
-    const rankLabel   = rank === 0 ? '🔥 Hottest' : rank === scored.length-1 ? '🥶 Coldest' : `#${rank+1}`;
+    const rankLabel   = rank === 0 ? '🔥 Hottest' : rank === scored.length-1 ? '🥶 Coldest' : ('#' + (rank+1));
+    const barML       = isCold ? 'margin-left:auto;' : '';
+    const barStyle    = 'height:100%;width:' + barWidth + '%;background:' + accentColor + ';border-radius:3px;transition:width 0.6s ease;' + barML;
+    const avgSign     = basket.avgChg >= 0 ? '+' : '';
 
     const stockRows = basket.results
       .sort((a,b) => b.data.chg5d - a.data.chg5d)
       .map(s => {
-        const inWL = watchlist.includes(s.sym);
-        const c5 = s.data.chg5d;
-        const c1 = s.data.chg1d;
+        const inWL    = watchlist.includes(s.sym);
+        const c5      = s.data.chg5d;
+        const c1      = s.data.chg1d;
         const c5Color = c5 >= 0 ? 'var(--green)' : 'var(--red)';
         const c1Color = c1 >= 0 ? 'var(--green)' : 'var(--red)';
-        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);">
-          <div style="flex:1;min-width:0;">
-            <span style="font-family:'DM Mono',monospace;font-size:12px;font-weight:600;">${s.sym}</span>
-            <span style="font-size:11px;color:var(--text3);margin-left:4px;">${s.name}</span>
-          </div>
-          <div style="text-align:right;min-width:52px;">
-            <div style="font-size:11px;color:var(--text3);">1D</div>
-            <div style="font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:${c1Color};">${c1>=0?'+':''}${c1.toFixed(1)}%</div>
-          </div>
-          <div style="text-align:right;min-width:52px;">
-            <div style="font-size:11px;color:var(--text3);">5D</div>
-            <div style="font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:${c5Color};">${c5>=0?'+':''}${c5.toFixed(1)}%</div>
-          </div>
-          <button onclick="discoverAdd('${s.sym}',this)"
-            style="padding:4px 10px;font-size:11px;font-weight:600;border-radius:6px;
-                   border:1.5px solid ${inWL?'var(--green)':'var(--border)'};
-                   background:${inWL?'var(--green-bg)':'var(--surface2)'};
-                   color:${inWL?'var(--green)':'var(--text2)'};
-                   cursor:pointer;white-space:nowrap;font-family:'DM Sans',sans-serif;flex-shrink:0;">
-            ${inWL ? '✓' : '+'}
-          </button>
-        </div>`;
+        const c1Sign  = c1 >= 0 ? '+' : '';
+        const c5Sign  = c5 >= 0 ? '+' : '';
+        const btnIcon = inWL ? '&#10003;' : '+';
+        const btnBorder = inWL ? 'var(--green)' : 'var(--border)';
+        const btnBg     = inWL ? 'var(--green-bg)' : 'var(--surface2)';
+        const btnColor  = inWL ? 'var(--green)' : 'var(--text2)';
+        return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);">'
+          + '<div style="flex:1;min-width:0;">'
+          + '<span style="font-family:\'DM Mono\',monospace;font-size:12px;font-weight:600;">' + s.sym + '</span>'
+          + '<span style="font-size:11px;color:var(--text3);margin-left:4px;">' + s.name + '</span>'
+          + '</div>'
+          + '<div style="text-align:right;min-width:52px;">'
+          + '<div style="font-size:11px;color:var(--text3);">1D</div>'
+          + '<div style="font-family:\'DM Mono\',monospace;font-size:12px;font-weight:600;color:' + c1Color + ';">' + c1Sign + c1.toFixed(1) + '%</div>'
+          + '</div>'
+          + '<div style="text-align:right;min-width:52px;">'
+          + '<div style="font-size:11px;color:var(--text3);">5D</div>'
+          + '<div style="font-family:\'DM Mono\',monospace;font-size:12px;font-weight:600;color:' + c5Color + ';">' + c5Sign + c5.toFixed(1) + '%</div>'
+          + '</div>'
+          + '<button onclick="discoverAdd(\'' + s.sym + '\',this)"'
+          + ' style="padding:4px 10px;font-size:11px;font-weight:600;border-radius:6px;'
+          + 'border:1.5px solid ' + btnBorder + ';background:' + btnBg + ';color:' + btnColor + ';'
+          + 'cursor:pointer;white-space:nowrap;font-family:\'DM Sans\',sans-serif;flex-shrink:0;">'
+          + btnIcon
+          + '</button>'
+          + '</div>';
       }).join('');
 
     return `<div class="card" style="margin-bottom:12px;">
@@ -1138,14 +1148,14 @@ function renderSectorHeat() {
           <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:${bgColor};color:${accentColor};font-weight:600;">${rankLabel}</span>
         </div>
         <div style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:${accentColor};">
-          ${basket.avgChg >= 0 ? '+' : ''}${basket.avgChg.toFixed(2)}%
+          ${avgSign}${basket.avgChg.toFixed(2)}%
         </div>
       </div>
       <div style="height:6px;background:var(--border);border-radius:3px;margin-bottom:12px;overflow:hidden;">
-        <div style="height:100%;width:${barWidth}%;background:${accentColor};border-radius:3px;transition:width 0.6s ease;${isCold?'margin-left:auto;':''}"></div>
+        <div style="${barStyle}"></div>
       </div>
       <div>${stockRows}</div>
-      <button onclick="addAllSector(${JSON.stringify(basket.stocks.map(s=>s.sym)).replace(/"/g,"'")})"
+      <button onclick="addAllSector(${rank})"
         style="margin-top:10px;width:100%;padding:7px;font-size:12px;font-weight:600;
                border-radius:6px;border:1.5px solid var(--border);background:var(--surface2);
                color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;">
@@ -1173,143 +1183,14 @@ function discoverAdd(sym, btn) {
   }
 }
 
-function addAllSector(syms) {
-  syms.forEach(sym => { if (!watchlist.includes(sym)) watchlist.push(sym); });
+function addAllSector(idx) {
+  const basket = _scoredBaskets[idx];
+  if (!basket) return;
+  basket.stocks.forEach(s => { if (!watchlist.includes(s.sym)) watchlist.push(s.sym); });
   saveWatchlist();
   renderWatchlist();
-  renderSectorHeat(); // refresh button states
+  renderSectorHeat();
 }
-  // PSU / Defence
-  {sym:'BHEL',    name:'Bharat Heavy Electricals', theme:'PSU · Defence', why:'Power & industrial capex play. Govt order book at multi-year high.'},
-  {sym:'BEL',     name:'Bharat Electronics',       theme:'PSU · Defence', why:'Defence electronics monopoly. Strong export order pipeline.'},
-  {sym:'HAL',     name:'Hindustan Aeronautics',    theme:'PSU · Defence', why:'Aircraft MRO & manufacturing. Tejas, helicopters driving revenue.'},
-  {sym:'COCHINSHIP',name:'Cochin Shipyard',        theme:'PSU · Defence', why:'Shipbuilding & repair. Beneficiary of Atmanirbhar defence push.'},
-  {sym:'MAZDOCK', name:'Mazagon Dock',             theme:'PSU · Defence', why:'Submarine & warship builder. Massive naval order backlog.'},
-  {sym:'GRSE',    name:'Garden Reach Shipbuilders',theme:'PSU · Defence', why:'Frigate & patrol vessel builder for Indian Navy.'},
-  {sym:'MIDHANI', name:'Mishra Dhatu Nigam',       theme:'PSU · Defence', why:'Speciality alloys for defence & space. Niche monopoly.'},
-  {sym:'PARAS',   name:'Paras Defence',            theme:'PSU · Defence', why:'Optics & electronics for defence. Small cap high growth.'},
-
-  // Railways & Infra PSU
-  {sym:'IRFC',    name:'Indian Railway Finance',   theme:'Railways', why:'AAA-rated NBFC funding Indian Railways. Safe with dividend.'},
-  {sym:'RVNL',    name:'Rail Vikas Nigam',         theme:'Railways', why:'Railway construction EPC. Massive order book visibility.'},
-  {sym:'IRCTC',   name:'Indian Railway Catering',  theme:'Railways', why:'Ticketing monopoly. High margin convenience fee income.'},
-  {sym:'IRCON',   name:'Ircon International',      theme:'Railways', why:'Railway & highway EPC. Strong international project pipeline.'},
-  {sym:'RAILTEL', name:'RailTel Corporation',      theme:'Railways', why:'Telecom infra on railway land. Data centre + Wi-Fi growth.'},
-  {sym:'RITES',   name:'RITES Ltd',                theme:'Railways', why:'Railway consultancy & exports. High dividend yield PSU.'},
-  {sym:'TITAGARH',name:'Titagarh Rail Systems',   theme:'Railways', why:'Wagon & metro coach manufacturer. Order book multi-year high.'},
-
-  // Capital Goods & Infra
-  {sym:'KEC',     name:'KEC International',        theme:'Capex · Infra', why:'Power transmission towers globally. Strong order inflows.'},
-  {sym:'KALPATPOWR',name:'Kalpataru Power',        theme:'Capex · Infra', why:'T&D EPC + real estate. Consistent execution track record.'},
-  {sym:'HGINFRA', name:'H.G. Infra Engineering',  theme:'Capex · Infra', why:'Roads & highways EPC. Strong HAM project execution.'},
-  {sym:'NCC',     name:'NCC Ltd',                  theme:'Capex · Infra', why:'Diversified EPC — buildings, roads, water. Improving margins.'},
-  {sym:'AHLUCONT',name:'Ahluwalia Contracts',      theme:'Capex · Infra', why:'Building construction. Hospital & institutional segment strong.'},
-  {sym:'PNCINFRA',name:'PNC Infratech',            theme:'Capex · Infra', why:'Road EPC & HAM. Consistent revenue growth & low debt.'},
-  {sym:'GPPL',    name:'Gujarat Pipavav Port',     theme:'Capex · Infra', why:'Private port. Container volume growth with Gujarat trade.'},
-  {sym:'KEI',     name:'KEI Industries',           theme:'Capex · Infra', why:'Cables & wires. Infra & real estate boom driving demand.'},
-  {sym:'POLYCAB', name:'Polycab India',            theme:'Capex · Infra', why:'Largest cable & wire company. FMEG segment scaling up.'},
-
-  // Power & Energy
-  {sym:'NHPC',    name:'NHPC Ltd',                 theme:'Power · Energy', why:'Hydropower PSU. Renewable capacity addition on track.'},
-  {sym:'SJVN',    name:'SJVN Ltd',                 theme:'Power · Energy', why:'Hydro + solar PSU. 5x capacity target by 2030.'},
-  {sym:'CESC',    name:'CESC Ltd',                 theme:'Power · Energy', why:'Kolkata utility + renewable arm. Consistent dividend payer.'},
-  {sym:'TORNTPOWER',name:'Torrent Power',          theme:'Power · Energy', why:'Private utility + RE. Ahmedabad distribution monopoly.'},
-  {sym:'INOXWIND',name:'Inox Wind',                theme:'Power · Energy', why:'Wind turbine manufacturer. Orderbook at record high.'},
-  {sym:'SUZLON',  name:'Suzlon Energy',            theme:'Power · Energy', why:'Debt-free wind energy turnaround. O&M recurring revenue.'},
-  {sym:'RPOWER',  name:'Reliance Power',           theme:'Power · Energy', why:'High risk/reward. Debt resolution play — speculative only.'},
-  {sym:'GIPCL',   name:'Gujarat Industries Power', theme:'Power · Energy', why:'Low debt Gujarat utility. Steady dividend, low volatility.'},
-
-  // Banking & Finance
-  {sym:'FEDERALBNK',name:'Federal Bank',           theme:'Banking · Finance', why:'South India private bank. Consistent NIM, low NPA.'},
-  {sym:'IDFCFIRSTB',name:'IDFC First Bank',        theme:'Banking · Finance', why:'High growth retail bank. Transition from infra lender complete.'},
-  {sym:'RBLBANK', name:'RBL Bank',                 theme:'Banking · Finance', why:'Turnaround story. New management improving asset quality.'},
-  {sym:'MANAPPURAM',name:'Manappuram Finance',     theme:'Banking · Finance', why:'Gold NBFC. High yield, plays on gold price rally.'},
-  {sym:'MUTHOOTFIN',name:'Muthoot Finance',        theme:'Banking · Finance', why:'Largest gold loan NBFC. Consistent compounder.'},
-  {sym:'CHOLAFIN',name:'Cholamandalam Finance',    theme:'Banking · Finance', why:'Vehicle finance NBFC. Southern India dominance.'},
-  {sym:'ANGELONE',name:'Angel One',                theme:'Banking · Finance', why:'Discount broker. Market activity directly drives revenue.'},
-  {sym:'CDSL',    name:'CDSL',                     theme:'Banking · Finance', why:'Depository monopoly. Benefits from every new demat account.'},
-  {sym:'MCX',     name:'Multi Commodity Exchange', theme:'Banking · Finance', why:'Commodity trading monopoly. Gold/oil vol drives revenue.'},
-  {sym:'CANFINHOME',name:'Can Fin Homes',          theme:'Banking · Finance', why:'Affordable housing finance. Low NPA, steady growth.'},
-
-  // Pharma & Healthcare
-  {sym:'LAURUSLABS',name:'Laurus Labs',            theme:'Pharma · Healthcare', why:'API + formulations. CDMO business scaling rapidly.'},
-  {sym:'GRANULES', name:'Granules India',          theme:'Pharma · Healthcare', why:'Paracetamol API & formulations. US generics recovery play.'},
-  {sym:'IPCALAB', name:'IPCA Laboratories',        theme:'Pharma · Healthcare', why:'Branded generics India + exports. Malaria API leader.'},
-  {sym:'GLENMARK',name:'Glenmark Pharma',         theme:'Pharma · Healthcare', why:'US generics + India branded. Skin & respiratory focus.'},
-  {sym:'JBCHEPHARM',name:'JB Chemicals',           theme:'Pharma · Healthcare', why:'Niche cardiac & derma brands. KKR-backed growth story.'},
-  {sym:'ERIS',    name:'Eris Lifesciences',        theme:'Pharma · Healthcare', why:'India chronic disease brands. Consistent 20%+ margins.'},
-  {sym:'NEULANDLAB',name:'Neuland Laboratories',   theme:'Pharma · Healthcare', why:'GMP API & CDMO. High value complex APIs for innovators.'},
-  {sym:'APLLTD',  name:'Alembic Pharma',           theme:'Pharma · Healthcare', why:'US ANDA approvals + India brands. Debt-free balance sheet.'},
-
-  // Chemicals & Specialty
-  {sym:'DEEPAKNITR',name:'Deepak Nitrite',         theme:'Chemicals', why:'Phenol chain integration. Industrial chemicals + specialty.'},
-  {sym:'NAVINFLUOR',name:'Navin Fluorine',         theme:'Chemicals', why:'Fluorochemicals & CDMO. Agrochemical + pharma API supplier.'},
-  {sym:'CLEAN',   name:'Clean Science',            theme:'Chemicals', why:'HPPO technology moat. Catechol & guaiacol global leader.'},
-  {sym:'FINEORG', name:'Fine Organics',            theme:'Chemicals', why:'Food & polymer additives. Niche global exporter. High margin.'},
-  {sym:'GALAXYSURF',name:'Galaxy Surfactants',     theme:'Chemicals', why:'Surfactants for FMCG. 70% export revenue. Steady compounder.'},
-  {sym:'AARTI',   name:'Aarti Industries',         theme:'Chemicals', why:'Benzene chain chemicals. Long-term supply contracts with MNCs.'},
-  {sym:'PIIND',   name:'PI Industries',            theme:'Chemicals', why:'Agrochemical CSM exports + India brands. Consistent 20% growth.'},
-  {sym:'SUMICHEM',name:'Sumitomo Chemical India',  theme:'Chemicals', why:'Japanese parent. Agro + specialty chem. Niche crop protection.'},
-
-  // IT & Technology
-  {sym:'MPHASIS', name:'Mphasis',                  theme:'IT · Tech', why:'BFS-focused IT. DXC & Blackstone parentage. US mortgage recovery.'},
-  {sym:'PERSISTENT',name:'Persistent Systems',     theme:'IT · Tech', why:'BFSI & healthcare IT. Fastest growing mid-tier IT company.'},
-  {sym:'COFORGE', name:'Coforge',                  theme:'IT · Tech', why:'BFS & travel IT. Consistent deal wins & revenue growth.'},
-  {sym:'LTTS',    name:'L&T Technology Services',  theme:'IT · Tech', why:'Engineering R&D services. Auto, aero & medtech verticals.'},
-  {sym:'KPITTECH',name:'KPIT Technologies',        theme:'IT · Tech', why:'Auto software — EV & ADAS focus. Multi-year secular growth.'},
-  {sym:'TATAELXSI',name:'Tata Elxsi',             theme:'IT · Tech', why:'Design & tech services. Auto, media & healthcare. Premium play.'},
-  {sym:'MASTEK',  name:'Mastek',                   theme:'IT · Tech', why:'UK govt IT & Oracle services. Consistent dividend growth.'},
-  {sym:'TANLA',   name:'Tanla Platforms',          theme:'IT · Tech', why:'CPaaS — SMS & messaging infrastructure. Platform model.'},
-
-  // Consumer & Retail
-  {sym:'TRENT',   name:'Trent Ltd',                theme:'Consumer · Retail', why:'Zudio fast fashion. Most exciting retail growth story in India.'},
-  {sym:'BATA',    name:'Bata India',               theme:'Consumer · Retail', why:'Footwear retail turnaround. Premium & sports pivot driving ASP.'},
-  {sym:'METRO',   name:'Metro Brands',             theme:'Consumer · Retail', why:'Premium footwear retail. Crocs & Fitflop licensee.'},
-  {sym:'CAMPUS',  name:'Campus Activewear',        theme:'Consumer · Retail', why:'Mass-market sports shoes. Tier 2/3 city distribution strength.'},
-  {sym:'VMART',   name:'V-Mart Retail',            theme:'Consumer · Retail', why:'Value fashion for Bharat. Post-merger Unlimited integration.'},
-  {sym:'SAPPHIRE',name:'Sapphire Foods',           theme:'Consumer · Retail', why:'KFC & Pizza Hut franchisee. India QSR recovery play.'},
-  {sym:'DEVYANI', name:'Devyani International',    theme:'Consumer · Retail', why:'KFC, Pizza Hut, Costa Coffee. Largest Yum! franchisee.'},
-
-  // Auto Ancillary
-  {sym:'MOTHERSON',name:'Samvardhana Motherson',   theme:'Auto Ancillary', why:'Global wiring harness + mirrors. EV transition beneficiary.'},
-  {sym:'ENDURANCE',name:'Endurance Technologies',  theme:'Auto Ancillary', why:'2W components. Bajaj & Honda supply. Die casting + ABS.'},
-  {sym:'SUPRAJIT',name:'Suprajit Engineering',     theme:'Auto Ancillary', why:'Cables for 2W & 4W globally. Western Rexnord acquisition.'},
-  {sym:'BALKRISIND',name:'Balkrishna Industries',  theme:'Auto Ancillary', why:'OHV tyres — farm & construction. 30% global market share.'},
-  {sym:'SONACOMS',name:'Sona BLW Precision',       theme:'Auto Ancillary', why:'EV differential gears. 30%+ EV revenue already.'},
-  {sym:'CRAFTSMAN',name:'Craftsman Automation',    theme:'Auto Ancillary', why:'Powertrain + aluminium casting. CV & tractor exposure.'},
-  {sym:'TIINDIA', name:'Tube Investments',         theme:'Auto Ancillary', why:'Precision tubes + cycles + financial services. Conglomerate.'},
-  {sym:'MINDA',   name:'Minda Corporation',        theme:'Auto Ancillary', why:'Switches, locks, sensors. EV component ramp-up underway.'},
-
-  // Housing Finance & Real Estate
-  {sym:'AAVAS',   name:'Aavas Financiers',         theme:'Housing Finance', why:'Affordable housing rural. Near-zero NPA. Rajasthan focus.'},
-  {sym:'HOMEFIRST',name:'Home First Finance',      theme:'Housing Finance', why:'Digital affordable housing NBFC. Tech-driven low-ticket loans.'},
-  {sym:'APTUS',   name:'Aptus Value Housing',      theme:'Housing Finance', why:'Self-employed rural home loans. South India dominance.'},
-  {sym:'PNBHOUSING',name:'PNB Housing Finance',    theme:'Housing Finance', why:'Turnaround. Retail pivot + affordable focus post-clean up.'},
-  {sym:'REPCO',   name:'Repco Home Finance',       theme:'Housing Finance', why:'Tamil Nadu housing NBFC. Self-employed segment focus.'},
-
-  // Consumption & FMCG
-  {sym:'RADICO',  name:'Radico Khaitan',           theme:'FMCG · Consumption', why:'Alcobev premium shift. 8PM whisky + Magic Moments vodka.'},
-  {sym:'MCDOWELL',name:'United Spirits',           theme:'FMCG · Consumption', why:'Diageo India. Premium alcobev + spirits leader.'},
-  {sym:'BIKAJI',  name:'Bikaji Foods',             theme:'FMCG · Consumption', why:'Bhujia & ethnic snacks. Pan-India distribution scaling up.'},
-  {sym:'PVRINOX', name:'PVR Inox',                 theme:'FMCG · Consumption', why:'Post-merger multiplex monopoly. Box office recovery play.'},
-  {sym:'MHRIL',   name:'Mahindra Holidays',        theme:'FMCG · Consumption', why:'Club Mahindra vacation ownership. Member addition driving ARR.'},
-
-  // Electronics & EMS
-  {sym:'DIXON',   name:'Dixon Technologies',       theme:'Electronics · EMS', why:'EMS for mobiles, TVs, LEDs. PLI scheme direct beneficiary.'},
-  {sym:'AMBER',   name:'Amber Enterprises',        theme:'Electronics · EMS', why:'AC & white goods EMS. Component backward integration.'},
-  {sym:'KAYNES',  name:'Kaynes Technology',        theme:'Electronics · EMS', why:'IoT & industrial electronics EMS. High value-add products.'},
-  {sym:'SYRMA',   name:'Syrma SGS Technology',     theme:'Electronics · EMS', why:'RFID + PCB + consumer EMS. Niche high-margin segments.'},
-
-  // Microcap Gems (higher risk, higher reward)
-  {sym:'ELECON',  name:'Elecon Engineering',       theme:'Microcap Gems', why:'Industrial gears & material handling. Capex cycle play.'},
-  {sym:'HBLPOWER',name:'HBL Power Systems',        theme:'Microcap Gems', why:'Railway electronics + defence batteries. Niche monopoly.'},
-  {sym:'DATAPATTNS',name:'Data Patterns India',    theme:'Microcap Gems', why:'Embedded defence electronics. Radar & avionics systems.'},
-  {sym:'IDEAFORGE',name:'ideaForge Technology',    theme:'Microcap Gems', why:'India\'s largest drone maker. Defence & surveillance UAVs.'},
-  {sym:'CENTUM',  name:'Centum Electronics',       theme:'Microcap Gems', why:'Defence & space electronics modules. ISRO & DRDO supplier.'},
-  {sym:'GPIL',    name:'Godawari Power',           theme:'Microcap Gems', why:'Iron ore pellet + steel + power. Integrated low-cost producer.'},
-  {sym:'MSTCLTD', name:'MSTC Ltd',                theme:'Microcap Gems', why:'PSU e-commerce & scrap recycling monopoly. High dividend.'},
-  {sym:'AFFLE',   name:'Affle India',              theme:'Microcap Gems', why:'Mobile ad-tech. Consumer platform CPCU model. High ROE.'},
-];
 
 function loadSettings() {
   const s = JSON.parse(localStorage.getItem('st_settings') || '{}');
@@ -1364,7 +1245,8 @@ function renderWatchlist() {
     const tag = document.createElement('div');
     tag.className = 'tag';
     tag.title = name;
-    tag.innerHTML = `${sym}${name ? ` <span style="font-size:10px;color:var(--text3);font-weight:400;">${name.split(' ').slice(0,2).join(' ')}</span>` : ''} <span class="tag-remove" onclick="removeSymbol(${i})">×</span>`;
+    const namePart = name ? '<span style="font-size:10px;color:var(--text3);font-weight:400;">' + name.split(' ').slice(0,2).join(' ') + '</span>' : '';
+    tag.innerHTML = sym + ' ' + namePart + ' <span class="tag-remove" onclick="removeSymbol(' + i + ')">×</span>';
     wrap.appendChild(tag);
   });
 }
