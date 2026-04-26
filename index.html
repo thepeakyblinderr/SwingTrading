@@ -728,17 +728,17 @@
 
     <div>
       <div class="card">
-        <div class="card-title">⚠️ Rules for ₹25K Capital</div>
+        <div class="card-title">⚠️ Rules for <span id="g_capital">₹25K</span> Capital</div>
         <div style="display:grid;gap:10px;font-size:13px;color:var(--text2);">
-          <div class="info-box">📌 Risk max ₹500 per trade (2% of capital). This lets you survive 10+ losing trades in a row.</div>
+          <div class="info-box">📌 Risk max <strong id="g_riskAmt">₹500</strong> per trade (2% of capital). This lets you survive 10+ losing trades in a row.</div>
           <div style="padding:10px;background:var(--green-bg);border-radius:8px;color:var(--green);border:1px solid #b8e0cc;">
-            ✅ Max 2 open trades at once. Don't over-diversify with ₹25K — focus!
+            ✅ Max 2 open trades at once. Don't over-diversify with <span id="g_capital2">₹25K</span> — focus!
           </div>
           <div style="padding:10px;background:var(--red-bg);border-radius:8px;color:var(--red);border:1px solid #f5c6c2;">
-            ❌ Avoid stocks above ₹2,000/share — you can't get adequate quantity.
+            ❌ Avoid stocks above <strong id="g_maxPrice">₹2,000</strong>/share — you can't get adequate quantity.
           </div>
           <div style="padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
-            🎯 <strong>Best price range:</strong> ₹50–₹800/share for meaningful quantity with ₹25K.
+            🎯 <strong>Best price range:</strong> <span id="g_priceRange">₹50–₹800</span>/share for meaningful quantity with <span id="g_capital3">₹25K</span>.
           </div>
           <div style="padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
             ⏱️ <strong>Hold period:</strong> 5–15 trading days. Review every Friday.
@@ -1047,16 +1047,27 @@ async function runDiscover() {
 
 async function fetchPriceData(symbol) {
   const nseSymbol = symbol + '.NS';
-  const urls = [
-    `https://query2.finance.yahoo.com/v8/finance/chart/${nseSymbol}?interval=1d&range=1mo`,
-    `https://query1.finance.yahoo.com/v8/finance/chart/${nseSymbol}?interval=1d&range=1mo`,
+  const yfUrl = 'https://query2.finance.yahoo.com/v8/finance/chart/' + nseSymbol + '?interval=1d&range=1mo';
+
+  const attempts = [
+    // 1. Direct Yahoo query2
+    () => fetch(yfUrl, { signal: AbortSignal.timeout(6000), headers: { 'Accept': 'application/json' } }),
+    // 2. Direct Yahoo query1
+    () => fetch(yfUrl.replace('query2','query1'), { signal: AbortSignal.timeout(6000), headers: { 'Accept': 'application/json' } }),
+    // 3. corsproxy.io wrapping query2
+    () => fetch('https://corsproxy.io/?' + encodeURIComponent(yfUrl), { signal: AbortSignal.timeout(8000) }),
+    // 4. allorigins wrapping query2
+    () => fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(yfUrl), { signal: AbortSignal.timeout(8000) }),
   ];
+
   let raw = null;
-  for (const url of urls) {
+  for (const attempt of attempts) {
     try {
-      const resp = await fetch(url, { signal: AbortSignal.timeout(7000), headers: { 'Accept': 'application/json' } });
+      const resp = await attempt();
       if (!resp.ok) continue;
-      const json = await resp.json();
+      let json = await resp.json();
+      // allorigins wraps in {contents}
+      if (json.contents) json = JSON.parse(json.contents);
       if (json?.chart?.result?.[0]) { raw = json; break; }
     } catch(e) { continue; }
   }
@@ -1066,7 +1077,7 @@ async function fetchPriceData(symbol) {
   if (closes.length < 6) return null;
 
   const price  = closes[closes.length - 1];
-  const price5 = closes[closes.length - 6]; // 5 trading days ago
+  const price5 = closes[closes.length - 6];
   const chg5d  = ((price - price5) / price5 * 100);
   const chg1d  = ((price - closes[closes.length - 2]) / closes[closes.length - 2] * 100);
   return { price, chg5d, chg1d };
@@ -1192,12 +1203,30 @@ function addAllSector(idx) {
   renderSectorHeat();
 }
 
+function updateGuideRules(capital) {
+  const c = capital || 25000;
+  const riskAmt  = Math.round(c * 0.02);
+  const capLabel = '₹' + (c >= 100000 ? (c/100000).toFixed(c%100000===0?0:1) + 'L' : (c >= 1000 ? Math.round(c/1000) + 'K' : c));
+  const maxPrice = Math.round(c * 0.08);  // ~8% of capital per share max
+  const minPrice = Math.round(c * 0.002); // ~0.2% of capital min
+  const maxPriceRange = Math.round(c * 0.032);
+
+  const set = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+  set('g_capital',   capLabel);
+  set('g_capital2',  capLabel);
+  set('g_capital3',  capLabel);
+  set('g_riskAmt',   '₹' + riskAmt.toLocaleString('en-IN'));
+  set('g_maxPrice',  '₹' + maxPrice.toLocaleString('en-IN'));
+  set('g_priceRange','₹' + minPrice + '–₹' + maxPriceRange);
+}
+
 function loadSettings() {
   const s = JSON.parse(localStorage.getItem('st_settings') || '{}');
   const capital  = s.capital  || 25000;
   const universe = s.universe || 'Midcap · Smallcap';
   // Apply capital to risk calculator
   document.getElementById('r_capital').value = capital;
+  updateGuideRules(capital);
   // Update badge
   document.getElementById('badgeText').textContent =
     `${universe} · ₹${Number(capital).toLocaleString('en-IN')} Capital`;
@@ -1229,6 +1258,7 @@ function saveSettings() {
   localStorage.setItem('st_settings', JSON.stringify({ capital, universe }));
   // Apply to risk calculator immediately
   document.getElementById('r_capital').value = capital;
+  updateGuideRules(capital);
   calcRisk();
   // Update badge
   document.getElementById('badgeText').textContent =
@@ -1351,41 +1381,24 @@ async function runScreener() {
 
 async function fetchStockData(symbol) {
   const nseSymbol = symbol + '.NS';
+  const yfUrl = 'https://query2.finance.yahoo.com/v8/finance/chart/' + nseSymbol + '?interval=1d&range=6mo&includePrePost=false';
 
-  // Try multiple Yahoo endpoints — query2 is less strict than query1
-  const endpoints = [
-    `https://query2.finance.yahoo.com/v8/finance/chart/${nseSymbol}?interval=1d&range=6mo&includePrePost=false`,
-    `https://query1.finance.yahoo.com/v8/finance/chart/${nseSymbol}?interval=1d&range=6mo&includePrePost=false`,
+  const attempts = [
+    () => fetch(yfUrl, { signal: AbortSignal.timeout(7000), headers: { 'Accept': 'application/json' } }),
+    () => fetch(yfUrl.replace('query2','query1'), { signal: AbortSignal.timeout(7000), headers: { 'Accept': 'application/json' } }),
+    () => fetch('https://corsproxy.io/?' + encodeURIComponent(yfUrl), { signal: AbortSignal.timeout(10000) }),
+    () => fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(yfUrl), { signal: AbortSignal.timeout(10000) }),
   ];
 
   let raw = null;
-  for (const url of endpoints) {
+  for (const attempt of attempts) {
     try {
-      const resp = await fetch(url, {
-        signal: AbortSignal.timeout(8000),
-        headers: {
-          'Accept': 'application/json',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36'
-        }
-      });
+      const resp = await attempt();
       if (!resp.ok) continue;
-      const json = await resp.json();
+      let json = await resp.json();
+      if (json.contents) json = JSON.parse(json.contents);
       if (json?.chart?.result?.[0]) { raw = json; break; }
     } catch(e) { continue; }
-  }
-
-  // Final fallback: corsproxy.io wrapping query2 (works on iOS Safari)
-  if (!raw) {
-    try {
-      const target = `https://query2.finance.yahoo.com/v8/finance/chart/${nseSymbol}?interval=1d&range=6mo`;
-      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(target)}`;
-      const resp = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
-      if (resp.ok) {
-        const json = await resp.json();
-        if (json?.chart?.result?.[0]) raw = json;
-      }
-    } catch(e) { /* skip */ }
   }
 
   if (!raw?.chart?.result?.[0]) return null;
