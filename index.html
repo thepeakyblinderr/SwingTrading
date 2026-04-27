@@ -467,6 +467,8 @@
       </div>
       <div style="font-size:11px;color:var(--text3);margin-bottom:10px;text-align:center;" id="syncLastSync"></div>
       <button class="btn btn-secondary btn-sm" onclick="showGistCredPanel()" style="width:100%;font-size:11px;">✏️ Edit Gist ID / Token</button>
+      <button class="btn btn-secondary btn-sm" onclick="diagnosSync()" style="width:100%;font-size:11px;margin-top:6px;">🔍 Diagnose — what's local vs Gist</button>
+      <div id="diagPanel" style="display:none;margin-top:10px;padding:10px 12px;background:var(--surface2);border-radius:var(--radius-sm);font-size:11px;font-family:'DM Mono',monospace;line-height:1.8;color:var(--text2);word-break:break-all;"></div>
     </div>
 
     <div id="syncMsg" style="display:none;margin-top:10px;padding:10px 12px;border-radius:8px;font-size:12px;text-align:center;"></div>
@@ -2203,34 +2205,103 @@ function saveCredAndSwitch(gistId, token) {
 
 function saveGistCredentials() { connectGist(); } // kept for compat
 
+async function diagnosSync() {
+  const panel = document.getElementById('diagPanel');
+  panel.style.display = 'block';
+  panel.innerHTML = 'Checking...';
+
+  // Local data
+  const local = buildPayload();
+  const localInfo = '📱 LOCAL DATA:\n'
+    + '  watchlist: ' + local.watchlist.length + ' stocks (' + local.watchlist.slice(0,5).join(',') + (local.watchlist.length > 5 ? '...' : '') + ')\n'
+    + '  trades: ' + local.trades.length + '\n'
+    + '  plans: ' + local.plans.length + '\n'
+    + '  settings: ' + JSON.stringify(local.settings) + '\n'
+    + '  learnings: ' + (local.learnings.length) + ' chars\n';
+
+  // Gist data
+  const { gistId, token } = getSyncCreds();
+  if (!gistId || !token) {
+    panel.innerHTML = localInfo + '\n⚠️ No Gist credentials set.';
+    return;
+  }
+
+  try {
+    const resp = await fetch('https://api.github.com/gists/' + gistId, {
+      headers: { 'Authorization': 'token ' + token }
+    });
+    if (!resp.ok) {
+      panel.innerHTML = localInfo + '\n❌ Gist fetch failed: HTTP ' + resp.status + '\nCheck your token has gist scope.';
+      return;
+    }
+    const gist = await resp.json();
+    const files = Object.keys(gist.files || {});
+
+    if (!gist.files[GIST_FILE]) {
+      panel.innerHTML = localInfo + '\n☁️ GIST FILES: ' + files.join(', ') + '\n❌ swingtrader.json NOT FOUND in Gist.\nPush from this device first.';
+      return;
+    }
+
+    let gistPayload;
+    try {
+      gistPayload = JSON.parse(gist.files[GIST_FILE].content);
+    } catch(e) {
+      panel.innerHTML = localInfo + '\n❌ Gist file is corrupted / invalid JSON.';
+      return;
+    }
+
+    const gistInfo = '\n☁️ GIST DATA (swingtrader.json):\n'
+      + '  saved: ' + (gistPayload.ts ? new Date(gistPayload.ts).toLocaleString('en-IN') : 'unknown') + '\n'
+      + '  watchlist: ' + (gistPayload.watchlist ? gistPayload.watchlist.length : 0) + ' stocks\n'
+      + '  trades: ' + (gistPayload.trades ? gistPayload.trades.length : 0) + '\n'
+      + '  plans: ' + (gistPayload.plans ? gistPayload.plans.length : 0) + '\n'
+      + '  settings: ' + JSON.stringify(gistPayload.settings || {}) + '\n'
+      + '  version: v' + (gistPayload.v || '?') + '\n';
+
+    const verdict = local.watchlist.length > 0 && (gistPayload.watchlist || []).length === 0
+      ? '\n⚠️ Local has data but Gist is empty — Push from this device.'
+      : local.watchlist.length === 0 && (gistPayload.watchlist || []).length > 0
+      ? '\n⚠️ Gist has data but local is empty — Pull to this device.'
+      : '\n✅ Both have data. Use Push/Pull to sync direction you want.';
+
+    panel.innerHTML = (localInfo + gistInfo + verdict).replace(/\n/g, '<br/>');
+  } catch(e) {
+    panel.innerHTML = localInfo + '\n❌ Error: ' + e.message;
+  }
+}
+
+
 function buildPayload() {
   return {
     v: 2,
     ts: Date.now(),
-    watchlist: JSON.parse(localStorage.getItem('st_watchlist') || '[]'),
-    preset:    JSON.parse(localStorage.getItem('st_preset')    || 'null'),
-    trades:    JSON.parse(localStorage.getItem('st_trades')    || '[]'),
-    settings:  JSON.parse(localStorage.getItem('st_settings')  || '{}'),
-    plans:        JSON.parse(localStorage.getItem('st_plans')          || '[]'),
-    learnings:    localStorage.getItem('st_learnings') || '',
-    sectorBaskets: localStorage.getItem('st_sectorBaskets') ? JSON.parse(localStorage.getItem('st_sectorBaskets')) : null,
+    watchlist:     JSON.parse(localStorage.getItem('st_watchlist')     || '[]'),
+    preset:        JSON.parse(localStorage.getItem('st_preset')        || 'null'),
+    trades:        JSON.parse(localStorage.getItem('st_trades')        || '[]'),
+    settings:      JSON.parse(localStorage.getItem('st_settings')      || '{}'),
+    plans:         JSON.parse(localStorage.getItem('st_plans')         || '[]'),
+    learnings:     localStorage.getItem('st_learnings') || '',
+    sectorBaskets: localStorage.getItem('st_sectorBaskets')
+      ? JSON.parse(localStorage.getItem('st_sectorBaskets')) : null,
   };
 }
 
 function applyPayload(payload) {
-  if (payload.watchlist) localStorage.setItem('st_watchlist', JSON.stringify(payload.watchlist));
-  if (payload.preset)    localStorage.setItem('st_preset',    JSON.stringify(payload.preset));
-  if (payload.trades)    localStorage.setItem('st_trades',    JSON.stringify(payload.trades));
-  if (payload.settings)  localStorage.setItem('st_settings',  JSON.stringify(payload.settings));
-  if (payload.plans)         localStorage.setItem('st_plans',         JSON.stringify(payload.plans));
-  if (payload.learnings)     localStorage.setItem('st_learnings',     payload.learnings || '');
-  if (payload.sectorBaskets) localStorage.setItem('st_sectorBaskets', JSON.stringify(payload.sectorBaskets));
+  if (Object.prototype.hasOwnProperty.call(payload, 'watchlist'))     localStorage.setItem('st_watchlist',     JSON.stringify(payload.watchlist));
+  if (Object.prototype.hasOwnProperty.call(payload, 'preset'))        localStorage.setItem('st_preset',        JSON.stringify(payload.preset));
+  if (Object.prototype.hasOwnProperty.call(payload, 'trades'))        localStorage.setItem('st_trades',        JSON.stringify(payload.trades));
+  if (Object.prototype.hasOwnProperty.call(payload, 'settings'))      localStorage.setItem('st_settings',      JSON.stringify(payload.settings));
+  if (Object.prototype.hasOwnProperty.call(payload, 'plans'))         localStorage.setItem('st_plans',         JSON.stringify(payload.plans));
+  if (Object.prototype.hasOwnProperty.call(payload, 'learnings'))     localStorage.setItem('st_learnings',     payload.learnings || '');
+  if (Object.prototype.hasOwnProperty.call(payload, 'sectorBaskets') && payload.sectorBaskets)
+                                                                        localStorage.setItem('st_sectorBaskets', JSON.stringify(payload.sectorBaskets));
   watchlist = JSON.parse(localStorage.getItem('st_watchlist') || '[]');
   trades    = JSON.parse(localStorage.getItem('st_trades')    || '[]');
   plans     = JSON.parse(localStorage.getItem('st_plans')     || '[]');
   loadSettings(); renderWatchlist(); renderJournal(); renderSundayPlans(); renderCapitalDashboard(); calcRisk();
   localStorage.setItem('st_lastSync', Date.now().toString());
-  document.getElementById('syncLastSync').textContent = 'Last synced: ' + new Date().toLocaleString('en-IN');
+  const lastEl = document.getElementById('syncLastSync');
+  if (lastEl) lastEl.textContent = 'Last synced: ' + new Date().toLocaleString('en-IN');
 }
 
 async function gistPush() {
