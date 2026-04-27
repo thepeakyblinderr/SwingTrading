@@ -34,12 +34,9 @@
 
 - { box-sizing: border-box; margin: 0; padding: 0; }
 
-html, body {
-overflow-x: hidden;
-max-width: 100vw;
-}
+html { overflow-x: hidden; }
 
-body {
+body { overflow-x: hidden;
 font-family: ‘DM Sans’, sans-serif;
 background: var(–bg);
 color: var(–text);
@@ -60,8 +57,7 @@ position: sticky;
 top: 0;
 z-index: 100;
 box-shadow: var(–shadow);
-width: 100%;
-overflow: hidden;
+min-width: 0;
 }
 .logo {
 font-family: ‘Playfair Display’, serif;
@@ -84,7 +80,7 @@ border: 1px solid var(–border);
 /* TABS */
 .tab-bar {
 display: flex;
-gap: 4px;
+gap: 2px;
 padding: 12px 12px 0;
 border-bottom: 1px solid var(–border);
 background: var(–surface);
@@ -97,7 +93,7 @@ scrollbar-width: none;
 font-family: ‘DM Sans’, sans-serif;
 font-size: 13px;
 font-weight: 500;
-padding: 10px 16px;
+padding: 10px 14px;
 border: none;
 background: transparent;
 color: var(–text2);
@@ -108,7 +104,7 @@ transition: all 0.2s;
 border-radius: var(–radius-sm) var(–radius-sm) 0 0;
 display: flex;
 align-items: center;
-gap: 6px;
+gap: 5px;
 white-space: nowrap;
 flex-shrink: 0;
 }
@@ -122,7 +118,7 @@ font-weight: 600;
 .tab-icon { font-size: 15px; }
 
 /* MAIN CONTENT */
-.main { padding: 16px; max-width: 1200px; margin: 0 auto; width: 100%; overflow-x: hidden; }
+.main { padding: 16px; max-width: 1200px; margin: 0 auto; width: 100%; min-width: 0; }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 
@@ -286,7 +282,7 @@ tbody tr:hover { background: var(–surface2); }
 
 /* SCREENER */
 .screener-controls { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 16px; }
-.watchlist-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; max-width: 100%; }
+.watchlist-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .tag {
 background: var(–surface2);
 border: 1px solid var(–border);
@@ -412,11 +408,9 @@ margin-top: 2px;
 @media (max-width: 700px) {
 .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
 .main { padding: 12px; }
-.tab-btn { padding: 8px 12px; font-size: 12px; }
+.tab-btn { padding: 8px 10px; font-size: 12px; }
 .logo { font-size: 18px; }
-.app-header { padding: 0 12px; }
-.header-badge { font-size: 10px; padding: 3px 8px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.card { padding: 14px; }
+.header-badge { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
 }
 </style>
 
@@ -532,7 +526,7 @@ margin-top: 2px;
 <!-- Watchlist -->
 <label>Your Watchlist</label>
 <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
-  <div style="position:relative;flex:1;min-width:150px;max-width:280px;">
+  <div style="position:relative;flex:1;min-width:130px;max-width:280px;">
     <input type="text" id="addSymbol" placeholder="Type stock name or symbol..." autocomplete="off"
       oninput="showSuggestions(this.value)"
       onkeydown="handleSuggestKey(event)"/>
@@ -576,12 +570,12 @@ margin-top: 2px;
         <thead>
           <tr>
             <th>Symbol</th>
-            <th>Price (₹) · Chg%</th>
+            <th>Price · Chg%</th>
             <th title="RSI 55–70 = +20pts">RSI (14) 🔵</th>
-            <th title="Volume vs 20-day avg ≥1.5× = +20pts">Vol Spike 🔵</th>
-            <th title="Price above 20 EMA = +20pts">vs 20 EMA 🔵</th>
-            <th title="Price above 50 EMA = +20pts">vs 50 EMA 🔵</th>
-            <th title="Within 15% of 52W High = +20pts">vs 52W High 🔵</th>
+            <th title="Vol ≥1.5× avg = +20pts">Vol Spike 🔵</th>
+            <th title="Above 20 EMA = +20pts">20 EMA 🔵</th>
+            <th title="Above 50 EMA = +20pts">50 EMA 🔵</th>
+            <th title="Within 15% of 52W High = +20pts">52W High 🔵</th>
             <th>ATR (14)</th>
             <th>Score /100</th>
             <th>Action</th>
@@ -2627,36 +2621,34 @@ const chgSign     = r.changePct >= 0 ? ‘+’ : ‘’;
 const rsiColor = r.rsi >= 70 ? 'var(--red)' : r.rsi >= 55 ? 'var(--green)' : 'var(--text3)';
 const rsiBg    = r.rsi >= 55 && r.rsi <= 70 ? 'var(--green-bg)' : r.rsi > 70 ? 'var(--red-bg)' : 'var(--surface2)';
 const rsiLabel = r.rsi >= 70 ? ' OB' : r.rsi >= 55 ? ' ✓' : ' ✗';
-const rsiCell  = `<span style="display:inline-block;padding:2px 7px;border-radius:5px;background:${rsiBg};color:${rsiColor};font-family:'DM Mono',monospace;font-size:12px;font-weight:600;">${r.rsi.toFixed(1)}${rsiLabel}</span>`;
+const rsiCell  = '<span style="display:inline-block;padding:2px 6px;border-radius:5px;background:' + rsiBg + ';color:' + rsiColor + ';font-family:\'DM Mono\',monospace;font-size:12px;font-weight:600;">' + r.rsi.toFixed(1) + rsiLabel + '</span>';
 
 // Vol spike cell
 const volColor = r.signals.vol === 'pass' ? 'var(--green)' : r.signals.vol === 'neutral' ? 'var(--orange)' : 'var(--red)';
 const volBg    = r.signals.vol === 'pass' ? 'var(--green-bg)' : r.signals.vol === 'neutral' ? 'var(--orange-bg)' : 'var(--red-bg)';
 const volLabel = r.signals.vol === 'pass' ? ' ✓' : r.signals.vol === 'neutral' ? ' ~' : ' ✗';
-const volCell  = `<span style="display:inline-block;padding:2px 7px;border-radius:5px;background:${volBg};color:${volColor};font-family:'DM Mono',monospace;font-size:12px;font-weight:600;">${r.volSpike.toFixed(2)}×${volLabel}</span>`;
+const volCell  = '<span style="display:inline-block;padding:2px 6px;border-radius:5px;background:' + volBg + ';color:' + volColor + ';font-family:\'DM Mono\',monospace;font-size:12px;font-weight:600;">' + r.volSpike.toFixed(2) + '×' + volLabel + '</span>';
 
 // 20 EMA cell
 const ema20pass = r.signals.ema20 === 'pass';
-const ema20Cell = `<span style="display:inline-block;padding:2px 7px;border-radius:5px;background:${ema20pass ? 'var(--green-bg)' : 'var(--red-bg)'};color:${ema20pass ? 'var(--green)' : 'var(--red)'};font-size:12px;font-weight:600;">${ema20pass ? '✓ Above' : '✗ Below'}</span>`;
+const ema20Cell = '<span style="display:inline-block;padding:2px 6px;border-radius:5px;background:' + (ema20pass ? 'var(--green-bg)' : 'var(--red-bg)') + ';color:' + (ema20pass ? 'var(--green)' : 'var(--red)') + ';font-size:12px;font-weight:600;">' + (ema20pass ? '✓ Above' : '✗ Below') + '</span>';
 
 // 50 EMA cell
 const ema50pass = r.signals.ema50 === 'pass';
-const ema50Cell = `<span style="display:inline-block;padding:2px 7px;border-radius:5px;background:${ema50pass ? 'var(--green-bg)' : 'var(--red-bg)'};color:${ema50pass ? 'var(--green)' : 'var(--red)'};font-size:12px;font-weight:600;">${ema50pass ? '✓ Above' : '✗ Below'}</span>`;
+const ema50Cell = '<span style="display:inline-block;padding:2px 6px;border-radius:5px;background:' + (ema50pass ? 'var(--green-bg)' : 'var(--red-bg)') + ';color:' + (ema50pass ? 'var(--green)' : 'var(--red)') + ';font-size:12px;font-weight:600;">' + (ema50pass ? '✓ Above' : '✗ Below') + '</span>';
 
 // 52W High cell
-const h52pass = r.signals.high52 === 'pass';
+const h52pass  = r.signals.high52 === 'pass';
 const h52Color = h52pass ? 'var(--green)' : r.pctFrom52High <= 30 ? 'var(--orange)' : 'var(--red)';
 const h52Bg    = h52pass ? 'var(--green-bg)' : r.pctFrom52High <= 30 ? 'var(--orange-bg)' : 'var(--red-bg)';
-const h52Cell  = `<span style="display:inline-block;padding:2px 7px;border-radius:5px;background:${h52Bg};color:${h52Color};font-family:'DM Mono',monospace;font-size:12px;font-weight:600;">${r.pctFrom52High.toFixed(1)}% below${h52pass ? ' ✓' : ''}</span>`;
+const h52Cell  = '<span style="display:inline-block;padding:2px 6px;border-radius:5px;background:' + h52Bg + ';color:' + h52Color + ';font-family:\'DM Mono\',monospace;font-size:12px;font-weight:600;">' + r.pctFrom52High.toFixed(1) + '% ' + (h52pass ? '✓' : '✗') + '</span>';
 
-// Score cell with breakdown tooltip
-const scoreBreakdown = [
-  r.signals.rsi === 'pass' ? '+20 RSI' : '0 RSI',
-  r.signals.ema20 === 'pass' ? '+20 20E' : '0 20E',
-  r.signals.ema50 === 'pass' ? '+20 50E' : '0 50E',
-  r.signals.vol === 'pass' ? '+20 VOL' : '0 VOL',
-  r.signals.high52 === 'pass' ? '+20 52W' : '0 52W',
-].join(' | ');
+// Score breakdown
+const breakdown = (r.signals.rsi==='pass'?'+20':' 0') + ' RSI | '
+  + (r.signals.ema20==='pass'?'+20':' 0') + ' 20E | '
+  + (r.signals.ema50==='pass'?'+20':' 0') + ' 50E | '
+  + (r.signals.vol==='pass'?'+20':' 0') + ' VOL | '
+  + (r.signals.high52==='pass'?'+20':' 0') + ' 52W';
 
 return '<tr id="row_' + idx + '">'
   + '<td><strong class="mono">' + r.symbol + '</strong>'
@@ -2672,7 +2664,7 @@ return '<tr id="row_' + idx + '">'
   + '</td>'
   + '<td><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill" style="width:' + r.score + '%;background:' + barColor + ';"></div></div>'
   + '<div class="score-num" style="color:' + scoreColor + ';font-size:14px;font-weight:700;">' + r.score + '</div></div>'
-  + '<div style="font-size:10px;color:var(--text3);margin-top:3px;white-space:nowrap;">' + scoreBreakdown + '</div></td>'
+  + '<div style="font-size:10px;color:var(--text3);margin-top:2px;font-family:\'DM Mono\',monospace;">' + breakdown + '</div></td>'
   + '<td><div style="display:flex;gap:4px;">'
   + '<button class="btn btn-sm btn-secondary" onclick="toggleChart(' + idx + ')">📈</button>'
   + '<button class="btn btn-sm btn-secondary" onclick="prefillRisk(\'' + r.symbol + '\',' + r.price.toFixed(2) + ')">⚖️</button>'
@@ -2680,7 +2672,7 @@ return '<tr id="row_' + idx + '">'
   + '</tr>'
   + '<tr id="chart_' + idx + '" style="display:none;">'
   + '<td colspan="10" style="padding:0;background:var(--surface2);">'
-  + (obWarning ? '<div style="padding:8px 16px;background:var(--red-bg);color:var(--red);font-size:12px;border-bottom:1px solid var(--border);">⚠️ RSI ' + r.rsi.toFixed(1) + ' — Overbought. Score is high from other signals but RSI warns this stock has run too far. Wait for RSI to pull back below 70 before entering.</div>' : '')
+  + (obWarning ? '<div style="padding:8px 16px;background:var(--red-bg);color:var(--red);font-size:12px;border-bottom:1px solid var(--border);">⚠️ RSI ' + r.rsi.toFixed(1) + ' — Overbought. Score capped at 60. Wait for RSI to pull back below 70 before entering.</div>' : '')
   + '<div style="padding:16px 20px;" id="chartWrap_' + idx + '"></div>'
   + '</td></tr>';
 ```
