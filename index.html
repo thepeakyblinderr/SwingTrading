@@ -569,13 +569,13 @@
             <th>Symbol</th>
             <th>Price (₹)</th>
             <th>Change %</th>
-            <th>RSI (14)</th>
-            <th>Vol Spike</th>
-            <th>vs 20 EMA</th>
-            <th>vs 52W High</th>
+            <th title="RSI 55–70 = +20pts">RSI (14) 🔵</th>
+            <th title="Volume vs 20-day avg ≥1.5× = +20pts">Vol Spike 🔵</th>
+            <th title="Price above 20 EMA = +20pts">vs 20 EMA 🔵</th>
+            <th title="Price above 50 EMA = +20pts">vs 50 EMA 🔵</th>
+            <th title="Within 15% of 52W High = +20pts">vs 52W High 🔵</th>
             <th>ATR (14)</th>
-            <th>Signals</th>
-            <th>Score</th>
+            <th>Score /100</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -583,7 +583,7 @@
       </table>
     </div>
     <div style="margin-top:10px;font-size:12px;color:var(--text3);">
-      * Score 70+ = Strong candidate · 50-69 = Watch · Below 50 = Avoid · Data: Yahoo Finance (15-min delay) · Host on GitHub Pages for best results
+      🔵 = scoring parameter (+20 pts each) · Score 70+ = Strong candidate · 50–69 = Watch · Below 50 = Avoid · Data: Yahoo Finance (15-min delay)
     </div>
   </div>
 </div>
@@ -2582,37 +2582,59 @@ function renderScreenerResults(results) {
     const scoreColor  = r.score >= 70 ? 'var(--green)' : r.score >= 50 ? 'var(--orange)' : 'var(--red)';
     const changeColor = r.changePct >= 0 ? 'var(--green)' : 'var(--red)';
     const barColor    = r.score >= 70 ? '#1e7a4e' : r.score >= 50 ? '#d4780a' : '#c0392b';
-    // If RSI overbought, score is high from other signals but RSI itself is a warning
     const obWarning   = r.signals.rsi === 'overbought';
     const chgSign     = r.changePct >= 0 ? '+' : '';
-    const ema20txt    = r.signals.ema20 === 'pass' ? '✓ Above' : '✗ Below';
-    const ema20col    = r.signals.ema20 === 'pass' ? 'var(--green)' : 'var(--red)';
-    const rsiClass    = r.signals.rsi === 'pass' ? 'pass' : 'fail';
 
-    const sigHTML = '<span class="sig sig-' + rsiClass + '">RSI</span>'
-      + '<span class="sig sig-' + r.signals.ema20 + '">20E</span>'
-      + '<span class="sig sig-' + r.signals.ema50 + '">50E</span>'
-      + '<span class="sig sig-' + r.signals.vol + '">VOL</span>'
-      + '<span class="sig sig-' + r.signals.high52 + '">52W</span>';
+    // RSI cell
+    const rsiColor = r.rsi >= 70 ? 'var(--red)' : r.rsi >= 55 ? 'var(--green)' : 'var(--text3)';
+    const rsiBg    = r.rsi >= 55 && r.rsi <= 70 ? 'var(--green-bg)' : r.rsi > 70 ? 'var(--red-bg)' : 'var(--surface2)';
+    const rsiLabel = r.rsi >= 70 ? ' OB' : r.rsi >= 55 ? ' ✓' : ' ✗';
+    const rsiCell  = `<span style="display:inline-block;padding:2px 7px;border-radius:5px;background:${rsiBg};color:${rsiColor};font-family:'DM Mono',monospace;font-size:12px;font-weight:600;">${r.rsi.toFixed(1)}${rsiLabel}</span>`;
+
+    // Vol spike cell
+    const volColor = r.signals.vol === 'pass' ? 'var(--green)' : r.signals.vol === 'neutral' ? 'var(--orange)' : 'var(--red)';
+    const volBg    = r.signals.vol === 'pass' ? 'var(--green-bg)' : r.signals.vol === 'neutral' ? 'var(--orange-bg)' : 'var(--red-bg)';
+    const volLabel = r.signals.vol === 'pass' ? ' ✓' : r.signals.vol === 'neutral' ? ' ~' : ' ✗';
+    const volCell  = `<span style="display:inline-block;padding:2px 7px;border-radius:5px;background:${volBg};color:${volColor};font-family:'DM Mono',monospace;font-size:12px;font-weight:600;">${r.volSpike.toFixed(2)}×${volLabel}</span>`;
+
+    // 20 EMA cell
+    const ema20pass = r.signals.ema20 === 'pass';
+    const ema20Cell = `<span style="display:inline-block;padding:2px 7px;border-radius:5px;background:${ema20pass ? 'var(--green-bg)' : 'var(--red-bg)'};color:${ema20pass ? 'var(--green)' : 'var(--red)'};font-size:12px;font-weight:600;">${ema20pass ? '✓ Above' : '✗ Below'}</span>`;
+
+    // 50 EMA cell
+    const ema50pass = r.signals.ema50 === 'pass';
+    const ema50Cell = `<span style="display:inline-block;padding:2px 7px;border-radius:5px;background:${ema50pass ? 'var(--green-bg)' : 'var(--red-bg)'};color:${ema50pass ? 'var(--green)' : 'var(--red)'};font-size:12px;font-weight:600;">${ema50pass ? '✓ Above' : '✗ Below'}</span>`;
+
+    // 52W High cell
+    const h52pass = r.signals.high52 === 'pass';
+    const h52Color = h52pass ? 'var(--green)' : r.pctFrom52High <= 30 ? 'var(--orange)' : 'var(--red)';
+    const h52Bg    = h52pass ? 'var(--green-bg)' : r.pctFrom52High <= 30 ? 'var(--orange-bg)' : 'var(--red-bg)';
+    const h52Cell  = `<span style="display:inline-block;padding:2px 7px;border-radius:5px;background:${h52Bg};color:${h52Color};font-family:'DM Mono',monospace;font-size:12px;font-weight:600;">${r.pctFrom52High.toFixed(1)}% below${h52pass ? ' ✓' : ''}</span>`;
+
+    // Score cell with breakdown tooltip
+    const scoreBreakdown = [
+      r.signals.rsi === 'pass' ? '+20 RSI' : '0 RSI',
+      r.signals.ema20 === 'pass' ? '+20 20E' : '0 20E',
+      r.signals.ema50 === 'pass' ? '+20 50E' : '0 50E',
+      r.signals.vol === 'pass' ? '+20 VOL' : '0 VOL',
+      r.signals.high52 === 'pass' ? '+20 52W' : '0 52W',
+    ].join(' | ');
 
     return '<tr id="row_' + idx + '">'
       + '<td><strong class="mono">' + r.symbol + '</strong>'
       + (r.fullName ? '<br/><span style="font-size:10px;color:var(--text3);">' + r.fullName + '</span>' : '') + '</td>'
-      + '<td class="mono">₹' + r.price.toFixed(2) + '</td>'
-      + '<td class="mono" style="color:' + changeColor + '">' + chgSign + r.changePct.toFixed(2) + '%</td>'
-      + '<td class="mono" style="color:' + (r.rsi >= 70 ? 'var(--red)' : r.rsi >= 55 ? 'var(--green)' : 'var(--text3)') + ';">'
-      + r.rsi.toFixed(1)
-      + (r.rsi >= 70 ? ' <span style="font-size:9px;background:var(--red-bg);color:var(--red);padding:1px 4px;border-radius:3px;font-family:sans-serif;">OB</span>' : '')
-      + '</td>'
-      + '<td class="mono">' + r.volSpike.toFixed(2) + '×</td>'
-      + '<td class="mono" style="color:' + ema20col + '">' + ema20txt + '</td>'
-      + '<td class="mono">' + r.pctFrom52High.toFixed(1) + '% below</td>'
+      + '<td class="mono">₹' + r.price.toFixed(2) + '<br/><span style="font-size:11px;color:' + changeColor + ';">' + chgSign + r.changePct.toFixed(2) + '%</span></td>'
+      + '<td>' + rsiCell + '</td>'
+      + '<td>' + volCell + '</td>'
+      + '<td>' + ema20Cell + '</td>'
+      + '<td>' + ema50Cell + '</td>'
+      + '<td>' + h52Cell + '</td>'
       + '<td class="mono">'
       + (r.atr ? '₹' + r.atr.toFixed(1) + '<br/><span style="font-size:10px;color:var(--text3);">' + r.atrPct.toFixed(1) + '%</span>' : '—')
       + '</td>'
-      + '<td><div class="signal-row">' + sigHTML + '</div></td>'
       + '<td><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill" style="width:' + r.score + '%;background:' + barColor + ';"></div></div>'
-      + '<div class="score-num" style="color:' + scoreColor + ';">' + r.score + '</div></div></td>'
+      + '<div class="score-num" style="color:' + scoreColor + ';font-size:14px;font-weight:700;">' + r.score + '</div></div>'
+      + '<div style="font-size:10px;color:var(--text3);margin-top:3px;white-space:nowrap;">' + scoreBreakdown + '</div></td>'
       + '<td><div style="display:flex;gap:4px;">'
       + '<button class="btn btn-sm btn-secondary" onclick="toggleChart(' + idx + ')">📈</button>'
       + '<button class="btn btn-sm btn-secondary" onclick="prefillRisk(\'' + r.symbol + '\',' + r.price.toFixed(2) + ')">⚖️</button>'
