@@ -2070,7 +2070,7 @@ function setSyncStatus(status, msg) {
 // Debounced auto-push — fires 3s after last change if Gist is connected
 function autoSync() {
   const { gistId, token } = getSyncCreds();
-  if (!gistId || !token) return; // not set up, skip silently
+  if (!gistId || !token) return;
   setSyncStatus('unsaved');
   clearTimeout(_syncTimer);
   _syncTimer = setTimeout(async () => {
@@ -2084,14 +2084,16 @@ function autoSync() {
       });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       localStorage.setItem('st_lastSync', Date.now().toString());
-      setSyncStatus('ok');
-      document.getElementById('syncLastSync').textContent = 'Last synced: ' + new Date().toLocaleString('en-IN');
-      setTimeout(() => setSyncStatus('idle'), 3000);
+      setSyncStatus('ok', payload.trades.length + 't · ' + payload.watchlist.length + 'w');
+      const el = document.getElementById('syncLastSync');
+      if (el) el.textContent = 'Last synced: ' + new Date().toLocaleString('en-IN')
+        + ' · ' + payload.trades.length + ' trades · ' + payload.watchlist.length + ' stocks';
+      setTimeout(() => setSyncStatus('idle'), 4000);
     } catch(e) {
       setSyncStatus('error');
       setTimeout(() => setSyncStatus('unsaved'), 4000);
     }
-  }, 3000);
+  }, 2000); // reduced to 2s for faster response
 }
 
 function getSyncCreds() {
@@ -2295,11 +2297,34 @@ function applyPayload(payload) {
   if (Object.prototype.hasOwnProperty.call(payload, 'learnings'))     localStorage.setItem('st_learnings',     payload.learnings || '');
   if (Object.prototype.hasOwnProperty.call(payload, 'sectorBaskets') && payload.sectorBaskets)
                                                                         localStorage.setItem('st_sectorBaskets', JSON.stringify(payload.sectorBaskets));
+  // Reload all in-memory variables
   watchlist = JSON.parse(localStorage.getItem('st_watchlist') || '[]');
   trades    = JSON.parse(localStorage.getItem('st_trades')    || '[]');
   plans     = JSON.parse(localStorage.getItem('st_plans')     || '[]');
-  loadSettings(); renderWatchlist(); renderJournal(); renderSundayPlans(); renderCapitalDashboard(); calcRisk();
+
   localStorage.setItem('st_lastSync', Date.now().toString());
+
+  // Close modal first, then re-render everything so user sees updated data
+  closeSyncModal();
+
+  // Small delay to let modal close animation finish, then full re-render
+  setTimeout(() => {
+    loadSettings();
+    renderWatchlist();
+    renderJournal();
+    renderSundayPlans();
+    renderCapitalDashboard();
+    calcRisk();
+    setSyncStatus('ok');
+    setTimeout(() => setSyncStatus('idle'), 3000);
+    // Show toast confirmation
+    const toast = document.createElement('div');
+    toast.textContent = '✓ Sync complete — ' + trades.length + ' trades · ' + watchlist.length + ' stocks loaded';
+    toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--green);color:white;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.2);white-space:nowrap;';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+  }, 300);
+
   const lastEl = document.getElementById('syncLastSync');
   if (lastEl) lastEl.textContent = 'Last synced: ' + new Date().toLocaleString('en-IN');
 }
