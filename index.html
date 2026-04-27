@@ -420,61 +420,47 @@
 
 <!-- Sync Modal -->
 <div id="syncModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:500;align-items:center;justify-content:center;">
-  <div style="background:var(--surface);border-radius:var(--radius);padding:24px;max-width:480px;width:92%;box-shadow:var(--shadow-lg);max-height:90vh;overflow-y:auto;">
+  <div style="background:var(--surface);border-radius:var(--radius);padding:24px;max-width:440px;width:92%;box-shadow:var(--shadow-lg);max-height:90vh;overflow-y:auto;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-      <div style="font-family:'Playfair Display',serif;font-size:18px;font-weight:700;">🔄 Gist Sync</div>
-      <button class="btn btn-secondary btn-sm" onclick="closeSyncModal()">✕</button>
+      <div style="font-family:'Playfair Display',serif;font-size:18px;font-weight:700;">🔥 Firebase Sync</div>
+      <button class="btn btn-secondary btn-sm" onclick="closeSyncModal()">&#10005;</button>
     </div>
     <div style="font-size:12px;color:var(--text3);margin-bottom:16px;" id="syncGistStatus">Not connected</div>
-
-    <!-- Credentials -->
     <div id="syncCredPanel">
-      <div style="font-size:13px;font-weight:600;margin-bottom:8px;">Connect your Gist</div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px;">Connect Firebase Realtime Database</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Free setup: console.firebase.google.com -> Realtime Database -> copy URL below.</div>
       <div style="display:grid;gap:10px;margin-bottom:12px;">
         <div>
-          <label>GitHub Token</label>
-          <input type="password" id="sync_token" placeholder="ghp_xxxxxxxxxxxx"/>
-          <div style="font-size:11px;color:var(--text3);margin-top:3px;">Same token you use in other apps</div>
+          <label>Firebase Database URL</label>
+          <input type="text" id="sync_fbUrl" placeholder="https://your-app-default-rtdb.firebaseio.com" style="font-family:'DM Mono',monospace;font-size:11px;"/>
         </div>
         <div>
-          <label>Gist ID <span style="font-weight:400;color:var(--text3);">— leave blank to auto-create</span></label>
-          <input type="text" id="sync_gistId" placeholder="Leave blank → we'll create one for you" style="font-family:'DM Mono',monospace;font-size:12px;"/>
-          <div style="font-size:11px;color:var(--text3);margin-top:3px;">Or paste existing Gist ID if you already have one</div>
+          <label>Your private sync key</label>
+          <input type="text" id="sync_fbKey" placeholder="any secret word only you know e.g. sandesh2024"/>
+          <div style="font-size:11px;color:var(--text3);margin-top:3px;">Keeps your data private — only someone with this key can read it</div>
         </div>
       </div>
-      <div style="display:grid;gap:8px;">
-        <button class="btn btn-primary btn-sm" onclick="connectGist()" id="connectBtn">🔗 Connect</button>
-      </div>
-      <div id="createGistProgress" style="display:none;font-size:12px;color:var(--text2);text-align:center;padding:8px;">Creating Gist...</div>
+      <button class="btn btn-primary btn-sm" onclick="connectFirebase()" style="width:100%;" id="fbConnectBtn">&#128279; Connect</button>
     </div>
-
-    <!-- Actions — shown after credentials saved -->
     <div id="syncActionPanel" style="display:none;">
       <div style="display:grid;gap:10px;margin-bottom:12px;">
-
         <div style="padding:12px;background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border);">
-          <div style="font-size:13px;font-weight:600;margin-bottom:4px;">📤 Push to Gist</div>
-          <div style="font-size:12px;color:var(--text2);margin-bottom:8px;">Saves your current data (watchlist, journal, settings) to Gist. Overwrites what's there.</div>
-          <button class="btn btn-primary btn-sm" onclick="gistPush()" style="width:100%;" id="pushBtn">📤 Push Now</button>
+          <div style="font-size:13px;font-weight:600;margin-bottom:4px;">&#128228; Push to Firebase</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:8px;">Save all current data to Firebase. Overwrites existing.</div>
+          <button class="btn btn-primary btn-sm" onclick="firebasePush()" style="width:100%;" id="pushBtn">&#128228; Push Now</button>
         </div>
-
         <div style="padding:12px;background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border);">
-          <div style="font-size:13px;font-weight:600;margin-bottom:4px;">📥 Pull from Gist</div>
-          <div style="font-size:12px;color:var(--text2);margin-bottom:8px;">Loads data from Gist onto this device. Shows exactly what's saved before you confirm.</div>
-          <button class="btn btn-secondary btn-sm" onclick="gistPull()" style="width:100%;" id="pullBtn">📥 Pull Now</button>
+          <div style="font-size:13px;font-weight:600;margin-bottom:4px;">&#128229; Pull from Firebase</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:8px;">Load data from Firebase. Shows summary before confirming.</div>
+          <button class="btn btn-secondary btn-sm" onclick="firebasePull()" style="width:100%;" id="pullBtn">&#128229; Pull Now</button>
         </div>
-
       </div>
-      <div style="font-size:11px;color:var(--text3);margin-bottom:10px;text-align:center;" id="syncLastSync"></div>
-      <button class="btn btn-secondary btn-sm" onclick="showGistCredPanel()" style="width:100%;font-size:11px;">✏️ Edit Gist ID / Token</button>
-      <button class="btn btn-secondary btn-sm" onclick="diagnosSync()" style="width:100%;font-size:11px;margin-top:6px;">🔍 Diagnose — what's local vs Gist</button>
-      <div id="diagPanel" style="display:none;margin-top:10px;padding:10px 12px;background:var(--surface2);border-radius:var(--radius-sm);font-size:11px;font-family:'DM Mono',monospace;line-height:1.8;color:var(--text2);word-break:break-all;"></div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px;text-align:center;" id="syncLastSync"></div>
+      <button class="btn btn-secondary btn-sm" onclick="showFbCredPanel()" style="width:100%;font-size:11px;">&#9998; Edit URL / Key</button>
     </div>
-
     <div id="syncMsg" style="display:none;margin-top:10px;padding:10px 12px;border-radius:8px;font-size:12px;text-align:center;"></div>
-
     <div style="margin-top:12px;background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px;font-size:11px;color:var(--text3);">
-      💡 Same Gist ID and token you use in other apps. SwingTrader saves to <strong>swingtrader.json</strong> inside your Gist — won't touch other files.
+      &#128161; Firebase Realtime DB is free (Spark plan). No token needed. Your sync key keeps data private.
     </div>
   </div>
 </div>
@@ -2043,10 +2029,17 @@ function updateGuideRules(capital) {
 }
 
 // ═══════════════════ GIST SYNC ═══════════════════
-const GIST_FILE = 'swingtrader.json';
-let _syncTimer = null;
 
-// Status: 'idle' | 'syncing' | 'ok' | 'error' | 'unsaved' | 'offline'
+// ═══════════════════ FIREBASE SYNC ═══════════════════
+const FB_PATH = 'swingtrader';
+
+function getFbConfig() {
+  return {
+    url: localStorage.getItem('st_fbUrl') || '',
+    key: localStorage.getItem('st_fbKey') || '',
+  };
+}
+
 function setSyncStatus(status, msg) {
   const dot  = document.getElementById('syncDot');
   const text = document.getElementById('syncPillText');
@@ -2060,65 +2053,52 @@ function setSyncStatus(status, msg) {
     offline: { color: 'var(--text3)',   label: 'Offline'    },
   };
   const s = map[status] || map.idle;
-  dot.style.background  = s.color;
-  text.style.color      = s.color;
-  text.textContent      = msg || s.label;
-  // Animate dot when syncing
-  dot.style.animation   = status === 'syncing' ? 'pulse 0.8s ease infinite' : 'none';
+  dot.style.background = s.color;
+  text.style.color     = s.color;
+  text.textContent     = msg || s.label;
+  dot.style.animation  = status === 'syncing' ? 'pulse 0.8s ease infinite' : 'none';
 }
 
-// Debounced auto-push — fires 3s after last change if Gist is connected
+let _syncTimer = null;
 function autoSync() {
-  const { gistId, token } = getSyncCreds();
-  if (!gistId || !token) return;
+  const { url, key } = getFbConfig();
+  if (!url || !key) return;
   setSyncStatus('unsaved');
   clearTimeout(_syncTimer);
   _syncTimer = setTimeout(async () => {
     setSyncStatus('syncing');
     try {
       const payload = buildPayload();
-      const resp = await fetch('https://api.github.com/gists/' + gistId, {
-        method: 'PATCH',
-        headers: { 'Authorization': 'token ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(payload, null, 2) } } })
+      const resp = await fetch(url + '/' + FB_PATH + '/' + encodeURIComponent(key) + '.json', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       localStorage.setItem('st_lastSync', Date.now().toString());
-      setSyncStatus('ok', payload.trades.length + 't · ' + payload.watchlist.length + 'w');
+      setSyncStatus('ok', payload.trades.length + 't ' + payload.watchlist.length + 'w');
       const el = document.getElementById('syncLastSync');
       if (el) el.textContent = 'Last synced: ' + new Date().toLocaleString('en-IN')
-        + ' · ' + payload.trades.length + ' trades · ' + payload.watchlist.length + ' stocks';
+        + ' — ' + payload.trades.length + ' trades, ' + payload.watchlist.length + ' stocks';
       setTimeout(() => setSyncStatus('idle'), 4000);
     } catch(e) {
       setSyncStatus('error');
       setTimeout(() => setSyncStatus('unsaved'), 4000);
     }
-  }, 2000); // reduced to 2s for faster response
-}
-
-function getSyncCreds() {
-  return {
-    gistId: localStorage.getItem('st_gistId') || '',
-    token:  localStorage.getItem('st_token')  || '',
-  };
+  }, 2000);
 }
 
 function openSync() {
-  const { gistId, token } = getSyncCreds();
-  const hasCreds = gistId && token;
+  const { url, key } = getFbConfig();
+  const hasCreds = url && key;
   document.getElementById('syncCredPanel').style.display   = hasCreds ? 'none'  : 'block';
   document.getElementById('syncActionPanel').style.display = hasCreds ? 'block' : 'none';
   if (hasCreds) {
-    document.getElementById('sync_gistId').value = gistId;
-    document.getElementById('sync_token').value  = token;
+    document.getElementById('syncGistStatus').textContent = 'Connected to Firebase';
     const last = localStorage.getItem('st_lastSync');
-    document.getElementById('syncLastSync').textContent = last
-      ? 'Last synced: ' + new Date(parseInt(last)).toLocaleString('en-IN')
-      : 'Never synced on this device';
-    document.getElementById('syncGistStatus').textContent = 'Connected · Gist ' + gistId.slice(0,8) + '...';
+    const el = document.getElementById('syncLastSync');
+    if (el) el.textContent = last ? 'Last synced: ' + new Date(parseInt(last)).toLocaleString('en-IN') : 'Never synced on this device';
   } else {
-    document.getElementById('sync_gistId').value = '';
-    document.getElementById('sync_token').value  = '';
     document.getElementById('syncGistStatus').textContent = 'Not connected';
   }
   document.getElementById('syncMsg').style.display = 'none';
@@ -2129,153 +2109,35 @@ function closeSyncModal() {
   document.getElementById('syncModal').style.display = 'none';
 }
 
-function showGistCredPanel() {
-  const { gistId, token } = getSyncCreds();
-  document.getElementById('sync_token').value  = token;
-  document.getElementById('sync_gistId').value = gistId;
+function showFbCredPanel() {
+  const { url, key } = getFbConfig();
+  document.getElementById('sync_fbUrl').value = url;
+  document.getElementById('sync_fbKey').value = key;
   document.getElementById('syncCredPanel').style.display   = 'block';
   document.getElementById('syncActionPanel').style.display = 'none';
-  document.getElementById('createGistProgress').style.display = 'none';
 }
 
-async function connectGist() {
-  const token  = document.getElementById('sync_token').value.trim();
-  const gistId = document.getElementById('sync_gistId').value.trim();
-  if (!token) { showSyncMsg('Enter your GitHub token first.', false); return; }
-
-  const btn = document.getElementById('connectBtn');
-  btn.disabled = true;
-
-  if (gistId) {
-    // Use existing Gist ID — just save and verify
-    btn.textContent = 'Verifying...';
-    try {
-      const resp = await fetch('https://api.github.com/gists/' + gistId, {
-        headers: { 'Authorization': 'token ' + token }
-      });
-      if (!resp.ok) throw new Error('Could not access Gist. Check your ID and token.');
-      saveCredAndSwitch(gistId, token);
-      showSyncMsg('✓ Connected to existing Gist!', true);
-    } catch(e) {
-      showSyncMsg(e.message, false);
-    }
-  } else {
-    // Auto-create a new Gist
-    btn.textContent = 'Creating Gist...';
-    document.getElementById('createGistProgress').style.display = 'block';
-    try {
-      const resp = await fetch('https://api.github.com/gists', {
-        method: 'POST',
-        headers: { 'Authorization': 'token ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          description: 'SwingTrader NSE — Sync Data',
-          public: false,
-          files: { [GIST_FILE]: { content: JSON.stringify({ v: 2, ts: Date.now(), note: 'Created by SwingTrader NSE' }, null, 2) } }
-        })
-      });
-      if (!resp.ok) {
-        const err = await resp.json();
-        throw new Error(err.message || 'Failed to create Gist. Check your token has gist scope.');
-      }
-      const gist = await resp.json();
-      const newId = gist.id;
-      document.getElementById('sync_gistId').value = newId;
-      saveCredAndSwitch(newId, token);
-      showSyncMsg('✓ New Gist created and connected! ID: ' + newId.slice(0,12) + '...', true);
-    } catch(e) {
-      showSyncMsg(e.message, false);
-    }
-    document.getElementById('createGistProgress').style.display = 'none';
+function connectFirebase() {
+  const url = document.getElementById('sync_fbUrl').value.trim().replace(/\/+$/, '');
+  const key = document.getElementById('sync_fbKey').value.trim().replace(/\s/g, '');
+  if (!url) { showSyncMsg('Enter your Firebase Database URL.', false); return; }
+  if (!key) { showSyncMsg('Enter a private sync key.', false); return; }
+  if (!url.includes('firebaseio.com') && !url.includes('firebasedatabase.app')) {
+    showSyncMsg('URL should be from Firebase (firebaseio.com or firebasedatabase.app).', false); return;
   }
-
-  btn.disabled = false;
-  btn.textContent = '🔗 Connect';
-}
-
-function saveCredAndSwitch(gistId, token) {
-  localStorage.setItem('st_gistId', gistId);
-  localStorage.setItem('st_token',  token);
+  localStorage.setItem('st_fbUrl', url);
+  localStorage.setItem('st_fbKey', key);
   document.getElementById('syncCredPanel').style.display   = 'none';
   document.getElementById('syncActionPanel').style.display = 'block';
-  document.getElementById('syncGistStatus').textContent    = 'Connected · Gist ' + gistId.slice(0,8) + '...';
-  const last = localStorage.getItem('st_lastSync');
-  document.getElementById('syncLastSync').textContent = last
-    ? 'Last synced: ' + new Date(parseInt(last)).toLocaleString('en-IN')
-    : 'Never synced on this device';
-  setSyncStatus('idle');
+  document.getElementById('syncGistStatus').textContent = 'Connected to Firebase';
+  const el = document.getElementById('syncLastSync');
+  if (el) el.textContent = 'Never synced on this device';
+  showSyncMsg('Connected! Push your data or Pull from another device.', true);
 }
-
-function saveGistCredentials() { connectGist(); } // kept for compat
-
-async function diagnosSync() {
-  const panel = document.getElementById('diagPanel');
-  panel.style.display = 'block';
-  panel.innerHTML = 'Checking...';
-
-  // Local data
-  const local = buildPayload();
-  const localInfo = '📱 LOCAL DATA:\n'
-    + '  watchlist: ' + local.watchlist.length + ' stocks (' + local.watchlist.slice(0,5).join(',') + (local.watchlist.length > 5 ? '...' : '') + ')\n'
-    + '  trades: ' + local.trades.length + '\n'
-    + '  plans: ' + local.plans.length + '\n'
-    + '  settings: ' + JSON.stringify(local.settings) + '\n'
-    + '  learnings: ' + (local.learnings.length) + ' chars\n';
-
-  // Gist data
-  const { gistId, token } = getSyncCreds();
-  if (!gistId || !token) {
-    panel.innerHTML = localInfo + '\n⚠️ No Gist credentials set.';
-    return;
-  }
-
-  try {
-    const resp = await fetch('https://api.github.com/gists/' + gistId, {
-      headers: { 'Authorization': 'token ' + token }
-    });
-    if (!resp.ok) {
-      panel.innerHTML = localInfo + '\n❌ Gist fetch failed: HTTP ' + resp.status + '\nCheck your token has gist scope.';
-      return;
-    }
-    const gist = await resp.json();
-    const files = Object.keys(gist.files || {});
-
-    if (!gist.files[GIST_FILE]) {
-      panel.innerHTML = localInfo + '\n☁️ GIST FILES: ' + files.join(', ') + '\n❌ swingtrader.json NOT FOUND in Gist.\nPush from this device first.';
-      return;
-    }
-
-    let gistPayload;
-    try {
-      gistPayload = JSON.parse(gist.files[GIST_FILE].content);
-    } catch(e) {
-      panel.innerHTML = localInfo + '\n❌ Gist file is corrupted / invalid JSON.';
-      return;
-    }
-
-    const gistInfo = '\n☁️ GIST DATA (swingtrader.json):\n'
-      + '  saved: ' + (gistPayload.ts ? new Date(gistPayload.ts).toLocaleString('en-IN') : 'unknown') + '\n'
-      + '  watchlist: ' + (gistPayload.watchlist ? gistPayload.watchlist.length : 0) + ' stocks\n'
-      + '  trades: ' + (gistPayload.trades ? gistPayload.trades.length : 0) + '\n'
-      + '  plans: ' + (gistPayload.plans ? gistPayload.plans.length : 0) + '\n'
-      + '  settings: ' + JSON.stringify(gistPayload.settings || {}) + '\n'
-      + '  version: v' + (gistPayload.v || '?') + '\n';
-
-    const verdict = local.watchlist.length > 0 && (gistPayload.watchlist || []).length === 0
-      ? '\n⚠️ Local has data but Gist is empty — Push from this device.'
-      : local.watchlist.length === 0 && (gistPayload.watchlist || []).length > 0
-      ? '\n⚠️ Gist has data but local is empty — Pull to this device.'
-      : '\n✅ Both have data. Use Push/Pull to sync direction you want.';
-
-    panel.innerHTML = (localInfo + gistInfo + verdict).replace(/\n/g, '<br/>');
-  } catch(e) {
-    panel.innerHTML = localInfo + '\n❌ Error: ' + e.message;
-  }
-}
-
 
 function buildPayload() {
   return {
-    v: 2,
+    v: 3,
     ts: Date.now(),
     watchlist:     JSON.parse(localStorage.getItem('st_watchlist')     || '[]'),
     preset:        JSON.parse(localStorage.getItem('st_preset')        || 'null'),
@@ -2297,130 +2159,95 @@ function applyPayload(payload) {
   if (Object.prototype.hasOwnProperty.call(payload, 'learnings'))     localStorage.setItem('st_learnings',     payload.learnings || '');
   if (Object.prototype.hasOwnProperty.call(payload, 'sectorBaskets') && payload.sectorBaskets)
                                                                         localStorage.setItem('st_sectorBaskets', JSON.stringify(payload.sectorBaskets));
-  // Reload all in-memory variables
   watchlist = JSON.parse(localStorage.getItem('st_watchlist') || '[]');
   trades    = JSON.parse(localStorage.getItem('st_trades')    || '[]');
   plans     = JSON.parse(localStorage.getItem('st_plans')     || '[]');
-
   localStorage.setItem('st_lastSync', Date.now().toString());
-
-  // Close modal first, then re-render everything so user sees updated data
   closeSyncModal();
-
-  // Small delay to let modal close animation finish, then full re-render
   setTimeout(() => {
-    loadSettings();
-    renderWatchlist();
-    renderJournal();
-    renderSundayPlans();
-    renderCapitalDashboard();
-    calcRisk();
+    loadSettings(); renderWatchlist(); renderJournal();
+    renderSundayPlans(); renderCapitalDashboard(); calcRisk();
     setSyncStatus('ok');
     setTimeout(() => setSyncStatus('idle'), 3000);
-    // Show toast confirmation
     const toast = document.createElement('div');
-    toast.textContent = '✓ Sync complete — ' + trades.length + ' trades · ' + watchlist.length + ' stocks loaded';
+    toast.textContent = '✓ Synced — ' + trades.length + ' trades · ' + watchlist.length + ' stocks loaded';
     toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--green);color:white;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.2);white-space:nowrap;';
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 4000);
   }, 300);
-
-  const lastEl = document.getElementById('syncLastSync');
-  if (lastEl) lastEl.textContent = 'Last synced: ' + new Date().toLocaleString('en-IN');
 }
 
-async function gistPush() {
-  const { gistId, token } = getSyncCreds();
-  if (!gistId || !token) { showSyncMsg('Set up Gist credentials first.', false); return; }
+async function firebasePush() {
+  const { url, key } = getFbConfig();
+  if (!url || !key) { showSyncMsg('Connect Firebase first.', false); return; }
   const btn = document.getElementById('pushBtn');
   btn.disabled = true; btn.textContent = 'Pushing...';
   setSyncStatus('syncing');
   try {
     const payload = buildPayload();
-    const resp = await fetch('https://api.github.com/gists/' + gistId, {
-      method: 'PATCH',
-      headers: { 'Authorization': 'token ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(payload, null, 2) } } })
+    const resp = await fetch(url + '/' + FB_PATH + '/' + encodeURIComponent(key) + '.json', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     });
-    if (!resp.ok) {
-      const err = await resp.json();
-      throw new Error(err.message || 'HTTP ' + resp.status);
-    }
+    if (!resp.ok) throw new Error('HTTP ' + resp.status + ' — check Firebase DB rules allow read/write');
     localStorage.setItem('st_lastSync', Date.now().toString());
-    document.getElementById('syncLastSync').textContent = 'Last synced: ' + new Date().toLocaleString('en-IN');
+    const el = document.getElementById('syncLastSync');
+    if (el) el.textContent = 'Last synced: ' + new Date().toLocaleString('en-IN')
+      + ' — ' + payload.trades.length + ' trades, ' + payload.watchlist.length + ' stocks';
     setSyncStatus('ok');
     setTimeout(() => setSyncStatus('idle'), 3000);
-    showSyncMsg('✓ Pushed! ' + payload.trades.length + ' trades and ' + payload.watchlist.length + ' stocks saved.', true);
+    showSyncMsg('Pushed! ' + payload.trades.length + ' trades + ' + payload.watchlist.length + ' stocks saved.', true);
   } catch(e) {
     setSyncStatus('error');
     setTimeout(() => setSyncStatus('idle'), 4000);
     showSyncMsg('Push failed: ' + e.message, false);
   }
-  btn.disabled = false; btn.textContent = '📤 Push Now';
+  btn.disabled = false; btn.textContent = 'Push Now';
 }
 
-async function gistPull() {
-  const { gistId, token } = getSyncCreds();
-  if (!gistId || !token) { showSyncMsg('Set up Gist credentials first.', false); return; }
+async function firebasePull() {
+  const { url, key } = getFbConfig();
+  if (!url || !key) { showSyncMsg('Connect Firebase first.', false); return; }
   const btn = document.getElementById('pullBtn');
   btn.disabled = true; btn.textContent = 'Pulling...';
   setSyncStatus('syncing');
   try {
-    const resp = await fetch('https://api.github.com/gists/' + gistId, {
-      headers: { 'Authorization': 'token ' + token }
-    });
-    if (!resp.ok) {
-      const err = await resp.json();
-      throw new Error(err.message || 'HTTP ' + resp.status);
+    const resp = await fetch(url + '/' + FB_PATH + '/' + encodeURIComponent(key) + '.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const payload = await resp.json();
+    if (!payload || payload === null) {
+      throw new Error('No data found for this sync key. Push from another device first.');
     }
-    const gist = await resp.json();
-    if (!gist.files || !gist.files[GIST_FILE]) {
-      throw new Error('swingtrader.json not found in this Gist. Push from this or another device first.');
-    }
-    const payload = JSON.parse(gist.files[GIST_FILE].content);
-    const tradeCount  = payload.trades      ? payload.trades.length      : 0;
-    const wlCount     = payload.watchlist   ? payload.watchlist.length   : 0;
-    const planCount   = payload.plans       ? payload.plans.length       : 0;
-    const hasSettings = !!payload.settings;
-    const hasLearnings = !!(payload.learnings && payload.learnings.length > 0);
-    const hasSectors  = !!payload.sectorBaskets;
-    const savedDate   = payload.ts ? new Date(payload.ts).toLocaleString('en-IN') : 'unknown';
-
-    const summary = 'Pull data from Gist?\n\n'
-      + 'Last saved: ' + savedDate + '\n\n'
-      + '• ' + wlCount    + ' watchlist stocks\n'
-      + '• ' + tradeCount + ' journal trades\n'
-      + '• ' + planCount  + ' Sunday plans\n'
-      + '• Settings: ' + (hasSettings ? 'Yes' : 'No') + '\n'
-      + '• Learnings: ' + (hasLearnings ? 'Yes' : 'No') + '\n'
-      + '• Custom sectors: ' + (hasSectors ? 'Yes' : 'No') + '\n\n'
-      + 'This replaces your current local data.';
-
-    if (!confirm(summary)) {
-      btn.disabled = false; btn.textContent = '📥 Pull Now';
-      setSyncStatus('idle');
-      return;
+    const tradeCount = payload.trades      ? payload.trades.length      : 0;
+    const wlCount    = payload.watchlist   ? payload.watchlist.length   : 0;
+    const planCount  = payload.plans       ? payload.plans.length       : 0;
+    const savedDate  = payload.ts ? new Date(payload.ts).toLocaleString('en-IN') : 'unknown';
+    const confirmMsg = 'Pull from Firebase?\n\nLast saved: ' + savedDate + '\n• ' + wlCount + ' watchlist stocks\n• ' + tradeCount + ' journal trades\n• ' + planCount + ' plans\n\nThis replaces your current local data.';
+    if (!confirm(confirmMsg)) {
+      btn.disabled = false; btn.textContent = 'Pull Now';
+      setSyncStatus('idle'); return;
     }
     applyPayload(payload);
-    setSyncStatus('ok');
-    setTimeout(() => setSyncStatus('idle'), 3000);
-    showSyncMsg('✓ Pulled! ' + tradeCount + ' trades, ' + wlCount + ' stocks, ' + planCount + ' plans loaded.', true);
   } catch(e) {
     setSyncStatus('error');
     setTimeout(() => setSyncStatus('idle'), 4000);
     showSyncMsg('Pull failed: ' + e.message, false);
+    btn.disabled = false; btn.textContent = 'Pull Now';
   }
-  btn.disabled = false; btn.textContent = '📥 Pull Now';
+  btn.disabled = false; btn.textContent = 'Pull Now';
 }
 
 function showSyncMsg(text, success) {
   const msg = document.getElementById('syncMsg');
+  if (!msg) return;
   msg.textContent = text;
   msg.style.display = 'block';
   msg.style.background = success ? 'var(--green-bg)' : 'var(--red-bg)';
   msg.style.color = success ? 'var(--green)' : 'var(--red)';
   msg.style.border = '1px solid ' + (success ? '#b8e0cc' : '#f5c6c2');
 }
+
 
 function loadSettings() {
   const s = JSON.parse(localStorage.getItem('st_settings') || '{}');
@@ -3651,14 +3478,14 @@ calcRisk();
 document.getElementById('j_date').value = new Date().toISOString().split('T')[0];
 
 // Init sync pill
-const _initCreds = getSyncCreds();
-if (_initCreds.gistId && _initCreds.token) {
+const _initFb = getFbConfig();
+if (_initFb.url && _initFb.key) {
   const _last = localStorage.getItem('st_lastSync');
-  setSyncStatus('idle');
   if (_last) {
-    document.getElementById('syncPillText').textContent = 'Synced';
-    document.getElementById('syncDot').style.background = 'var(--green)';
-    document.getElementById('syncPillText').style.color = 'var(--green)';
+    setSyncStatus('ok', 'Synced');
+    setTimeout(() => setSyncStatus('idle'), 3000);
+  } else {
+    setSyncStatus('idle');
   }
 } else {
   setSyncStatus('offline');
