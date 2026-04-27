@@ -738,6 +738,15 @@
     <div class="stat-box"><div class="stat-value" id="j_open">0</div><div class="stat-label">Open Trades</div></div>
   </div>
 
+  <!-- Monthly P&L Chart -->
+  <div id="monthlyChartWrap" style="display:none;margin-bottom:16px;">
+    <div class="card">
+      <div class="card-title">📅 Monthly Net P&amp;L</div>
+      <div id="monthlyChartSvg"></div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px;">Net P&L after Zerodha charges · closed trades only</div>
+    </div>
+  </div>
+
   <!-- Trade Monitor -->
   <div id="tradeMonitorWrap" style="display:none;margin-bottom:16px;">
     <div class="section-head">
@@ -2727,11 +2736,17 @@ function drawChart(idx, container) {
   // Use last 45 candles — less cramped, more readable
   const candles = r.chartCandles.slice(-45);
   const W = Math.max(container.offsetWidth || 600, 320);
-  const H = 280;           // taller chart
-  const VBAR_H = 48;       // taller volume section
-  const PAD_L = 54; const PAD_R = 14; const PAD_T = 16; const PAD_B = 24;
+  const H = 260;
+  const VBAR_H = 40;
+  const PAD_L = 54; const PAD_R = 14; const PAD_T = 16; const PAD_B = 8;
   const plotW = W - PAD_L - PAD_R;
   const plotH = H - PAD_T - PAD_B - VBAR_H;
+  // RSI sub-panel constants
+  const RSI_H   = 64;
+  const RSI_GAP = 10;
+  const RSI_TOP = H - PAD_B + RSI_GAP;
+  const H_TOTAL = RSI_TOP + RSI_H + 20;
+  function rsiPY(v) { return RSI_TOP + RSI_H * (1 - Math.max(0,Math.min(100,v))/100); }
 
   const prices = candles.flatMap(c => [c.h, c.l]);
   const minP = Math.min(...prices);
@@ -2748,6 +2763,7 @@ function drawChart(idx, container) {
   const closes = candles.map(c => c.c);
   const ema20arr = calcEMAArray(closes, 20);
   const ema50arr = calcEMAArray(closes, 50);
+  const rsiArr14  = calcRSIArray(closes.map(c => c.c), 14);
 
   // SL: use 1.5× ATR below current price if ATR available, else swing low
   const recentLows = candles.slice(-10).map(c => c.l);
@@ -2762,7 +2778,7 @@ function drawChart(idx, container) {
   function py(price) { return PAD_T + plotH - ((price - minP) / priceRange * plotH); }
   function vy(vol)   { return H - PAD_B - (vol / maxVol * VBAR_H); }
 
-  let svg = '<svg width="100%" viewBox="0 0 ' + W + ' ' + H + '" style="display:block;border-radius:6px;background:var(--surface);">';
+  let svg = '<svg width="100%" viewBox="0 0 ' + W + ' ' + H_TOTAL + '" style="display:block;border-radius:6px;background:var(--surface);">';
 
   // Grid lines — 5 horizontal lines
   for (let i = 0; i <= 5; i++) {
@@ -2840,6 +2856,26 @@ function drawChart(idx, container) {
     svg += '<text x="' + (W - PAD_R - 2) + '" y="' + (ty - 3).toFixed(1) + '" text-anchor="end" font-size="10" fill="#1e7a4e" font-family="DM Mono,monospace">TGT ₹' + suggestTgt.toFixed(0) + '</text>';
   }
 
+
+  // ── RSI Sub-panel ──────────────────────────────────────────────────────
+  svg += '<line x1="' + PAD_L + '" y1="' + (RSI_TOP - RSI_GAP/2).toFixed(1) + '" x2="' + (W-PAD_R) + '" y2="' + (RSI_TOP - RSI_GAP/2).toFixed(1) + '" stroke="var(--border)" stroke-width="1"/>';
+  svg += '<rect x="' + PAD_L + '" y="' + RSI_TOP.toFixed(1) + '" width="' + plotW + '" height="' + RSI_H + '" fill="var(--surface2)" opacity="0.4" rx="2"/>';
+  svg += '<text x="4" y="' + (RSI_TOP+10).toFixed(1) + '" font-size="9" fill="var(--text3)" font-family="DM Mono,monospace">RSI</text>';
+  [{v:70,col:'#c0392b',lbl:'70'},{v:55,col:'#1e7a4e',lbl:'55'},{v:50,col:'var(--text3)',lbl:'50'},{v:30,col:'#2a6bc8',lbl:'30'}].forEach(function(l) {
+    var ry = rsiPY(l.v).toFixed(1);
+    svg += '<line x1="' + PAD_L + '" y1="' + ry + '" x2="' + (W-PAD_R) + '" y2="' + ry + '" stroke="' + l.col + '" stroke-width="0.6" stroke-dasharray="3,2" opacity="0.7"/>';
+    svg += '<text x="' + (PAD_L-4) + '" y="' + (parseFloat(ry)+3) + '" text-anchor="end" font-size="9" fill="' + l.col + '" font-family="DM Mono,monospace">' + l.lbl + '</text>';
+  });
+  svg += '<rect x="' + PAD_L + '" y="' + rsiPY(70).toFixed(1) + '" width="' + plotW + '" height="' + (rsiPY(55)-rsiPY(70)).toFixed(1) + '" fill="#1e7a4e" opacity="0.07"/>';
+  var rsiPath14 = '';
+  rsiArr14.forEach(function(v,i){ if(v==null)return; rsiPath14+=(rsiPath14===''?'M':'L')+px(i).toFixed(1)+','+rsiPY(v).toFixed(1)+' '; });
+  if(rsiPath14) svg += '<path d="'+rsiPath14+'" fill="none" stroke="#7c3aed" stroke-width="1.6" opacity="0.9"/>';
+  var lastRSIIdx=rsiArr14.length-1; while(lastRSIIdx>=0&&rsiArr14[lastRSIIdx]==null)lastRSIIdx--;
+  if(lastRSIIdx>=0){
+    var lv=rsiArr14[lastRSIIdx],lvc=lv>=70?'#c0392b':lv>=55?'#1e7a4e':'var(--text3)';
+    svg+='<circle cx="'+px(lastRSIIdx).toFixed(1)+'" cy="'+rsiPY(lv).toFixed(1)+'" r="3" fill="'+lvc+'"/>';
+    svg+='<text x="'+(W-PAD_R-2)+'" y="'+(rsiPY(lv)-4).toFixed(1)+'" text-anchor="end" font-size="10" fill="'+lvc+'" font-family="DM Mono,monospace" font-weight="600">RSI '+lv.toFixed(1)+(lv>=70?' OB':lv>=55?' ✓':lv<50?' ✗':'')+' </text>';
+  }
   svg += '</svg>';
 
   // Legend + action row
@@ -2866,6 +2902,25 @@ function drawChart(idx, container) {
     + '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">'
     + '<button class="btn btn-sm btn-secondary" onclick="prefillRiskWithSL(\'' + r.symbol + '\',' + r.price.toFixed(2) + ',' + suggestSL.toFixed(2) + ',' + suggestTgt.toFixed(2) + ')">⚖️ Use these levels in Risk Calc</button>'
     + '</div>';
+}
+
+function calcRSIArray(data, period=14) {
+  const result = new Array(data.length).fill(null);
+  if (data.length < period + 1) return result;
+  let ag = 0, al = 0;
+  for (let i = 1; i <= period; i++) {
+    const d = data[i] - data[i-1];
+    if (d > 0) ag += d; else al -= d;
+  }
+  ag /= period; al /= period;
+  result[period] = al === 0 ? 100 : 100 - (100 / (1 + ag/al));
+  for (let i = period+1; i < data.length; i++) {
+    const d = data[i] - data[i-1];
+    ag = (ag*(period-1) + (d>0?d:0)) / period;
+    al = (al*(period-1) + (d<0?-d:0)) / period;
+    result[i] = al === 0 ? 100 : 100 - (100 / (1 + ag/al));
+  }
+  return result;
 }
 
 function calcEMAArray(data, period) {
@@ -3189,9 +3244,43 @@ function checkMonday(id) {
       action = 'R:R has dropped to 1:' + (newRR || '?') + ' — below minimum 1:1.5. Skip this trade. Wait for a pullback to ₹' + p.entry.toFixed(0) + ' range before re-evaluating.';
     }
   } else if (openPrice < p.entry * 0.97) {
-    verdict = '⚠️ CAUTION — Gapped down ' + Math.abs(gapPct) + '%';
-    bg = 'var(--orange-bg)'; color = 'var(--orange)';
-    action = 'Opened below your planned entry. Still above SL so setup is valid. New entry: ₹' + openPrice.toFixed(2) + '. Recalculate — R:R is now 1:' + (newRR || '?') + '. Adjust qty to ' + newQty + ' shares.';
+    // ── Gap-down safety check ──────────────────────────────────────────────
+    // If the old SL is now dangerously close to new entry (< 1.5% away),
+    // the SL is meaningless at the new price — any normal candle will stop you out.
+    // Don't show a new qty — show a NO-GO with a clear explanation.
+    const slDistPct = ((openPrice - p.sl) / openPrice * 100);
+
+    if (slDistPct < 1.5) {
+      // SL is too close — original SL invalid for this new entry
+      verdict = '🔴 NO-GO — SL too close after gap down';
+      bg = 'var(--red-bg)'; color = 'var(--red)';
+      action = 'Opened at ₹' + openPrice.toFixed(2) + ' but your SL is ₹' + p.sl.toFixed(2)
+        + ' — only ₹' + (openPrice - p.sl).toFixed(2) + ' away (' + slDistPct.toFixed(1) + '% risk per share). '
+        + 'This SL was designed for entry ₹' + p.entry + ', not ₹' + openPrice.toFixed(2) + '. '
+        + 'Any normal candle wick will stop you out instantly. '
+        + 'Skip this trade. If you still want to enter, recalculate a proper SL '
+        + '(at least 3–5% below ₹' + openPrice.toFixed(0) + ' = ₹' + (openPrice * 0.96).toFixed(0) + '–₹' + (openPrice * 0.95).toFixed(0) + ') and redo the Risk Calculator.';
+    } else {
+      // SL still has reasonable distance — gap down but setup can be adjusted
+      const adjSl    = p.sl;
+      const adjRR    = p.target ? ((p.target - openPrice) / (openPrice - adjSl)).toFixed(2) : null;
+      const adjQty   = (openPrice - adjSl) > 0 ? Math.floor(maxLoss / (openPrice - adjSl)) : 0;
+      const rrNum    = parseFloat(adjRR);
+      if (adjRR && rrNum < 1.5) {
+        verdict = '🔴 NO-GO — Gap down killed the R:R';
+        bg = 'var(--red-bg)'; color = 'var(--red)';
+        action = 'Gapped down ' + Math.abs(gapPct) + '%. R:R is now only 1:' + adjRR
+          + ' — below the 1:1.5 minimum. The gap has compressed your reward too much. Skip this trade.';
+      } else {
+        verdict = '⚠️ CAUTION — Gapped down ' + Math.abs(gapPct) + '%';
+        bg = 'var(--orange-bg)'; color = 'var(--orange)';
+        action = 'Opened ₹' + (p.entry - openPrice).toFixed(0) + ' below plan. SL still valid at ₹' + adjSl.toFixed(2)
+          + ' (' + slDistPct.toFixed(1) + '% away — acceptable). '
+          + 'Adjusted qty: ' + adjQty + ' shares at ₹' + openPrice.toFixed(2)
+          + (adjRR ? '. New R:R: 1:' + adjRR + (rrNum >= 2 ? ' ✓ Good.' : ' — borderline, your call.') : '.')
+          + ' Place OCO GTT immediately after buy: SL ₹' + adjSl.toFixed(2) + ', Target ₹' + (p.target || '—') + '.';
+      }
+    }
   } else {
     verdict = '✅ GO — Clean open, execute as planned';
     bg = 'var(--green-bg)'; color = 'var(--green)';
@@ -3415,17 +3504,17 @@ function updateMonitor(id, entry, sl, tgt, days, curPriceStr) {
   let action = '', actionBg = '', actionColor = '', actionBorder = '';
 
   if (cur <= sl) {
-    action = '🔴 SL TRIGGERED — Exit immediately in Groww. Go to Orders, if SL sell already executed you\'re done. If not, sell at market now.';
+    action = '🔴 SL TRIGGERED — Your OCO GTT SL leg has fired. Check Kite → Orders tab to confirm execution. If the CDSL TPIN authorisation notification appeared, approve it immediately — the sell executes once authorised. If not approved within time, sell manually at market.';
     actionBg = 'var(--red-bg)'; actionColor = 'var(--red)'; actionBorder = 'var(--red)';
   } else if (tgt && cur >= tgt * 0.98) {
-    action = '🎯 Near target — Cancel your SL order in Groww → place Limit Sell at ₹' + tgt.toFixed(2) + ' for ' + qty + ' shares. Take the planned profit.';
+    action = '🎯 Near target — Your OCO GTT target leg at ₹' + tgt.toFixed(2) + ' will auto-trigger when price touches it. No manual action needed. Ensure CDSL TPIN notifications are ON in Zerodha (Profile → Settings). When it fires, approve the TPIN prompt immediately to complete the sell.';
     actionBg = 'var(--green-bg)'; actionColor = 'var(--green)'; actionBorder = 'var(--green)';
   } else if (progress !== null && progress >= 75) {
     const newSL = (entry + profitZone * 0.5).toFixed(2);
-    action = '✅ At 75% of target — Move SL to ₹' + newSL + ' in Groww (locks ₹' + Math.round((newSL - entry) * qty) + ' profit). Update SL order: trigger = ₹' + newSL + ', limit = ₹' + (parseFloat(newSL) - 2).toFixed(2) + '.';
+    action = '✅ At 75% of target — Update OCO GTT in Kite: GTT orders → edit → update SL leg trigger to ₹' + newSL + ' (locks ₹' + Math.round((parseFloat(newSL) - entry) * qty) + ' profit). Target leg stays at ₹' + tgt.toFixed(2) + ' — do not touch it. Save the GTT.';
     actionBg = 'var(--green-bg)'; actionColor = 'var(--green)'; actionBorder = 'var(--green)';
   } else if (progress !== null && progress >= 50) {
-    action = '✅ At 50% of target — Move SL to entry price ₹' + entry.toFixed(2) + ' in Groww. Cancel current SL, place new SL with trigger = ₹' + entry.toFixed(2) + ', limit = ₹' + (entry - 2).toFixed(2) + '. You are now RISK-FREE.';
+    action = '✅ At 50% of target — Update OCO GTT in Kite: GTT orders → edit → update SL leg trigger to ₹' + entry.toFixed(2) + ' (your entry price). Target leg stays at ₹' + (tgt||0).toFixed(2) + ' — do not touch it. Save. You are now RISK-FREE — worst case you break even.';
     actionBg = 'var(--green-bg)'; actionColor = 'var(--green)'; actionBorder = 'var(--green)';
   } else if (days > 15) {
     action = '⏰ TIME STOP — Day ' + days + '. This setup has run its course. Exit Monday morning at market price. Sell ' + qty + ' shares of ' + (t ? t.sym : '') + ' at market open.';
@@ -3505,8 +3594,76 @@ function updateExit(id) {
   if (t) { t.exit = exit; t.exitDate = exitDate; saveTrades(); renderJournal(); }
 }
 
+
+// ═══════════════════ MONTHLY P&L CHART ═══════════════════
+function renderMonthlyChart() {
+  const wrap = document.getElementById('monthlyChartWrap');
+  const svgEl = document.getElementById('monthlyChartSvg');
+  if (!wrap || !svgEl) return;
+
+  const closed = trades.filter(t => t.exit && t.exitDate);
+  if (closed.length < 2) { wrap.style.display = 'none'; return; }
+
+  // Group by month, compute net P&L
+  const monthMap = {};
+  closed.forEach(t => {
+    const key = t.exitDate.slice(0, 7); // YYYY-MM
+    const gross = (t.exit - t.entry) * t.qty;
+    const ch    = calcCharges(t.entry * t.qty, t.exit * t.qty).total;
+    monthMap[key] = (monthMap[key] || 0) + gross - ch;
+  });
+
+  const months = Object.keys(monthMap).sort().slice(-8); // last 8 months
+  if (!months.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+
+  const vals   = months.map(m => monthMap[m]);
+  const maxAbs = Math.max(...vals.map(Math.abs), 1);
+  const W = 560, H = 140, PAD_L = 50, PAD_R = 12, PAD_T = 16, PAD_B = 28;
+  const plotW = W - PAD_L - PAD_R;
+  const plotH = H - PAD_T - PAD_B;
+  const barW  = Math.floor(plotW / months.length * 0.6);
+  const gap   = plotW / months.length;
+  const zeroY = PAD_T + plotH / 2;
+
+  let svg = '<svg width="100%" viewBox="0 0 ' + W + ' ' + H + '" style="display:block;">';
+
+  // Zero line
+  svg += '<line x1="' + PAD_L + '" y1="' + zeroY + '" x2="' + (W-PAD_R) + '" y2="' + zeroY + '" stroke="var(--border)" stroke-width="1.5"/>';
+
+  // Bars
+  months.forEach((m, i) => {
+    const val  = monthMap[m];
+    const barH = Math.abs(val) / maxAbs * (plotH/2 - 4);
+    const x    = PAD_L + i * gap + gap/2 - barW/2;
+    const y    = val >= 0 ? zeroY - barH : zeroY;
+    const col  = val >= 0 ? '#1e7a4e' : '#c0392b';
+    const bgC  = val >= 0 ? '#eaf5ef' : '#fdf0ee';
+
+    svg += '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + barW + '" height="' + barH.toFixed(1) + '" fill="' + col + '" rx="3" opacity="0.85"/>';
+
+    // Value label above/below bar
+    const lblY = val >= 0 ? (y - 4).toFixed(1) : (y + barH + 12).toFixed(1);
+    const sign = val >= 0 ? '+' : '-';
+    svg += '<text x="' + (x + barW/2).toFixed(1) + '" y="' + lblY + '" text-anchor="middle" font-size="9" fill="' + col + '" font-family="DM Mono,monospace" font-weight="600">' + sign + '₹' + Math.abs(val).toFixed(0) + '</text>';
+
+    // Month label
+    const mLabel = new Date(m + '-15').toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
+    svg += '<text x="' + (x + barW/2).toFixed(1) + '" y="' + (H - PAD_B + 14) + '" text-anchor="middle" font-size="9" fill="var(--text3)" font-family="DM Sans,sans-serif">' + mLabel + '</text>';
+  });
+
+  // Y axis labels (max, 0, min)
+  svg += '<text x="' + (PAD_L-4) + '" y="' + (PAD_T+6) + '" text-anchor="end" font-size="9" fill="var(--text3)" font-family="DM Mono,monospace">+₹' + maxAbs.toFixed(0) + '</text>';
+  svg += '<text x="' + (PAD_L-4) + '" y="' + (zeroY+3) + '" text-anchor="end" font-size="9" fill="var(--text3)" font-family="DM Mono,monospace">0</text>';
+  svg += '<text x="' + (PAD_L-4) + '" y="' + (H-PAD_B-2) + '" text-anchor="end" font-size="9" fill="var(--text3)" font-family="DM Mono,monospace">-₹' + maxAbs.toFixed(0) + '</text>';
+
+  svg += '</svg>';
+  svgEl.innerHTML = svg;
+}
+
 function renderJournal() {
   renderTradeMonitor();
+  renderMonthlyChart();
   const filter = document.getElementById('j_filter').value;
   let filtered = trades;
 
@@ -3518,7 +3675,11 @@ function renderJournal() {
   // Stats
   const closed = trades.filter(t => t.exit);
   const wins = closed.filter(t => t.exit > t.entry);
-  const totalPnL = closed.reduce((sum, t) => sum + (t.exit - t.entry) * t.qty, 0);
+  const totalPnL = closed.reduce((sum, t) => {
+    const gross = (t.exit - t.entry) * t.qty;
+    const ch    = calcCharges(t.entry * t.qty, t.exit * t.qty);
+    return sum + gross - ch.total;
+  }, 0);
   const open = trades.filter(t => !t.exit);
 
   document.getElementById('j_total').textContent = trades.length;
@@ -3539,8 +3700,16 @@ function renderJournal() {
 
   tbody.innerHTML = filtered.map(t => {
     const pnl = t.exit ? (t.exit - t.entry) * t.qty : null;
-    const pnlStr = pnl !== null ? (pnl >= 0 ? '+₹' : '-₹') + Math.abs(pnl).toFixed(0) : '—';
-    const pnlColor = pnl === null ? '' : pnl >= 0 ? 'color:var(--green);' : 'color:var(--red);';
+    let netPnl = pnl, chTotal = null;
+    if (pnl !== null) {
+      chTotal = calcCharges(t.entry * t.qty, t.exit * t.qty).total;
+      netPnl  = pnl - chTotal;
+    }
+    const pnlStr  = netPnl !== null
+      ? (netPnl >= 0 ? '+₹' : '-₹') + Math.abs(netPnl).toFixed(0)
+        + '<div style="font-size:10px;color:var(--text3);font-weight:400;">-₹' + (chTotal||0).toFixed(0) + ' chg</div>'
+      : '—';
+    const pnlColor = pnl === null ? '' : netPnl >= 0 ? 'color:var(--green);' : 'color:var(--red);';
     const rr = t.tgt && t.sl ? ((t.tgt - t.entry) / (t.entry - t.sl)).toFixed(2) : '—';
     let status, statusClass;
     if (!t.exit) { status = '⏳ Open'; statusClass = 'status-open'; }
