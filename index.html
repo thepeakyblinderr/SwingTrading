@@ -460,7 +460,7 @@
 
         <div style="padding:12px;background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border);">
           <div style="font-size:13px;font-weight:600;margin-bottom:4px;">📥 Pull from Gist</div>
-          <div style="font-size:12px;color:var(--text2);margin-bottom:8px;">Loads data from Gist onto this device. Replaces your current local data.</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:8px;">Loads data from Gist onto this device. Shows exactly what's saved before you confirm.</div>
           <button class="btn btn-secondary btn-sm" onclick="gistPull()" style="width:100%;" id="pullBtn">📥 Pull Now</button>
         </div>
 
@@ -788,7 +788,7 @@
     <button class="btn btn-secondary btn-sm" onclick="showGuide('g_entry',this)">🎯 Entry Rules</button>
     <button class="btn btn-secondary btn-sm" onclick="showGuide('g_exit',this)">🚪 Exit Rules</button>
     <button class="btn btn-secondary btn-sm" onclick="showGuide('g_weekly',this)">📅 Weekly Review</button>
-    <button class="btn btn-secondary btn-sm" onclick="showGuide('g_groww',this)">📱 Groww Guide</button>
+    <button class="btn btn-secondary btn-sm" onclick="showGuide('g_groww',this)">📱 Kite Guide</button>
     <button class="btn btn-secondary btn-sm" onclick="showGuide('g_concepts',this)">🧠 Concepts</button>
     <button class="btn btn-secondary btn-sm" onclick="showGuide('g_sim',this)">🎬 Simulation</button>
     <button class="btn btn-secondary btn-sm" onclick="showGuide('g_learnings',this)">✏️ My Learnings</button>
@@ -859,7 +859,7 @@
             <div style="display:flex;align-items:center;gap:8px;"><span style="width:22px;height:22px;background:var(--accent);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">2</span> Screener → score 70+ stocks</div>
             <div style="display:flex;align-items:center;gap:8px;"><span style="width:22px;height:22px;background:var(--accent);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">3</span> TradingView → confirm chart looks clean</div>
             <div style="display:flex;align-items:center;gap:8px;"><span style="width:22px;height:22px;background:var(--accent);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">4</span> Risk Calc → check R:R ≥ 1:2</div>
-            <div style="display:flex;align-items:center;gap:8px;"><span style="width:22px;height:22px;background:var(--accent);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">5</span> Groww → Buy (CNC) + SL order immediately</div>
+            <div style="display:flex;align-items:center;gap:8px;"><span style="width:22px;height:22px;background:var(--accent);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">5</span> Kite → Buy (CNC) + OCO GTT immediately</div>
             <div style="display:flex;align-items:center;gap:8px;"><span style="width:22px;height:22px;background:var(--accent);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">6</span> Journal → log trade + write reason</div>
             <div style="display:flex;align-items:center;gap:8px;"><span style="width:22px;height:22px;background:var(--accent);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">7</span> Sunday review → trail SL or plan exit</div>
           </div>
@@ -1032,74 +1032,134 @@
 
   <!-- ── GROWW GUIDE ── -->
   <div id="g_groww" class="g-panel" style="display:none;">
+    <div style="font-size:12px;color:var(--text2);margin-bottom:14px;">You're using <strong>Zerodha Kite</strong> — which is better than Groww for swing trading. The OCO GTT order lets you set both SL and Target simultaneously. One triggers, the other auto-cancels.</div>
+
     <div class="grid-2">
-      <div class="card">
-        <div class="card-title">📱 Buying a Stock on Groww</div>
-        <div>
-          <div class="guide-step"><div class="step-num">1</div><div>
-            <div class="step-title">Search the stock</div>
-            <div class="step-desc">Open Groww → search bar → type symbol (e.g. BEL) → tap from results.</div>
-          </div></div>
-          <div class="guide-step"><div class="step-num">2</div><div>
-            <div class="step-title">Tap Buy → choose Limit</div>
-            <div class="step-desc">Always use Limit for swing trades — sets your exact entry price. Avoid Market order.</div>
-          </div></div>
-          <div class="guide-step"><div class="step-num">3</div><div>
-            <div class="step-title">Select CNC (not MIS)</div>
-            <div class="step-desc">CNC = delivery, hold for days/weeks. MIS = intraday only, auto-closes at 3:20 PM. ALWAYS CNC for swings.</div>
-          </div></div>
-          <div class="guide-step"><div class="step-num">4</div><div>
-            <div class="step-title">Enter quantity &amp; price</div>
-            <div class="step-desc">Qty from Risk Calculator. Price = your planned entry. Tap Place Buy Order.</div>
-          </div></div>
-        </div>
-      </div>
       <div>
         <div class="card">
-          <div class="card-title">🛡️ Setting Stop-Loss on Groww</div>
+          <div class="card-title">📱 Step 1 — Buy the stock on Kite</div>
           <div>
+            <div class="guide-step"><div class="step-num">1</div><div>
+              <div class="step-title">Search the stock</div>
+              <div class="step-desc">Open Kite → search bar → type symbol (e.g. BEL) → tap from results to open stock page.</div>
+            </div></div>
+            <div class="guide-step"><div class="step-num">2</div><div>
+              <div class="step-title">Tap Buy → choose Limit</div>
+              <div class="step-desc">Always use Limit for swing trades — enters at your exact planned price. Avoid Market order which fills at whatever price is available.</div>
+            </div></div>
+            <div class="guide-step"><div class="step-num">3</div><div>
+              <div class="step-title">Select CNC (not MIS or NRML)</div>
+              <div class="step-desc">CNC = Cash & Carry = delivery. Holds for days/weeks. MIS = intraday only, auto-squares at 3:20 PM. ALWAYS CNC for swing trades.</div>
+            </div></div>
+            <div class="guide-step"><div class="step-num">4</div><div>
+              <div class="step-title">Enter qty and price → Place order</div>
+              <div class="step-desc">Qty from Risk Calculator. Price = your planned entry from Sunday plan. Confirm and place.</div>
+            </div></div>
             <div class="guide-step"><div class="step-num">5</div><div>
-              <div class="step-title">Immediately after buy executes</div>
-              <div class="step-desc">Go back to stock page → Sell → choose SL order type.</div>
-            </div></div>
-            <div class="guide-step"><div class="step-num">6</div><div>
-              <div class="step-title">SL vs SL-M</div>
-              <div class="step-desc"><strong>SL:</strong> Trigger price = your SL. Limit price = ₹2–3 below trigger.<br/><strong>SL-M:</strong> Only trigger price — sells at market. Simpler for liquid stocks.</div>
-            </div></div>
-            <div class="guide-step"><div class="step-num">7</div><div>
-              <div class="step-title">Verify both orders active</div>
-              <div class="step-desc">Orders tab → buy should show Executed, SL sell should show Open. If SL is missing, place it again.</div>
+              <div class="step-title">Verify buy executed</div>
+              <div class="step-desc">Orders tab → buy should show status "Complete". If still "Open" it hasn't filled yet — price hasn't touched your limit. Wait or adjust price.</div>
             </div></div>
           </div>
         </div>
+
         <div class="card">
-          <div class="card-title">💰 Booking Profit on Groww</div>
+          <div class="card-title">🎯 Step 3 — Log exit in SwingTrader</div>
           <div>
+            <div class="guide-step"><div class="step-num">10</div><div>
+              <div class="step-title">When GTT triggers (SL or Target)</div>
+              <div class="step-desc">Kite sends you a notification when your GTT fires. Check which one triggered — SL or Target.</div>
+            </div></div>
+            <div class="guide-step"><div class="step-num">11</div><div>
+              <div class="step-title">Log exit in Journal</div>
+              <div class="step-desc">SwingTrader → Journal tab → find trade → tap Exit → enter actual exit price → P&amp;L auto-calculates. Mark as Win or Loss.</div>
+            </div></div>
+            <div class="guide-step"><div class="step-num">12</div><div>
+              <div class="step-title">Update capital in Settings</div>
+              <div class="step-desc">After a profitable month → tap ✏️ in header → update capital to your new balance. Risk Calculator will auto-adjust all future position sizes.</div>
+            </div></div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card" style="border:2px solid var(--green);">
+          <div class="card-title" style="color:var(--green);">🛡️ Step 2 — OCO GTT (the key step)</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">OCO = One Cancels Other. Set SL + Target together. When one triggers, the other auto-cancels. Do this immediately after buy executes.</div>
+          <div>
+            <div class="guide-step"><div class="step-num">6</div><div>
+              <div class="step-title">Tap the GTT icon (top right of stock page)</div>
+              <div class="step-desc">On the stock page in Kite, look for the GTT button at top right (blue icon with lines). Tap it.</div>
+            </div></div>
+            <div class="guide-step"><div class="step-num">7</div><div>
+              <div class="step-title">Select: Type = Sell · Trigger type = OCO</div>
+              <div class="step-desc">Type = Sell (you're placing a sell order). Trigger type = OCO (not Single). OCO lets you set both SL and Target at once.</div>
+            </div></div>
             <div class="guide-step"><div class="step-num">8</div><div>
-              <div class="step-title">Cancel SL order first</div>
-              <div class="step-desc">Orders tab → find open SL sell → Cancel. Do this BEFORE placing sell order or you'll have duplicate sells.</div>
+              <div class="step-title">Fill in Stoploss section</div>
+              <div class="step-desc">Trigger price = your SL from Risk Calc (e.g. ₹268). Order = Limit. Price = same as trigger or ₹1–2 below. Qty = from Risk Calc.</div>
             </div></div>
             <div class="guide-step"><div class="step-num">9</div><div>
-              <div class="step-title">Place Limit sell at target</div>
-              <div class="step-desc">Stock page → Sell → Limit → target price → qty → Place Sell Order. Done.</div>
+              <div class="step-title">Fill in Target section → Create GTT</div>
+              <div class="step-desc">Trigger price = your target (e.g. ₹312). Order = Limit. Price = same as trigger. Qty = same. Tap Create GTT.</div>
             </div></div>
-            <div class="guide-step"><div class="step-num">10</div><div>
-              <div class="step-title">Log exit in Journal</div>
-              <div class="step-desc">SwingTrader → Journal → find trade → tap Exit → enter exit price. P&amp;L auto-calculates.</div>
-            </div></div>
+          </div>
+          <div style="margin-top:10px;padding:10px 12px;background:var(--green-bg);border-radius:8px;font-size:12px;color:var(--green);">
+            ✅ GTT stays active until triggered — no daily expiry. No need to re-place every morning. When SL hits, target auto-cancels and vice versa.
+          </div>
+          <div style="margin-top:8px;padding:10px 12px;background:var(--orange-bg);border-radius:8px;font-size:12px;color:var(--orange);">
+            ⚠️ CDSL Authorisation required: When your GTT triggers, Kite will ask you to authorise the sell via CDSL (your depository). Make sure TPIN is set up in your Zerodha profile and notifications are ON — otherwise the order won't execute even when triggered.
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">⚡ Key Terms — Kite edition</div>
+          <div style="display:grid;gap:6px;font-size:12px;">
+            <div style="padding:8px 10px;background:var(--green-bg);border-radius:8px;color:var(--green);border:1px solid #b8e0cc;"><strong>CNC</strong> — Cash &amp; Carry. Delivery holding for days/weeks. Always use for swings.</div>
+            <div style="padding:8px 10px;background:var(--red-bg);border-radius:8px;color:var(--red);border:1px solid #f5c6c2;"><strong>MIS</strong> — Margin Intraday Square-off. Auto-closes 3:20 PM. Never for swings.</div>
+            <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);"><strong>GTT</strong> — Good Till Triggered. Order stays active until price hits trigger. No expiry.</div>
+            <div style="padding:8px 10px;background:var(--green-bg);border-radius:8px;color:var(--green);border:1px solid #b8e0cc;"><strong>OCO GTT</strong> — One Cancels Other. Set SL + Target together. Best for swing trading.</div>
+            <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);"><strong>T+1</strong> — Shares settle next trading day. You can still sell same day (BTST).</div>
+            <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);"><strong>CDSL TPIN</strong> — Required to authorise sell orders from your demat. Set up once in Zerodha profile.</div>
+            <div style="padding:8px 10px;background:var(--orange-bg);border-radius:8px;color:var(--orange);border:1px solid #f0c070;"><strong>BTST</strong> — Buy Today Sell Tomorrow. Allowed. Kite handles settlement automatically.</div>
           </div>
         </div>
       </div>
     </div>
-    <div class="card">
-      <div class="card-title">⚡ Key Terms — CNC vs MIS vs SL vs SL-M</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
-        <div style="padding:8px 10px;background:var(--green-bg);border-radius:8px;color:var(--green);border:1px solid #b8e0cc;"><strong>CNC</strong> — Cash &amp; Carry. Hold for days/weeks. Always use this for swings.</div>
-        <div style="padding:8px 10px;background:var(--red-bg);border-radius:8px;color:var(--red);border:1px solid #f5c6c2;"><strong>MIS</strong> — Intraday only. Auto-closes 3:20 PM. Never use for swing trades.</div>
-        <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);"><strong>SL</strong> — Stop Loss Limit. Trigger + Limit price. May not execute in fast crash.</div>
-        <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);"><strong>SL-M</strong> — Stop Loss Market. Trigger only. Always executes. Best for liquid midcaps.</div>
-        <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);"><strong>T+1</strong> — Shares settle next trading day. You can still sell same day (BTST).</div>
-        <div style="padding:8px 10px;background:var(--orange-bg);border-radius:8px;border:1px solid #f0c070;color:var(--orange);"><strong>BTST</strong> — Buy Today Sell Tomorrow. Allowed in India. Groww handles automatically.</div>
+
+    <!-- Full workflow summary -->
+    <div class="card" style="margin-top:4px;">
+      <div class="card-title">🔄 Complete Kite swing trade — one view</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;font-size:12px;">
+        <div style="padding:10px;background:var(--surface2);border-radius:8px;text-align:center;border:1px solid var(--border);">
+          <div style="font-size:18px;margin-bottom:4px;">1️⃣</div>
+          <strong>Sunday</strong><br/>
+          <span style="color:var(--text2);">Screener → Risk Calc → Save Plan</span>
+        </div>
+        <div style="padding:10px;background:var(--surface2);border-radius:8px;text-align:center;border:1px solid var(--border);">
+          <div style="font-size:18px;margin-bottom:4px;">2️⃣</div>
+          <strong>Mon 9:30 AM</strong><br/>
+          <span style="color:var(--text2);">Check open price → GO/NO-GO</span>
+        </div>
+        <div style="padding:10px;background:var(--green-bg);border-radius:8px;text-align:center;border:1px solid #b8e0cc;">
+          <div style="font-size:18px;margin-bottom:4px;">3️⃣</div>
+          <strong style="color:var(--green);">Kite Buy</strong><br/>
+          <span style="color:var(--green);">Limit · CNC · Qty</span>
+        </div>
+        <div style="padding:10px;background:var(--green-bg);border-radius:8px;text-align:center;border:1px solid #b8e0cc;">
+          <div style="font-size:18px;margin-bottom:4px;">4️⃣</div>
+          <strong style="color:var(--green);">OCO GTT</strong><br/>
+          <span style="color:var(--green);">SL + Target in one order</span>
+        </div>
+        <div style="padding:10px;background:var(--surface2);border-radius:8px;text-align:center;border:1px solid var(--border);">
+          <div style="font-size:18px;margin-bottom:4px;">5️⃣</div>
+          <strong>Journal</strong><br/>
+          <span style="color:var(--text2);">Log trade → Monitor weekly</span>
+        </div>
+        <div style="padding:10px;background:var(--surface2);border-radius:8px;text-align:center;border:1px solid var(--border);">
+          <div style="font-size:18px;margin-bottom:4px;">6️⃣</div>
+          <strong>GTT fires</strong><br/>
+          <span style="color:var(--text2);">Authorise CDSL → Log exit</span>
+        </div>
       </div>
     </div>
   </div>
@@ -1113,7 +1173,7 @@
         <button class="btn btn-primary btn-sm" onclick="showSim(0,this)">1. Discover</button>
         <button class="btn btn-secondary btn-sm" onclick="showSim(1,this)">2. Screener</button>
         <button class="btn btn-secondary btn-sm" onclick="showSim(2,this)">3. Risk Calc</button>
-        <button class="btn btn-secondary btn-sm" onclick="showSim(3,this)">4. Buy on Groww</button>
+        <button class="btn btn-secondary btn-sm" onclick="showSim(3,this)">4. Buy on Kite</button>
         <button class="btn btn-secondary btn-sm" onclick="showSim(4,this)">5. Journal</button>
         <button class="btn btn-secondary btn-sm" onclick="showSim(5,this)">6. Profit!</button>
       </div>
@@ -2208,6 +2268,7 @@ async function gistPull() {
   if (!gistId || !token) { showSyncMsg('Set up Gist credentials first.', false); return; }
   const btn = document.getElementById('pullBtn');
   btn.disabled = true; btn.textContent = 'Pulling...';
+  setSyncStatus('syncing');
   try {
     const resp = await fetch('https://api.github.com/gists/' + gistId, {
       headers: { 'Authorization': 'token ' + token }
@@ -2218,18 +2279,39 @@ async function gistPull() {
     }
     const gist = await resp.json();
     if (!gist.files || !gist.files[GIST_FILE]) {
-      throw new Error('swingtrader.json not found in this Gist. Push from another device first.');
+      throw new Error('swingtrader.json not found in this Gist. Push from this or another device first.');
     }
     const payload = JSON.parse(gist.files[GIST_FILE].content);
-    const tradeCount = payload.trades ? payload.trades.length : 0;
-    const wlCount    = payload.watchlist ? payload.watchlist.length : 0;
-    const savedDate  = payload.ts ? new Date(payload.ts).toLocaleString('en-IN') : 'unknown';
-    if (!confirm('Pull data from Gist?\n\nSaved on: ' + savedDate + '\n• ' + wlCount + ' watchlist stocks\n• ' + tradeCount + ' journal trades\n\nThis replaces your current local data.')) {
-      btn.disabled = false; btn.textContent = '📥 Pull Now'; return;
+    const tradeCount  = payload.trades      ? payload.trades.length      : 0;
+    const wlCount     = payload.watchlist   ? payload.watchlist.length   : 0;
+    const planCount   = payload.plans       ? payload.plans.length       : 0;
+    const hasSettings = !!payload.settings;
+    const hasLearnings = !!(payload.learnings && payload.learnings.length > 0);
+    const hasSectors  = !!payload.sectorBaskets;
+    const savedDate   = payload.ts ? new Date(payload.ts).toLocaleString('en-IN') : 'unknown';
+
+    const summary = 'Pull data from Gist?\n\n'
+      + 'Last saved: ' + savedDate + '\n\n'
+      + '• ' + wlCount    + ' watchlist stocks\n'
+      + '• ' + tradeCount + ' journal trades\n'
+      + '• ' + planCount  + ' Sunday plans\n'
+      + '• Settings: ' + (hasSettings ? 'Yes' : 'No') + '\n'
+      + '• Learnings: ' + (hasLearnings ? 'Yes' : 'No') + '\n'
+      + '• Custom sectors: ' + (hasSectors ? 'Yes' : 'No') + '\n\n'
+      + 'This replaces your current local data.';
+
+    if (!confirm(summary)) {
+      btn.disabled = false; btn.textContent = '📥 Pull Now';
+      setSyncStatus('idle');
+      return;
     }
     applyPayload(payload);
-    showSyncMsg('✓ Pulled successfully! ' + tradeCount + ' trades and ' + wlCount + ' stocks loaded from Gist.', true);
+    setSyncStatus('ok');
+    setTimeout(() => setSyncStatus('idle'), 3000);
+    showSyncMsg('✓ Pulled! ' + tradeCount + ' trades, ' + wlCount + ' stocks, ' + planCount + ' plans loaded.', true);
   } catch(e) {
+    setSyncStatus('error');
+    setTimeout(() => setSyncStatus('idle'), 4000);
     showSyncMsg('Pull failed: ' + e.message, false);
   }
   btn.disabled = false; btn.textContent = '📥 Pull Now';
