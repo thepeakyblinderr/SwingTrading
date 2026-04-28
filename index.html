@@ -3218,82 +3218,123 @@ function checkMonday(id) {
   const p         = plans.find(p => p.id === id);
   if (!p || isNaN(openPrice) || openPrice <= 0) return;
 
-  const riskPerShare = p.entry - p.sl;
-  const newRisk      = openPrice - p.sl;
-  const newRR        = p.target ? ((p.target - openPrice) / newRisk).toFixed(2) : null;
-  const gapPct       = ((openPrice - p.entry) / p.entry * 100).toFixed(1);
-  const capital      = p.capital || 25000;
-  const maxLoss      = capital * (p.riskPct || 2) / 100;
-  const newQty       = newRisk > 0 ? Math.floor(maxLoss / newRisk) : 0;
+  // ── Core metrics — everything is derived from these ───────────────────────
+  const capital    = p.capital  || 25000;
+  const maxLoss    = capital * (p.riskPct || 2) / 100;
+  const gapPct     = (openPrice - p.entry) / p.entry * 100;       // + = up, - = down
+  const slDist     = openPrice - p.sl;                             // ₹ distance open → SL
+  const slDistPct  = slDist / openPrice * 100;                     // % distance open → SL
+  const liveRR     = p.target && slDist > 0
+                     ? (p.target - openPrice) / slDist : null;     // live R:R from open
+  const adjQty     = slDist > 0 ? Math.floor(maxLoss / slDist) : 0;
+  const gapDir     = gapPct >= 0 ? 'up' : 'down';
+  const gapAbs     = Math.abs(gapPct).toFixed(1);
+  const rrStr      = liveRR ? liveRR.toFixed(2) : '?';
+  const rrNum      = liveRR ? parseFloat(liveRR.toFixed(2)) : 0;
 
-  let verdict, bg, color, action;
-
-  if (openPrice <= p.sl) {
-    verdict = '🔴 NO-GO — Opened below your SL';
-    bg = 'var(--red-bg)'; color = 'var(--red)';
-    action = 'Stock opened at ₹' + openPrice + ', below your SL of ₹' + p.sl + '. Setup is invalid. Do NOT buy. Skip this trade.';
-  } else if (openPrice > p.entry * 1.03) {
-    const rrNum = parseFloat(newRR);
-    if (newRR && rrNum >= 1.5) {
-      verdict = '⚠️ CAUTION — Gapped up ' + gapPct + '%';
-      bg = 'var(--orange-bg)'; color = 'var(--orange)';
-      action = 'Opened ₹' + (openPrice - p.entry).toFixed(0) + ' above plan. R:R is now 1:' + newRR + ' — still acceptable. Adjust qty to ' + newQty + ' shares. Buy at ₹' + openPrice.toFixed(2) + ', SL stays at ₹' + p.sl + '.';
-    } else {
-      verdict = '🔴 NO-GO — Gapped up too much (' + gapPct + '%)';
-      bg = 'var(--red-bg)'; color = 'var(--red)';
-      action = 'R:R has dropped to 1:' + (newRR || '?') + ' — below minimum 1:1.5. Skip this trade. Wait for a pullback to ₹' + p.entry.toFixed(0) + ' range before re-evaluating.';
-    }
-  } else if (openPrice < p.entry * 0.97) {
-    // ── Gap-down safety check ──────────────────────────────────────────────
-    // If the old SL is now dangerously close to new entry (< 1.5% away),
-    // the SL is meaningless at the new price — any normal candle will stop you out.
-    // Don't show a new qty — show a NO-GO with a clear explanation.
-    const slDistPct = ((openPrice - p.sl) / openPrice * 100);
-
-    if (slDistPct < 1.5) {
-      // SL is too close — original SL invalid for this new entry
-      verdict = '🔴 NO-GO — SL too close after gap down';
-      bg = 'var(--red-bg)'; color = 'var(--red)';
-      action = 'Opened at ₹' + openPrice.toFixed(2) + ' but your SL is ₹' + p.sl.toFixed(2)
-        + ' — only ₹' + (openPrice - p.sl).toFixed(2) + ' away (' + slDistPct.toFixed(1) + '% risk per share). '
-        + 'This SL was designed for entry ₹' + p.entry + ', not ₹' + openPrice.toFixed(2) + '. '
-        + 'Any normal candle wick will stop you out instantly. '
-        + 'Skip this trade. If you still want to enter, recalculate a proper SL '
-        + '(at least 3–5% below ₹' + openPrice.toFixed(0) + ' = ₹' + (openPrice * 0.96).toFixed(0) + '–₹' + (openPrice * 0.95).toFixed(0) + ') and redo the Risk Calculator.';
-    } else {
-      // SL still has reasonable distance — gap down but setup can be adjusted
-      const adjSl    = p.sl;
-      const adjRR    = p.target ? ((p.target - openPrice) / (openPrice - adjSl)).toFixed(2) : null;
-      const adjQty   = (openPrice - adjSl) > 0 ? Math.floor(maxLoss / (openPrice - adjSl)) : 0;
-      const rrNum    = parseFloat(adjRR);
-      if (adjRR && rrNum < 1.5) {
-        verdict = '🔴 NO-GO — Gap down killed the R:R';
-        bg = 'var(--red-bg)'; color = 'var(--red)';
-        action = 'Gapped down ' + Math.abs(gapPct) + '%. R:R is now only 1:' + adjRR
-          + ' — below the 1:1.5 minimum. The gap has compressed your reward too much. Skip this trade.';
-      } else {
-        verdict = '⚠️ CAUTION — Gapped down ' + Math.abs(gapPct) + '%';
-        bg = 'var(--orange-bg)'; color = 'var(--orange)';
-        action = 'Opened ₹' + (p.entry - openPrice).toFixed(0) + ' below plan. SL still valid at ₹' + adjSl.toFixed(2)
-          + ' (' + slDistPct.toFixed(1) + '% away — acceptable). '
-          + 'Adjusted qty: ' + adjQty + ' shares at ₹' + openPrice.toFixed(2)
-          + (adjRR ? '. New R:R: 1:' + adjRR + (rrNum >= 2 ? ' ✓ Good.' : ' — borderline, your call.') : '.')
-          + ' Place OCO GTT immediately after buy: SL ₹' + adjSl.toFixed(2) + ', Target ₹' + (p.target || '—') + '.';
-      }
-    }
-  } else {
-    verdict = '✅ GO — Clean open, execute as planned';
-    bg = 'var(--green-bg)'; color = 'var(--green)';
-    action = 'Opened near your plan (gap: ' + gapPct + '%). Buy ' + newQty + ' shares of ' + p.sym + ' at ₹' + openPrice.toFixed(2) + '. SL: ₹' + p.sl + '. Target: ' + (p.target ? '₹' + p.target : 'as planned') + '. Place SL order immediately after buy fills.';
+  // ── Helper: format action row ─────────────────────────────────────────────
+  function row(label, val, good) {
+    const col = good === true ? 'var(--green)' : good === false ? 'var(--red)' : 'var(--orange)';
+    return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(0,0,0,0.05);">'
+      + '<span style="color:var(--text3);font-size:11px;">' + label + '</span>'
+      + '<span style="color:' + col + ';font-size:11px;font-weight:600;font-family:DM Mono,monospace;">' + val + '</span>'
+      + '</div>';
   }
 
-  resultEl.innerHTML = '<div style="padding:10px 12px;border-radius:8px;background:' + bg + ';border-left:3px solid ' + color + ';margin-top:8px;">'
-    + '<div style="font-size:13px;font-weight:600;color:' + color + ';margin-bottom:4px;">' + verdict + '</div>'
-    + '<div style="font-size:12px;color:' + color + ';line-height:1.6;opacity:0.85;">' + action + '</div>'
+  let verdict, bg, color, action, metrics;
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // DECISION TREE — in priority order
+  // ══════════════════════════════════════════════════════════════════════════
+
+  if (openPrice <= p.sl) {
+    // ── 1. Opened below SL — instant NO-GO ───────────────────────────────
+    verdict = '🔴 NO-GO — Opened below SL';
+    bg = 'var(--red-bg)'; color = 'var(--red)';
+    action  = 'Opened at ₹' + openPrice + ', which is below your SL of ₹' + p.sl + '. '
+            + 'Setup is completely invalid — do NOT enter. Skip this trade.';
+    metrics = row('Open price', '₹' + openPrice, false)
+            + row('Your SL', '₹' + p.sl, false)
+            + row('Gap', gapAbs + '% down', false);
+
+  } else if (Math.abs(gapPct) > 5) {
+    // ── 2. Gap > 5% either direction — event risk, NO-GO ─────────────────
+    verdict = '🔴 NO-GO — Extreme gap ' + (gapDir === 'up' ? '▲' : '▼') + ' ' + gapAbs + '%';
+    bg = 'var(--red-bg)'; color = 'var(--red)';
+    action  = 'A ' + gapAbs + '% gap ' + gapDir + ' signals a news/event-driven move, not normal price action. '
+            + 'These setups are unpredictable and your original technical thesis no longer applies. '
+            + 'Skip. Re-evaluate from scratch if interested.';
+    metrics = row('Gap', gapAbs + '% ' + gapDir, false)
+            + row('Threshold', '> 5% = skip', false)
+            + row('Reason', 'Event/news risk', false);
+
+  } else if (slDistPct < 1.5) {
+    // ── 3. SL too close — wick risk, NO-GO ───────────────────────────────
+    verdict = '🔴 NO-GO — SL too close to entry';
+    bg = 'var(--red-bg)'; color = 'var(--red)';
+    const suggestSL = (openPrice * 0.96).toFixed(0);
+    action  = 'Your SL (₹' + p.sl + ') is only ₹' + slDist.toFixed(2) + ' (' + slDistPct.toFixed(1) + '%) '
+            + 'from the open price ₹' + openPrice + '. A normal intraday wick will stop you out within minutes. '
+            + 'This SL was built for entry ₹' + p.entry + ' — it is no longer valid here. '
+            + 'Skip, or redo Risk Calculator with a proper SL around ₹' + suggestSL + ' (4% below open).';
+    metrics = row('SL distance', '₹' + slDist.toFixed(1) + ' (' + slDistPct.toFixed(1) + '%)', false)
+            + row('Min required', '≥ 1.5%', false)
+            + row('Suggested SL', '~₹' + suggestSL, null);
+
+  } else if (liveRR !== null && rrNum < 1.5) {
+    // ── 4. R:R too low — reward not worth it, NO-GO ──────────────────────
+    verdict = '🔴 NO-GO — R:R too low at 1:' + rrStr;
+    bg = 'var(--red-bg)'; color = 'var(--red)';
+    action  = 'From the open price ₹' + openPrice + ', your R:R is only 1:' + rrStr + '. '
+            + 'You need at least 1:1.5 — meaning for every ₹1 you risk, you should stand to make ₹1.50. '
+            + (gapDir === 'up'
+               ? 'The gap up has compressed your reward. Skip — the easy money was the gap itself.'
+               : 'Wait for a cleaner entry closer to ₹' + p.entry.toFixed(0) + ' or skip.')
+    metrics = row('Live R:R from open', '1:' + rrStr, false)
+            + row('Minimum R:R', '1:1.5', false)
+            + row('Target', p.target ? '₹' + p.target : '—', null)
+            + row('SL', '₹' + p.sl, null);
+
+  } else if (Math.abs(gapPct) <= 1) {
+    // ── 5. Clean open (±1%) — full GO ────────────────────────────────────
+    verdict = '✅ GO — Clean open · Execute as planned';
+    bg = 'var(--green-bg)'; color = 'var(--green)';
+    action  = 'Opened within 1% of your planned entry. Buy ' + adjQty + ' shares at ₹' + openPrice.toFixed(2) + '. '
+            + 'Set OCO GTT immediately: SL ₹' + p.sl + ', Target ₹' + (p.target || '—') + '.';
+    metrics = row('Gap', gapAbs + '%', true)
+            + row('Live R:R', '1:' + rrStr, rrNum >= 2)
+            + row('Adj qty', adjQty + ' shares', true)
+            + row('SL distance', slDistPct.toFixed(1) + '%', slDistPct >= 3);
+
+  } else {
+    // ── 6. Moderate gap (1–5%) — CAUTION, numbers adjusted ───────────────
+    const rrGood = rrNum >= 2;
+    verdict = '⚠️ CAUTION — Gapped ' + (gapDir === 'up' ? '▲ up ' : '▼ down ') + gapAbs + '%';
+    bg = 'var(--orange-bg)'; color = 'var(--orange)';
+    action  = 'Opened ₹' + Math.abs(openPrice - p.entry).toFixed(0) + ' ' + gapDir + ' from your plan. '
+            + 'Setup still valid — SL is ' + slDistPct.toFixed(1) + '% away and R:R is 1:' + rrStr + '. '
+            + (rrGood ? 'R:R is solid. ' : 'R:R is borderline — your call. ')
+            + 'Adjusted qty: ' + adjQty + ' shares at ₹' + openPrice.toFixed(2) + '. '
+            + 'Set OCO GTT: SL ₹' + p.sl + ', Target ₹' + (p.target || '—') + '. '
+            + (gapDir === 'up'
+               ? 'Momentum is in your favour but entry is less ideal — size down if unsure.'
+               : 'Gap down improved R:R — but watch first 15 mins for direction confirmation before buying.');
+    metrics = row('Gap', gapAbs + '% ' + gapDir, null)
+            + row('Live R:R', '1:' + rrStr, rrGood)
+            + row('SL distance', slDistPct.toFixed(1) + '%', slDistPct >= 3)
+            + row('Adj qty', adjQty + ' shares', null);
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  resultEl.innerHTML =
+    '<div style="padding:12px 14px;border-radius:8px;background:' + bg + ';border-left:3px solid ' + color + ';margin-top:8px;">'
+    + '<div style="font-size:13px;font-weight:700;color:' + color + ';margin-bottom:8px;">' + verdict + '</div>'
+    + '<div style="margin-bottom:10px;">' + metrics + '</div>'
+    + '<div style="font-size:12px;color:' + color + ';line-height:1.7;padding-top:8px;border-top:1px solid rgba(0,0,0,0.08);">' + action + '</div>'
     + '</div>'
     + '<div style="display:flex;gap:6px;margin-top:8px;">'
-    + '<button class="btn btn-sm btn-green" onclick="markPlan(' + id + ',\'executed\')">✓ Executed</button>'
-    + '<button class="btn btn-sm btn-danger" onclick="markPlan(' + id + ',\'skipped\')">✗ Skipped</button>'
+    + '<button class="btn btn-sm btn-green" onclick="markPlan(' + id + ',&#39;executed&#39;)">✓ Executed</button>'
+    + '<button class="btn btn-sm btn-danger" onclick="markPlan(' + id + ',&#39;skipped&#39;)">✗ Skipped</button>'
     + '</div>';
 }
 
