@@ -3943,16 +3943,14 @@ function renderPortfolioStatic() {
       <td class="mono" style="color:${retPct!==null?(retPct>=0?'var(--green)':'var(--red)'):'var(--text3)'};font-weight:600;">
         ${retPct !== null ? (retPct>=0?'+':'')+retPct.toFixed(1)+'%' : '—'}
       </td>
-      <td class="mono" style="font-size:11px;">
+      <td style="font-size:11px;">
         ${cagr !== null ? (() => {
-          const FD_RATE = 7;
-          const beat = cagr >= FD_RATE;
-          const diff = Math.abs(cagr - FD_RATE).toFixed(0);
-          const col  = beat ? 'var(--green)' : 'var(--red)';
-          const sign = cagr >= 0 ? '+' : '';
-          const diffSign = beat ? '+' : '-';
-          return '<span style=\"color:'+col+';font-weight:700;\">'+sign+cagr.toFixed(0)+'%</span>'
-            + '<br/><span style=\"font-size:9px;color:'+col+';">'+diffSign+diff+'pp vs FD</span>';
+          const beat = cagr >= 7;
+          return '<span style=\"display:inline-block;padding:3px 7px;border-radius:20px;font-size:10px;font-weight:600;'
+            + 'background:' + (beat ? 'var(--green-bg)' : 'var(--red-bg)') + ';'
+            + 'color:'      + (beat ? 'var(--green)'    : 'var(--red)')    + ';">'
+            + (beat ? '✓ Beats FD' : '✗ Below FD')
+            + '</span>';
         })() : '—'}
       </td>
       <td style="color:${dayColor};font-size:12px;font-weight:600;">D${tradingDays}</td>
@@ -4006,7 +4004,7 @@ function renderPortfolioStatic() {
       // Update vs FD label
       const vsFdEl = document.getElementById('pf_vsfd');
       if (vsFdEl) {
-        vsFdEl.textContent = 'vs FD 7%: ' + diffSign + diff + 'pp';
+        vsFdEl.textContent = beat ? '✓ Beating FD (7%)' : '✗ Below FD (7%)';
         vsFdEl.style.color = cagrCol;
       }
     }
