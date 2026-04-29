@@ -492,6 +492,11 @@
         <label>Stock Universe</label>
         <input type="text" id="s_universe" placeholder="e.g. Midcap · Smallcap" oninput="previewBadge()"/>
       </div>
+      <div>
+        <label>Twelve Data API Key <span style="font-size:10px;color:var(--text3);">(optional — faster &amp; proxy-free)</span></label>
+        <input type="text" id="s_tdkey" placeholder="Paste your free key from twelvedata.com" autocomplete="off"/>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;">Free: 800 req/day · No CORS proxy · Direct API · <a href="https://twelvedata.com" target="_blank" style="color:var(--accent);">Get key →</a></div>
+      </div>
       <div style="padding:10px 12px;background:var(--surface2);border-radius:var(--radius-sm);font-size:13px;color:var(--text2);">
         Preview: <span id="s_preview" style="color:var(--accent);font-weight:600;"></span>
       </div>
@@ -2042,22 +2047,106 @@ async function yfFetch(yfUrl, timeoutMs=8000) {
   }))).catch(() => null);
 }
 
-async function fetchPriceData(symbol) {
-  const nseSymbol = symbol + '.NS';
-  const yfUrl = 'https://query2.finance.yahoo.com/v8/finance/chart/' + nseSymbol + '?interval=1d&range=1mo';
 
-  const raw = await yfFetch(yfUrl, 8000);
-  if (!raw) return null;
+// ═══════════════════ TWELVE DATA — PRIMARY DATA SOURCE ═══════════════════
+// Official API · CORS supported · No proxy needed · NSE native
+// Set API key in ⚙️ Settings. Falls back to Yahoo Finance if no key or on error.
 
-  const closes = (raw.chart.result[0].indicators.quote[0].close || []).filter(v => v != null);
-  if (closes.length < 6) return null;
-
-  const price  = closes[closes.length - 1];
-  const price5 = closes[closes.length - 6];
-  const chg5d  = ((price - price5) / price5 * 100);
-  const chg1d  = ((price - closes[closes.length - 2]) / closes[closes.length - 2] * 100);
-  return { price, chg5d, chg1d };
+function getTDKey() {
+  var s = JSON.parse(localStorage.getItem('st_settings') || '{}');
+  return s.tdkey || '';
 }
+
+async function tdTimeSeries(sym, outputsize) {
+  var key = getTDKey();
+  if (!key) return null;
+  var url = 'https://api.twelvedata.com/time_series'
+    + '?symbol=' + encodeURIComponent(sym + ':NSE')
+    + '&interval=1day'
+    + '&outputsize=' + (outputsize || 120)
+    + '&apikey=' + encodeURIComponent(key);
+  try {
+    var t = mkTimeout(8000);
+    var r = await fetch(url, { signal: t.signal, headers: { 'Accept': 'application/json' } });
+    t.clear();
+    if (!r.ok) return null;
+    var j = await r.json();
+    if (j.status === 'error' || !j.values || !j.values.length) return null;
+    return j;
+  } catch(e) { return null; }
+}
+
+async function tdQuote(sym) {
+  var key = getTDKey();
+  if (!key) return null;
+  var url = 'https://api.twelvedata.com/quote'
+    + '?symbol=' + encodeURIComponent(sym + ':NSE')
+    + '&apikey=' + encodeURIComponent(key);
+  try {
+    var t = mkTimeout(6000);
+    var r = await fetch(url, { signal: t.signal, headers: { 'Accept': 'application/json' } });
+    t.clear();
+    if (!r.ok) return null;
+    var j = await r.json();
+    if (j.status === 'error' || !j.close) return null;
+    return j;
+  } catch(e) { return null; }
+}
+
+function parseTDCandles(tdData) {
+  // TD returns newest-first — reverse to oldest-first
+  var vals = tdData.values.slice().reverse();
+  return {
+    closes:     vals.map(function(v) { return parseFloat(v.close); }),
+    opens:      vals.map(function(v) { return parseFloat(v.open); }),
+    highs:      vals.map(function(v) { return parseFloat(v.high); }),
+    lows:       vals.map(function(v) { return parseFloat(v.low); }),
+    volumes:    vals.map(function(v) { return parseInt(v.volume) || 0; }),
+    timestamps: vals.map(function(v) { return new Date(v.datetime).getTime() / 1000; })
+  };
+}
+
+// iOS-safe timeout helper (shared by TD and Yahoo fetch)
+function mkTimeout(ms) {
+  var ctrl = new AbortController();
+  var tid  = setTimeout(function() { ctrl.abort(); }, ms);
+  ctrl.clear = function() { clearTimeout(tid); };
+  return ctrl;
+}
+
+async function fetchPriceData(symbol) {
+  // Try Twelve Data first (if key set)
+  if (getTDKey()) {
+    var q = await tdQuote(symbol);
+    if (q) {
+      var price = parseFloat(q.close);
+      var chg1d = parseFloat(q.percent_change) || 0;
+      var chg5d = 0;
+      var ts = await tdTimeSeries(symbol, 8);
+      if (ts && ts.values.length >= 6) {
+        var cur  = parseFloat(ts.values[0].close);
+        var old5 = parseFloat(ts.values[Math.min(5, ts.values.length - 1)].close);
+        chg5d = (cur - old5) / old5 * 100;
+      }
+      return { price: price, chg5d: chg5d, chg1d: chg1d };
+    }
+  }
+  // Fallback: Yahoo Finance
+  var yfNse = symbol + '.NS';
+  var yfUrl2 = 'https://query2.finance.yahoo.com/v8/finance/chart/' + yfNse + '?interval=1d&range=1mo';
+  var yfRaw = await yfFetch(yfUrl2, 8000);
+  if (!yfRaw) return null;
+  var yfCloses = (yfRaw.chart.result[0].indicators.quote[0].close || []).filter(function(v) { return v != null; });
+  if (yfCloses.length < 6) return null;
+  var yfPrice  = yfCloses[yfCloses.length - 1];
+  var yfPrice5 = yfCloses[yfCloses.length - 6];
+  return {
+    price: yfPrice,
+    chg5d: (yfPrice - yfPrice5) / yfPrice5 * 100,
+    chg1d: (yfPrice - yfCloses[yfCloses.length - 2]) / yfCloses[yfCloses.length - 2] * 100
+  };
+}
+
 
 let _scoredBaskets = [];
 
@@ -2482,7 +2571,8 @@ function previewBadge() {
 function saveSettings() {
   const capital  = parseFloat(document.getElementById('s_capital').value)  || 25000;
   const universe = document.getElementById('s_universe').value.trim() || 'Midcap · Smallcap';
-  localStorage.setItem('st_settings', JSON.stringify({ capital, universe }));
+  const tdkey    = (document.getElementById('s_tdkey') ? document.getElementById('s_tdkey').value.trim() : '');
+  localStorage.setItem('st_settings', JSON.stringify({ capital, universe, tdkey }));
   // Apply to risk calculator immediately
   document.getElementById('r_capital').value = capital;
   updateGuideRules(capital);
@@ -2608,41 +2698,47 @@ async function runScreener() {
 // on many network configurations, with fallback to a working public endpoint
 
 async function fetchStockData(symbol) {
-  const nseSymbol = symbol + '.NS';
-  const yfUrl = 'https://query2.finance.yahoo.com/v8/finance/chart/' + nseSymbol + '?interval=1d&range=6mo&includePrePost=false';
+  var closes, opens, highs, lows, volumes, timestamps;
+  var usedTD = false;
 
-  const raw = await yfFetch(yfUrl, 10000);
-  if (!raw || !raw.chart || !raw.chart.result || !raw.chart.result[0]) return null;
+  // Try Twelve Data first
+  if (getTDKey()) {
+    var td = await tdTimeSeries(symbol, 120);
+    if (td) {
+      var p = parseTDCandles(td);
+      closes = p.closes; opens = p.opens; highs = p.highs;
+      lows = p.lows; volumes = p.volumes; timestamps = p.timestamps;
+      usedTD = true;
+    }
+  }
 
-  const chart   = raw.chart.result[0];
-  const q       = chart.indicators.quote[0];
-  const allCloses  = (q.close  || []);
-  const allOpens   = (q.open   || []);
-  const allHighs   = (q.high   || []);
-  const allLows    = (q.low    || []);
-  const allVolumes = (q.volume || []);
-  const allTimestamps = (chart.timestamp || []);
+  // Fallback: Yahoo Finance
+  if (!usedTD) {
+    const yfUrl = 'https://query2.finance.yahoo.com/v8/finance/chart/' + symbol + '.NS?interval=1d&range=6mo&includePrePost=false';
+    const raw = await yfFetch(yfUrl, 10000);
+    if (!raw || !raw.chart || !raw.chart.result || !raw.chart.result[0]) return null;
+    const chart = raw.chart.result[0];
+    const q = chart.indicators.quote[0];
+    const allCloses = q.close || [];
+    const validIdx  = allCloses.map((v,i) => v != null ? i : -1).filter(i => i >= 0);
+    closes     = validIdx.map(i => allCloses[i]);
+    opens      = validIdx.map(i => (q.open   ||[])[i] || allCloses[i]);
+    highs      = validIdx.map(i => (q.high   ||[])[i] || allCloses[i]);
+    lows       = validIdx.map(i => (q.low    ||[])[i] || allCloses[i]);
+    volumes    = validIdx.map(i => (q.volume ||[])[i] || 0);
+    timestamps = validIdx.map(i => (chart.timestamp||[])[i] || 0);
+  }
 
-  // Filter to valid candles only (close must exist)
-  const validIdx = allCloses.map((v,i) => v != null ? i : -1).filter(i => i >= 0);
-  const closes   = validIdx.map(i => allCloses[i]);
-  const opens    = validIdx.map(i => allOpens[i]  || allCloses[i]);
-  const highs    = validIdx.map(i => allHighs[i]  || allCloses[i]);
-  const lows     = validIdx.map(i => allLows[i]   || allCloses[i]);
-  const volumes  = validIdx.map(i => allVolumes[i] || 0);
-  const timestamps = validIdx.map(i => allTimestamps[i] || 0);
+  if (!closes || closes.length < 55) return null;
 
-  if (closes.length < 55) return null;
-
-  // Use last 60 candles for chart
-  const chartCandles = closes.slice(-60).map((c, i) => {
+  const chartCandles = closes.slice(-60).map((cv, i) => {
     const idx = closes.length - 60 + i;
-    return { c, o: opens[idx], h: highs[idx], l: lows[idx], v: volumes[idx], ts: timestamps[idx] };
+    return { c: cv, o: opens[idx], h: highs[idx], l: lows[idx], v: volumes[idx], ts: timestamps[idx] };
   });
 
   const price     = closes[closes.length - 1];
   const prevClose = closes[closes.length - 2];
-  const changePct = ((price - prevClose) / prevClose * 100);
+  const changePct = (price - prevClose) / prevClose * 100;
   const ema20     = calcEMA(closes, 20);
   const ema50     = calcEMA(closes, 50);
   const rsi       = calcRSI(closes, 14);
@@ -2651,45 +2747,37 @@ async function fetchStockData(symbol) {
   const lastVol   = vols[vols.length - 1] || 0;
   const volSpike  = avgVol20 > 0 ? lastVol / avgVol20 : 0;
   const high52    = Math.max(...closes);
-  const pctFrom52High = ((high52 - price) / high52 * 100);
+  const pctFrom52High = (high52 - price) / high52 * 100;
 
   let score = 0;
   const signals = {};
 
-  // RSI signal
   if (rsi >= 55 && rsi <= 70)  { score += 20; signals.rsi = 'pass'; }
   else if (rsi > 70)           { signals.rsi = 'overbought'; }
   else                         { signals.rsi = 'fail'; }
 
-  // EMA signals
   if (price > ema20)           { score += 20; signals.ema20 = 'pass'; } else { signals.ema20 = 'fail'; }
   if (price > ema50)           { score += 20; signals.ema50 = 'pass'; } else { signals.ema50 = 'fail'; }
 
-  // Volume signal
   if (volSpike >= 1.5)         { score += 20; signals.vol = 'pass'; }
   else if (volSpike >= 1.0)    { signals.vol = 'neutral'; }
   else                         { signals.vol = 'fail'; }
 
-  // 52W High proximity
   if (pctFrom52High <= 15)     { score += 20; signals.high52 = 'pass'; } else { signals.high52 = 'fail'; }
 
-  // ── Hard caps & penalties ──
-  // If RSI overbought — hard cap at 60. An overheated stock is not a valid entry
-  // regardless of how many other signals pass.
-  if (signals.rsi === 'overbought') score = Math.min(score, 60);
-
-  // If price below BOTH EMAs — this is a downtrend. Cap at 40.
+  if (signals.rsi === 'overbought')                         score = Math.min(score, 60);
   if (signals.ema20 === 'fail' && signals.ema50 === 'fail') score = Math.min(score, 40);
-
-  // If RSI below 50 (weak momentum) — cap at 50
-  if (rsi < 50) score = Math.min(score, 50);
+  if (rsi < 50)                                             score = Math.min(score, 50);
 
   const fullName = NSE_STOCKS[symbol] || '';
-  // ATR using last 60 candles (same as chart candles)
-  const atr = calcATR(chartCandles, 14);
-  const atrPct = atr ? (atr / price * 100) : null;
-  return { symbol, fullName, price, changePct, rsi, ema20, volSpike, pctFrom52High, score, signals, chartCandles, closes, atr, atrPct };
+  const atr      = calcATR(chartCandles, 14);
+  const atrPct   = atr ? (atr / price * 100) : null;
+
+  return { symbol, fullName, price, changePct, rsi, ema20, volSpike, pctFrom52High,
+           score, signals, chartCandles, closes, atr, atrPct,
+           source: usedTD ? 'TD' : 'YF' };
 }
+
 
 // Stub — no longer needed but kept to avoid reference errors
 async function initYahooCrumb() { return true; }
