@@ -1906,7 +1906,7 @@ function switchTab(name, btn) {
       if (resEl) resEl.style.display = 'block';
     }
   }
-  if (name === 'portfolio') { renderPortfolioStatic(); }
+  if (name === 'portfolio') { renderPortfolioStatic(); refreshPortfolio(); }
   if (name === 'stats') { renderStats(); }
 }
 
@@ -3669,7 +3669,10 @@ function calcRisk() {
   const calcQty      = Math.floor(maxLoss / riskPerShare);
   // Allow manual override (e.g. when free capital is limited)
   const overrideEl   = document.getElementById('r_qty_override');
-  const overrideVal  = overrideEl ? parseInt(overrideEl.value) : NaN;
+  const rawOverride  = overrideEl ? parseInt(overrideEl.value) : NaN;
+  // Cap override at max shares affordable from total capital (sanity guard)
+  const maxAffordable= capital > 0 && entry > 0 ? Math.floor(capital / entry) : 99999;
+  const overrideVal  = (!isNaN(rawOverride) && rawOverride > 0) ? Math.min(rawOverride, maxAffordable) : NaN;
   const qty          = (!isNaN(overrideVal) && overrideVal > 0) ? overrideVal : calcQty;
   const isOverridden = (!isNaN(overrideVal) && overrideVal > 0 && overrideVal !== calcQty);
   const deployed     = qty * entry;
@@ -4548,7 +4551,42 @@ function renderJournal() {
     else if (t.exit > t.entry) { status = '✅ Win'; statusClass = 'status-win'; }
     else { status = '❌ Loss'; statusClass = 'status-loss'; }
 
-    return `<tr>
+    // ── Potential outcomes ───────────────────────────────────────────────────
+    var potProfit = null, potLoss = null, currentR = null;
+    if (t.tgt && t.sl) {
+      var planRisk  = (t.entry - t.sl) * t.qty;
+      var chAtTgt   = calcCharges(invested, t.tgt * t.qty);
+      var chAtSL    = calcCharges(invested, t.sl  * t.qty);
+      potProfit = (t.tgt  - t.entry) * t.qty - chAtTgt.total;
+      potLoss   = (t.entry - t.sl)   * t.qty + chAtSL.total;
+    }
+    if (cur && t.sl && (t.entry - t.sl) > 0) {
+      currentR = (cur - t.entry) / (t.entry - t.sl);
+    }
+
+    // ── Health badge ─────────────────────────────────────────────────────────
+    var health = '', healthCol = '';
+    if (cur) {
+      if (cur <= t.sl)               { health = '🔴 At SL';             healthCol = 'var(--red)'; }
+      else if (tradingDays >= 15)    { health = '🔴 Day '+tradingDays+' exit'; healthCol = 'var(--red)'; }
+      else if (cur < t.entry)        { health = '🟠 Below entry';       healthCol = 'var(--orange)'; }
+      else if (tradingDays >= 10)    { health = '🟡 Day '+tradingDays;  healthCol = 'var(--orange)'; }
+      else if (t.tgt && cur >= t.tgt * 0.98) { health = '🎯 Near target'; healthCol = 'var(--green)'; }
+      else if (progress !== null && progress >= 50) { health = '🟢 On track'; healthCol = 'var(--green)'; }
+      else                           { health = '🟢 Active';            healthCol = 'var(--green)'; }
+    }
+
+    var potProfitStr = potProfit !== null
+      ? '<span style="color:var(--green);font-weight:600;">+₹'+Math.round(potProfit).toLocaleString('en-IN')+'</span>' : '—';
+    var potLossStr   = potLoss !== null
+      ? '<span style="color:var(--red);font-weight:600;">-₹'+Math.round(potLoss).toLocaleString('en-IN')+'</span>' : '—';
+    var plannedR     = (t.tgt && t.sl && (t.entry-t.sl)>0) ? ((t.tgt-t.entry)/(t.entry-t.sl)).toFixed(2) : '—';
+    var currentRStr  = currentR !== null
+      ? '<span style="color:'+(currentR>=1?'var(--green)':currentR>=0?'var(--orange)':'var(--red)')+';font-weight:700;">'+(currentR>=0?'+':'')+currentR.toFixed(2)+'R</span>'
+        +'<br/><span style="font-size:10px;color:var(--text3);">of '+plannedR+'R planned</span>'
+      : '—';
+
+        return `<tr>
       <td><strong class="mono">${t.sym}</strong></td>
       <td class="mono">${t.date}</td>
       <td class="mono">₹${t.entry.toFixed(2)}</td>
@@ -4663,6 +4701,7 @@ function renderPortfolioStatic() {
   document.getElementById('pf_invested').textContent = '₹' + Math.round(totalInvested).toLocaleString('en-IN');
 
   let totalGross = 0, totalCharges = 0, hasPrices = false;
+  let totalPotProfit = 0, totalPotLoss = 0;
 
   const rows = open.map(t => {
     const pfData  = pfPrices[t.sym];
@@ -4694,6 +4733,11 @@ function renderPortfolioStatic() {
       netPL    = grossPL - charges;
       totalGross   += grossPL;
       totalCharges += charges;
+    }
+    // Always accumulate potential (uses trade data, not live price)
+    if (potProfit !== null) totalPotProfit += potProfit;
+    if (potLoss   !== null) totalPotLoss   += potLoss;
+    if (cur) {
       // % return on invested capital (net)
       retPct = netPL / invested * 100;
       // Simple annualised return: retPct × (365 ÷ days held)
@@ -4714,37 +4758,29 @@ function renderPortfolioStatic() {
     return `<tr>
       <td>
         <strong class="mono">${t.sym}</strong>
-        ${slStatus ? `<span style="font-size:11px;margin-left:4px;">${slStatus}</span>` : ''}
+        ${health ? `<br/><span style="font-size:11px;color:${healthCol};">${health}</span>` : ''}
         <div style="margin-top:4px;height:4px;background:var(--border);border-radius:2px;width:64px;overflow:hidden;">
-          <div style="height:100%;width:${(progress||0).toFixed(0)}%;background:${barColor};border-radius:2px;transition:width 0.5s;"></div>
+          <div style="height:100%;width:${(progress||0).toFixed(0)}%;background:${barColor};border-radius:2px;"></div>
         </div>
-        <div style="font-size:9px;color:var(--text3);margin-top:1px;">${progress !== null ? progress.toFixed(0)+'% to tgt' : 'No target set'}</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:1px;">${progress!==null?progress.toFixed(0)+'% to tgt':'No target'}</div>
       </td>
       <td class="mono">${t.qty}</td>
-      <td class="mono">₹${t.entry.toFixed(2)}<br/><span style="font-size:10px;color:var(--text3);">SL ₹${t.sl.toFixed(0)}</span></td>
-      <td class="mono" style="color:var(--text2);">₹${Math.round(invested).toLocaleString('en-IN')}</td>
+      <td class="mono">₹${t.entry.toFixed(2)}
+        <br/><span style="font-size:10px;color:var(--red);">SL ₹${t.sl.toFixed(0)}</span>
+        ${t.tgt?`<br/><span style="font-size:10px;color:var(--green);">T ₹${t.tgt.toFixed(0)}</span>`:''}
+      </td>
+      <td class="mono">₹${Math.round(invested).toLocaleString('en-IN')}</td>
       <td class="mono">${cur
-        ? `₹${cur.toFixed(2)}<br/><span style="font-size:10px;color:${chg1dColor};">${chg1d >= 0 ? '+' : ''}${chg1d !== undefined ? chg1d.toFixed(1)+'%' : ''}</span>`
+        ? `₹${cur.toFixed(2)}<br/><span style="font-size:10px;color:${chg1dColor};">${chg1d>=0?'+':''}${chg1d!==undefined?chg1d.toFixed(1)+'%':''}</span>`
         : '<span style="color:var(--text3);">—</span>'}</td>
-      <td class="mono" style="color:${grossPL!==null?(grossPL>=0?'var(--green)':'var(--red)'):'var(--text3)'};font-weight:600;">${grossPL !== null ? fmtINR(grossPL) : '—'}</td>
-      <td class="mono" style="color:var(--orange);font-size:11px;">${charges !== null ? '-₹'+charges.toFixed(0) : '—'}</td>
-      <td class="mono" style="color:${plColor};font-weight:700;font-size:14px;">${netPL !== null ? fmtINR(netPL) : '—'}</td>
-      <td class="mono" style="color:${retPct!==null?(retPct>=0?'var(--green)':'var(--red)'):'var(--text3)'};font-weight:600;">
-        ${retPct !== null ? (retPct>=0?'+':'')+retPct.toFixed(1)+'%' : '—'}
-      </td>
-      <td style="font-size:11px;">
-        ${cagr !== null ? (() => {
-          const beat = cagr >= 7;
-          return '<span style=\"display:inline-block;padding:3px 7px;border-radius:20px;font-size:10px;font-weight:600;'
-            + 'background:' + (beat ? 'var(--green-bg)' : 'var(--red-bg)') + ';'
-            + 'color:'      + (beat ? 'var(--green)'    : 'var(--red)')    + ';">'
-            + (beat ? '✓ Beats FD' : '✗ Below FD')
-            + '</span>';
-        })() : '—'}
-      </td>
+      <td class="mono" style="color:${plColor};font-weight:700;">${netPL!==null?(netPL>=0?'+₹':'-₹')+Math.abs(netPL).toFixed(0):'—'}</td>
+      <td class="mono" style="color:${retPct!==null?(retPct>=0?'var(--green)':'var(--red)'):'var(--text3)'};">${retPct!==null?(retPct>=0?'+':'')+retPct.toFixed(1)+'%':'—'}</td>
+      <td>${currentRStr}</td>
+      <td>${potProfitStr}</td>
+      <td>${potLossStr}</td>
       <td style="color:${dayColor};font-size:12px;font-weight:600;">D${tradingDays}</td>
       <td>
-        <button class="btn btn-sm btn-secondary" title="Pyramid add" onclick="pfPyramid('${t.sym}',${t.entry},${t.sl},${t.tgt||0},${t.qty})" style="font-size:14px;">△</button>
+        <button class="btn btn-sm btn-secondary" onclick="pfPyramid('${t.sym}',${t.entry.toFixed(2)},${t.sl.toFixed(2)},${t.tgt?t.tgt.toFixed(2):0},${t.qty})" style="font-size:14px;">△</button>
       </td>
     </tr>`;
   }).join('');
@@ -4774,6 +4810,10 @@ function renderPortfolioStatic() {
     };
 
     setEl('pf_gross',  fmtINR(totalGross),  totalGross >= 0 ? 'var(--green)' : 'var(--red)');
+    var ppEl = document.getElementById('pf_pot_profit');
+    var plEl = document.getElementById('pf_pot_loss');
+    if (ppEl) { ppEl.textContent = totalPotProfit > 0 ? '+₹'+Math.round(totalPotProfit).toLocaleString('en-IN') : '—'; ppEl.style.color = 'var(--green)'; }
+    if (plEl) { plEl.textContent = totalPotLoss   > 0 ? '-₹'+Math.round(totalPotLoss).toLocaleString('en-IN')   : '—'; plEl.style.color = 'var(--red)'; }
     setEl('pf_net',    fmtINR(totalNet),     totalNet   >= 0 ? 'var(--green)' : 'var(--red)');
 
     if (portRetPct !== null) {
@@ -4807,9 +4847,8 @@ function renderPortfolioStatic() {
   el.innerHTML = `<div class="tbl-wrap">
     <table>
       <thead><tr>
-        <th>Symbol</th><th>Qty</th><th>Entry / SL</th><th>Invested</th>
-        <th>Live Price</th><th>Gross P&L</th><th>Charges</th>
-        <th>Net P&L</th><th>Return %</th><th title="Simple annualised return vs FD 7%">Ann. Return</th><th>Days</th><th>△</th>
+        <th>Symbol / Health</th><th>Qty</th><th>Entry · SL · Target</th><th>Invested</th>
+        <th>Live Price</th><th>Net P&L now</th><th>Return %</th><th>Current R</th><th title="If target hits">🎯 At Target</th><th title="If SL hits">🛑 At SL</th><th>Days</th><th>△</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
@@ -4884,13 +4923,17 @@ function calcPyramid() {
 
   const totalQty  = origQty + addQty;
   const avgEntry  = (origQty * entry + addQty * addPrice) / totalQty;
-  const addCost   = addQty  * addPrice;
-  const totalRisk = origRiskUsed + addQty * addRiskPerSh;
+  const addCost      = addQty  * addPrice;
+  const freeForPyramid = getFreeCapital(capital);
+  const totalRisk    = origRiskUsed + addQty * addRiskPerSh;
   const newRR     = target ? ((target - avgEntry) / (avgEntry - sl)) : null;
   const rrColor   = newRR && newRR >= 2 ? 'var(--green)' : newRR && newRR >= 1.5 ? 'var(--orange)' : 'var(--red)';
   const fmt       = n => '₹' + Math.round(n).toLocaleString('en-IN');
 
-  out.innerHTML = `<div style="margin-top:10px;display:grid;gap:8px;">
+  var capWarn = freeForPyramid < addCost
+    ? '<div style="padding:6px 10px;background:var(--orange-bg);border-radius:6px;font-size:11px;color:var(--orange);margin-bottom:6px;">⚠️ Add cost ' + fmt(addCost) + ' exceeds free capital ' + fmt(freeForPyramid) + ' — ensure you have cash available before placing the order.</div>'
+    : '';
+  out.innerHTML = `<div style="margin-top:10px;display:grid;gap:8px;">${capWarn}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
       <div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center;">
         <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;">Add Qty</div>
