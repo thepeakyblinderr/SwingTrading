@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+<head>    try {
+
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="theme-color" content="#f5f0e8"/>
@@ -4534,6 +4535,18 @@ function renderJournal() {
   empty.style.display = 'none';
 
   tbody.innerHTML = filtered.map(t => {
+    try {
+    // Normalise fields — guard against null/undefined from old formats or incomplete syncs
+    const entry    = parseFloat(t.entry)    || 0;
+    const sl       = parseFloat(t.sl)       || 0;
+    const tgt      = t.tgt ? parseFloat(t.tgt) : null;
+    const qty      = parseInt(t.qty)        || 0;
+    const exitP    = t.exit ? parseFloat(t.exit) : null;
+    const invested = entry * qty;
+
+    // Patch t so all downstream refs work safely
+    t = Object.assign({}, t, { entry, sl, tgt, qty, exit: exitP });
+
     const pnl = t.exit ? (t.exit - t.entry) * t.qty : null;
     let netPnl = pnl, chTotal = null;
     if (pnl !== null) {
@@ -4554,11 +4567,11 @@ function renderJournal() {
     return `<tr>
       <td><strong class="mono">${t.sym}</strong></td>
       <td class="mono">${t.date}</td>
-      <td class="mono">₹${t.entry.toFixed(2)}</td>
-      <td class="mono">₹${t.sl.toFixed(2)}</td>
-      <td class="mono">${t.tgt ? '₹'+t.tgt.toFixed(2) : '—'}</td>
+      <td class="mono">₹${entry.toFixed(2)}</td>
+      <td class="mono">₹${sl.toFixed(2)}</td>
+      <td class="mono">${tgt ? '₹'+tgt.toFixed(2) : '—'}</td>
       <td class="mono">${t.qty}</td>
-      <td class="mono">${t.exit ? '₹'+t.exit.toFixed(2) : '—'}</td>
+      <td class="mono">${exitP ? '₹'+exitP.toFixed(2) : '—'}</td>
       <td class="mono" style="${pnlColor}font-weight:600;">${pnlStr}</td>
       <td class="mono">${rr !== '—' ? '1:'+rr : '—'}</td>
       <td><span class="${statusClass}">${status}</span></td>
@@ -4570,6 +4583,9 @@ function renderJournal() {
         </div>
       </td>
     </tr>`;
+    } catch(rowErr) {
+      return '<tr><td colspan="12" style="color:var(--red);font-size:12px;padding:8px 12px;">Could not render: ' + (t&&t.sym||'?') + '</td></tr>';
+    }
   }).join('');
 }
 
