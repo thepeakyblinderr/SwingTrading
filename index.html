@@ -645,6 +645,13 @@
         <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:8px;">Position Size</div>
         <div class="result-big" id="r_qty">—</div>
         <div style="color:var(--text2);font-size:13px;margin-top:2px;">shares to buy</div>
+        <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
+          <input type="number" id="r_qty_override" placeholder="Override qty" min="1" step="1"
+            style="width:130px;font-size:13px;padding:6px 10px;"
+            oninput="calcRisk()" title="Override calculated qty — useful when free capital is limited"/>
+          <span style="font-size:11px;color:var(--text3);">optional override</span>
+          <button class="btn btn-sm btn-secondary" onclick="document.getElementById('r_qty_override').value='';calcRisk();" title="Clear override">✕</button>
+        </div>
         <hr class="divider"/>
         <div class="grid-2" style="gap:16px;margin-top:4px;">
           <div>
@@ -3415,13 +3422,23 @@ function calcRisk() {
     return;
   }
 
-  const maxLoss = capital * riskPct / 100;
+  const maxLoss      = capital * riskPct / 100;
   const riskPerShare = entry - sl;
-  const qty = Math.floor(maxLoss / riskPerShare);
-  const deployed = qty * entry;
-  const actualLoss = qty * riskPerShare;
+  const calcQty      = Math.floor(maxLoss / riskPerShare);
+  // Allow manual override (e.g. when free capital is limited)
+  const overrideEl   = document.getElementById('r_qty_override');
+  const overrideVal  = overrideEl ? parseInt(overrideEl.value) : NaN;
+  const qty          = (!isNaN(overrideVal) && overrideVal > 0) ? overrideVal : calcQty;
+  const isOverridden = (!isNaN(overrideVal) && overrideVal > 0 && overrideVal !== calcQty);
+  const deployed     = qty * entry;
+  const actualLoss   = qty * riskPerShare;
 
-  document.getElementById('r_qty').textContent = qty || '—';
+  var qtyEl = document.getElementById('r_qty');
+  if (qtyEl) {
+    qtyEl.textContent = qty || '—';
+    qtyEl.style.color = isOverridden ? 'var(--accent2)' : '';
+    qtyEl.title = isOverridden ? 'Overridden (calculated: ' + calcQty + ')' : '';
+  }
   document.getElementById('r_deployed').textContent = qty ? '₹' + deployed.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '—';
   document.getElementById('r_maxloss').textContent = qty ? '₹' + actualLoss.toFixed(0) : '—';
 
@@ -3520,6 +3537,7 @@ function calcRisk() {
               + 'Max loss: <strong>' + fmt(reducedRisk) + '</strong>'
               + (target ? ' · R:R: <strong>' + reducedRRStr + '</strong>' : '')
               + '<br/><span style="color:var(--text3);">Note: Risk % on total capital drops to ' + (reducedRisk / capital * 100).toFixed(2) + '% — still within safe limits.</span>'
+              + '<br/><button class="btn btn-sm btn-secondary" style="margin-top:6px;" onclick="var el=document.getElementById(\'r_qty_override\');if(el){el.value=' + maxQtyFree + ';calcRisk();}">👆 Use ' + maxQtyFree + ' shares</button>'
               + '</div>'
             : '<div style="font-size:12px;color:var(--red);">Not enough free capital to buy even 1 share at ₹' + entry.toFixed(2) + '.</div>')
           + '</div>';
