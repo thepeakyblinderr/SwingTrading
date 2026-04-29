@@ -1898,6 +1898,14 @@ function switchTab(name, btn) {
   if (name === 'journal') renderJournal();
   if (name === 'discover') { if (!discoverLoaded) runDiscover(); else renderSectorHeat(); }
   if (name === 'risk') { renderSundayPlans(); renderCapitalDashboard(); }
+  if (name === 'screener' && _screenerHTML) {
+    var bodyEl = document.getElementById('screenerBody');
+    var resEl  = document.getElementById('screenerResults');
+    if (bodyEl && bodyEl.innerHTML.trim() === '' || bodyEl.innerHTML.includes('Add symbols')) {
+      bodyEl.innerHTML = _screenerHTML;
+      if (resEl) resEl.style.display = 'block';
+    }
+  }
   if (name === 'portfolio') { renderPortfolioStatic(); }
   if (name === 'stats') { renderStats(); }
 }
@@ -2460,6 +2468,7 @@ async function fetchPriceData(symbol) {
 
 let _scoredBaskets = [];
 let _screenerCache = {}; // sym → full result object from last screen run
+let _screenerHTML  = null; // last rendered screener results HTML (persists across tab switches)
 
 function renderSectorHeat() {
   const container = document.getElementById('discoverSectors');
@@ -2541,12 +2550,20 @@ function renderSectorHeat() {
         <div style="${barStyle}"></div>
       </div>
       <div>${stockRows}</div>
-      <button onclick="addAllSector(${rank})"
-        style="margin-top:10px;width:100%;padding:7px;font-size:12px;font-weight:600;
-               border-radius:6px;border:1.5px solid var(--border);background:var(--surface2);
-               color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;">
-        + Add all ${basket.name} to watchlist
-      </button>
+      <div style="display:flex;gap:6px;margin-top:10px;">
+        <button onclick="addAllSector(${rank})"
+          style="flex:1;padding:7px;font-size:12px;font-weight:600;border-radius:6px;
+                 border:1.5px solid var(--border);background:var(--surface2);
+                 color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;">
+          + Add to watchlist
+        </button>
+        <button onclick="screenSector(${rank})"
+          style="flex:1;padding:7px;font-size:12px;font-weight:700;border-radius:6px;
+                 border:none;background:var(--accent);color:white;cursor:pointer;
+                 font-family:'DM Sans',sans-serif;">
+          🔍 Screen now
+        </button>
+      </div>
     </div>`;
   }).join('');
 
@@ -2567,6 +2584,22 @@ function discoverAdd(sym, btn) {
     btn.style.color = 'var(--green)';
     btn.style.borderColor = 'var(--green)';
   }
+}
+
+
+function screenSector(rank) {
+  var basket = _scoredBaskets[rank];
+  if (!basket) return;
+  // Add all stocks from this sector to watchlist (deduplicated)
+  basket.stocks.forEach(function(s) {
+    if (!watchlist.includes(s.sym)) watchlist.push(s.sym);
+  });
+  saveWatchlist();
+  renderWatchlist();
+  // Switch to screener tab and auto-run
+  var tabs = document.querySelectorAll('.tab-btn');
+  switchTab('screener', tabs[0]);
+  setTimeout(function() { runScreener(); }, 300);
 }
 
 function addAllSector(idx) {
@@ -2997,6 +3030,9 @@ async function runScreener() {
     // Cache full result objects for smart prefill
     results.forEach(function(r) { _screenerCache[r.symbol] = r; });
     renderScreenerResults(results);
+    // Save rendered HTML so it persists across tab switches
+    var bodyEl = document.getElementById('screenerBody');
+    if (bodyEl) _screenerHTML = bodyEl.innerHTML;
   }
 
   btn.disabled = false;
@@ -3886,6 +3922,35 @@ function saveSundayPlan() {
   alert('Plan saved for ' + sym + '! Enter the open price on the day of entry to get your go/no-go decision.');
 }
 
+
+function editPlan(id) {
+  var p = plans.find(function(p) { return p.id === id; });
+  if (!p) return;
+  // Pre-fill Risk Calc with plan values
+  document.getElementById('r_symbol').value  = p.sym;
+  document.getElementById('r_entry').value   = p.entry;
+  document.getElementById('r_sl').value      = p.sl;
+  document.getElementById('r_target').value  = p.target || '';
+  // Clear override qty
+  var ov = document.getElementById('r_qty_override');
+  if (ov) ov.value = '';
+  calcRisk();
+  // Delete the old plan
+  plans = plans.filter(function(pl) { return pl.id !== id; });
+  savePlans();
+  // Switch to Risk tab
+  var tabs = document.querySelectorAll('.tab-btn');
+  switchTab('risk', tabs[2]);
+  setTimeout(function() {
+    // Show a note that this is an edit
+    var note = document.getElementById('r_sl_note');
+    if (note) {
+      note.innerHTML = '<div style="padding:8px 12px;background:var(--accent2);background:rgba(42,107,200,0.1);border-radius:8px;font-size:12px;color:var(--accent2);margin-top:6px;">✏️ Editing plan for <strong>' + p.sym + '</strong> — adjust values and click Save Plan again.</div>';
+      note.style.display = 'block';
+    }
+  }, 200);
+}
+
 function deletePlan(id) {
   plans = plans.filter(p => p.id !== id);
   savePlans();
@@ -4091,6 +4156,7 @@ function renderSundayPlans() {
       + '</div>'
       + '<div style="display:flex;align-items:center;gap:6px;">'
       + '<span style="font-size:11px;color:var(--text3);">Planned ' + p.savedOn + '</span>'
+      + '<button class="btn btn-sm btn-secondary" onclick="editPlan(' + p.id + ')" title="Edit this plan">✏️</button>'
       + '<button class="btn btn-sm btn-danger" onclick="deletePlan(' + p.id + ')">✕</button>'
       + '</div>'
       + '</div>'
