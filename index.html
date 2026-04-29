@@ -506,6 +506,7 @@
   <button class="tab-btn" onclick="switchTab('risk',this)"><span class="tab-icon">⚖️</span>Risk Calc</button>
   <button class="tab-btn" onclick="switchTab('journal',this)"><span class="tab-icon">📒</span>Journal</button>
   <button class="tab-btn" onclick="switchTab('portfolio',this)"><span class="tab-icon">📈</span>Portfolio</button>
+  <button class="tab-btn" onclick="switchTab('stats',this)"><span class="tab-icon">📊</span>Stats</button>
   <button class="tab-btn" onclick="switchTab('guide',this)"><span class="tab-icon">📖</span>Guide</button>
 </div>
 
@@ -1500,6 +1501,83 @@
   </div>
 </div>
 
+
+<!-- ═══════════════════════════════════════════════ STATS ═══════════════════════════════════════════════ -->
+<div id="tab-stats" class="tab-panel">
+
+  <!-- Top KPIs -->
+  <div class="grid-4" style="margin-bottom:16px;" id="stats_kpis">
+    <div class="stat-box"><div class="stat-value" id="st_trades">—</div><div class="stat-label">Closed Trades</div></div>
+    <div class="stat-box"><div class="stat-value" id="st_winrate">—</div><div class="stat-label">Win Rate</div></div>
+    <div class="stat-box"><div class="stat-value" id="st_avgR">—</div><div class="stat-label">Avg R-Multiple</div></div>
+    <div class="stat-box"><div class="stat-value" id="st_pf">—</div><div class="stat-label">Profit Factor</div></div>
+  </div>
+
+  <!-- Returns row -->
+  <div class="grid-4" style="margin-bottom:16px;">
+    <div class="stat-box"><div class="stat-value" id="st_netpnl">—</div><div class="stat-label">Total Net P&amp;L</div></div>
+    <div class="stat-box"><div class="stat-value" id="st_retpct">—</div><div class="stat-label">Total Return %</div></div>
+    <div class="stat-box"><div class="stat-value" id="st_annret">—</div><div class="stat-label">Ann. Return (simple)</div></div>
+    <div class="stat-box">
+      <div class="stat-value" id="st_vsfd">—</div>
+      <div class="stat-label">vs FD (7%)</div>
+    </div>
+  </div>
+
+  <!-- Win / Loss breakdown -->
+  <div class="grid-2" style="margin-bottom:16px;">
+    <div class="card">
+      <div class="card-title">🏆 Winners</div>
+      <div id="st_winners"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">📉 Losers</div>
+      <div id="st_losers"></div>
+    </div>
+  </div>
+
+  <!-- R-Multiple chart -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-title">📐 R-Multiple per Trade</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">Planned R:R vs Actual R achieved · positive = profitable · 2R = hit full target</div>
+    <div id="st_rChart"></div>
+  </div>
+
+  <!-- Monthly P&L chart (moved from Journal) -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-title">📅 Monthly Net P&amp;L</div>
+    <div id="st_monthlyChart"></div>
+    <div style="font-size:11px;color:var(--text3);margin-top:6px;">Net P&amp;L after charges · closed trades only</div>
+  </div>
+
+  <!-- Best / Worst trades -->
+  <div class="grid-2" style="margin-bottom:16px;">
+    <div class="card">
+      <div class="card-title">⭐ Best Trade</div>
+      <div id="st_best"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">💀 Worst Trade</div>
+      <div id="st_worst"></div>
+    </div>
+  </div>
+
+  <!-- Exit quality -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-title">🎯 Exit Quality</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">Did you hold to target or exit early?</div>
+    <div id="st_exitQuality"></div>
+  </div>
+
+  <div id="st_empty" style="display:none;">
+    <div class="empty-state">
+      <div class="empty-icon">📊</div>
+      <div class="empty-title">No closed trades yet</div>
+      <div>Close some trades in the Journal tab to see your performance stats here.</div>
+    </div>
+  </div>
+</div>
+
 </div><!-- /main -->
 
 <script>
@@ -1575,6 +1653,7 @@ function switchTab(name, btn) {
   if (name === 'discover') { if (!discoverLoaded) runDiscover(); else renderSectorHeat(); }
   if (name === 'risk') { renderSundayPlans(); renderCapitalDashboard(); }
   if (name === 'portfolio') { renderPortfolioStatic(); }
+  if (name === 'stats') { renderStats(); }
 }
 
 // ═══════════════════ AUTOCOMPLETE ═══════════════════
@@ -1849,7 +1928,7 @@ function addNewSector() {
   const baskets = JSON.parse(JSON.stringify(getActiveSectorBaskets()));
   baskets.push({
     name,
-    emoji: name.match(/\p{Emoji}/u)?.[0] || '📊',
+    emoji: '📊',
     stocks: syms.map(sym => ({ sym, name: NSE_STOCKS[sym] || sym }))
   });
   saveSectorBaskets(baskets);
@@ -1908,6 +1987,22 @@ async function runDiscover() {
 // ═══════════════════ YAHOO FINANCE — ROBUST FETCH LAYER ═══════════════════
 // iOS-safe manual timeout, parallel proxy racing, allorigins /raw
 
+
+// iOS-safe Promise.any polyfill — works on iOS 10+
+function promiseAny(promises) {
+  return new Promise(function(resolve, reject) {
+    var errors = [];
+    var remaining = promises.length;
+    if (remaining === 0) { reject(new Error('All promises were rejected')); return; }
+    promises.forEach(function(p) {
+      Promise.resolve(p).then(resolve).catch(function(e) {
+        errors.push(e);
+        remaining--;
+        if (remaining === 0) reject(errors);
+      });
+    });
+  });
+}
 function yfTimeout(ms) {
   const ctrl = new AbortController();
   const tid  = setTimeout(() => ctrl.abort(), ms);
@@ -1922,28 +2017,28 @@ async function yfGet(url, ms) {
 
 function parseYF(text) {
   let j; try { j = JSON.parse(text); } catch(e) { return null; }
-  if (j?.contents) { try { j = JSON.parse(j.contents); } catch(e) {} }
+  if (j && j.contents) { try { j = JSON.parse(j.contents); } catch(e) {} }
   return j;
 }
 
 async function yfFetch(yfUrl, timeoutMs=8000) {
   // Round 1 — try direct Yahoo simultaneously (3s fast-fail)
   const q1 = yfUrl.replace('query2','query1');
-  const direct = await Promise.any([
+  const direct = await promiseAny([
     yfGet(yfUrl, 3000).then(r => r.ok ? r.text() : Promise.reject()),
     yfGet(q1,    3000).then(r => r.ok ? r.text() : Promise.reject()),
   ]).catch(() => null);
-  if (direct) { const j = parseYF(direct); if (j?.chart?.result?.[0]) return j; }
+  if (direct) { const j = parseYF(direct); if (j && j.chart && j.chart.result && j.chart.result[0]) return j; }
 
   // Round 2 — race all CORS proxies in parallel, take first winner
-  return Promise.any([
+  return promiseAny([
     yfGet('https://api.allorigins.win/raw?url='      + encodeURIComponent(q1),    timeoutMs),
     yfGet('https://corsproxy.io/?'                   + encodeURIComponent(q1),    timeoutMs),
     yfGet('https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(q1),    timeoutMs),
     yfGet('https://thingproxy.freeboard.io/fetch/'   + q1,                        timeoutMs),
     yfGet('https://api.allorigins.win/raw?url='      + encodeURIComponent(yfUrl), timeoutMs),
   ].map(p => p.then(r => r.ok ? r.text() : Promise.reject()).then(t => {
-    const j = parseYF(t); if (j?.chart?.result?.[0]) return j; throw 0;
+    const j = parseYF(t); if (j && j.chart && j.chart.result && j.chart.result[0]) return j; throw 0;
   }))).catch(() => null);
 }
 
@@ -2517,7 +2612,7 @@ async function fetchStockData(symbol) {
   const yfUrl = 'https://query2.finance.yahoo.com/v8/finance/chart/' + nseSymbol + '?interval=1d&range=6mo&includePrePost=false';
 
   const raw = await yfFetch(yfUrl, 10000);
-  if (!raw?.chart?.result?.[0]) return null;
+  if (!raw || !raw.chart || !raw.chart.result || !raw.chart.result[0]) return null;
 
   const chart   = raw.chart.result[0];
   const q       = chart.indicators.quote[0];
@@ -3877,8 +3972,8 @@ function renderPortfolioStatic() {
 
   const rows = open.map(t => {
     const pfData  = pfPrices[t.sym];
-    const cur     = pfData?.price;
-    const chg1d   = pfData?.chg1d;
+    const cur     = pfData ? pfData.price : undefined;
+    const chg1d   = pfData ? pfData.chg1d : undefined;
     const invested = t.entry * t.qty;
 
     // Days held (trading days Mon–Fri)
@@ -4130,6 +4225,273 @@ function calcPyramid() {
       <strong>Total risk used:</strong> ₹${totalRisk.toFixed(0)} of ₹${maxLoss.toFixed(0)} budget · SL stays at ₹${sl}
     </div>
   </div>`;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STATS TAB
+// ═══════════════════════════════════════════════════════════════════════════
+
+function renderStats() {
+  const FD_RATE = 7; // FD benchmark %
+
+  // ── Data prep ─────────────────────────────────────────────────────────────
+  const closed = trades.filter(t => t.exit && t.exitDate);
+
+  const emptyEl = document.getElementById('st_empty');
+  const kpiEl   = document.getElementById('stats_kpis');
+
+  if (closed.length === 0) {
+    if (emptyEl) emptyEl.style.display = 'block';
+    ['st_trades','st_winrate','st_avgR','st_pf','st_netpnl','st_retpct','st_annret','st_vsfd',
+     'st_rChart','st_monthlyChart','st_best','st_worst','st_winners','st_losers','st_exitQuality']
+      .forEach(id => { const el=document.getElementById(id); if(el) el.innerHTML='—'; });
+    return;
+  }
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  // ── Per-trade metrics ─────────────────────────────────────────────────────
+  const tradeData = closed.map(t => {
+    const gross    = (t.exit - t.entry) * t.qty;
+    const ch       = calcCharges(t.entry * t.qty, t.exit * t.qty);
+    const net      = gross - ch.total;
+    const invested = t.entry * t.qty;
+    const retPct   = net / invested * 100;
+
+    // Trading days held
+    let days = 0;
+    let d = new Date(t.date);
+    const end = new Date(t.exitDate);
+    while (d <= end) { if (d.getDay()!==0&&d.getDay()!==6) days++; d=new Date(d.getTime()+86400000); }
+    days = Math.max(1, days - 1);
+
+    // R-Multiple: actual gain / initial risk per share
+    const riskPerShare  = t.entry - t.sl;
+    const actualR       = riskPerShare > 0 ? (t.exit - t.entry) / riskPerShare : null;
+    // Planned R:R
+    const plannedR      = (t.tgt && riskPerShare > 0) ? (t.tgt - t.entry) / riskPerShare : null;
+    // Ann return (simple)
+    const annRet        = retPct * (365 / days);
+    const beatsFD       = annRet >= FD_RATE;
+
+    return { ...t, gross, net, ch: ch.total, invested, retPct, days, actualR, plannedR, annRet, beatsFD };
+  });
+
+  const winners = tradeData.filter(t => t.net > 0);
+  const losers  = tradeData.filter(t => t.net <= 0);
+  const winRate = (winners.length / tradeData.length * 100).toFixed(1);
+
+  const totalNet      = tradeData.reduce((s,t) => s+t.net, 0);
+  const totalInvested = tradeData.reduce((s,t) => s+t.invested, 0);
+  const totalRetPct   = totalInvested > 0 ? totalNet / totalInvested * 100 : 0;
+  const avgDays       = tradeData.reduce((s,t) => s+t.days, 0) / tradeData.length;
+  const totalAnnRet   = totalRetPct * (365 / avgDays);
+
+  // Avg R-Multiple (only trades with valid riskPerShare)
+  const validR  = tradeData.filter(t => t.actualR !== null);
+  const avgR    = validR.length ? validR.reduce((s,t) => s+t.actualR, 0) / validR.length : null;
+
+  // Profit Factor = sum of winners / abs sum of losers
+  const grossWin  = winners.reduce((s,t) => s+t.net, 0);
+  const grossLoss = Math.abs(losers.reduce((s,t) => s+t.net, 0));
+  const pf        = grossLoss > 0 ? (grossWin / grossLoss) : grossWin > 0 ? 999 : 0;
+
+  // ── KPI boxes ──────────────────────────────────────────────────────────────
+  const setEl = (id, html, col) => {
+    const sEl = document.getElementById(id);
+    if (!sEl) return;
+    sEl.innerHTML = html;
+    if (col) sEl.style.color = col;
+  };
+
+  setEl('st_trades',  tradeData.length, 'var(--text)');
+  setEl('st_winrate', winRate + '%',    parseFloat(winRate)>=50?'var(--green)':'var(--red)');
+  setEl('st_avgR',    avgR !== null ? (avgR>=0?'+':'')+avgR.toFixed(2)+'R' : '—',
+                      avgR!==null?(avgR>=1?'var(--green)':avgR>=0?'var(--orange)':'var(--red)'):'var(--text3)');
+  setEl('st_pf',      pf >= 999 ? '∞' : pf.toFixed(2),
+                      pf>=2?'var(--green)':pf>=1?'var(--orange)':'var(--red)');
+  setEl('st_netpnl',  (totalNet>=0?'+':'-')+'₹'+Math.abs(totalNet).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,','),
+                      totalNet>=0?'var(--green)':'var(--red)');
+  setEl('st_retpct',  (totalRetPct>=0?'+':'')+totalRetPct.toFixed(2)+'%',
+                      totalRetPct>=0?'var(--green)':'var(--red)');
+  setEl('st_annret',  (totalAnnRet>=0?'+':'')+totalAnnRet.toFixed(0)+'% p.a.',
+                      totalAnnRet>=FD_RATE?'var(--green)':'var(--red)');
+
+  // vs FD badge
+  const beatFD  = totalAnnRet >= FD_RATE;
+  const fdEl    = document.getElementById('st_vsfd');
+  if (fdEl) {
+    fdEl.innerHTML  = beatFD ? '✓ Beating FD' : '✗ Below FD';
+    fdEl.style.color= beatFD ? 'var(--green)'  : 'var(--red)';
+  }
+
+  // ── Winners / Losers panels ────────────────────────────────────────────────
+  const statRow = (label, val, col) =>
+    '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);">'
+    + '<span style="font-size:12px;color:var(--text3);">' + label + '</span>'
+    + '<span style="font-size:12px;font-weight:600;color:' + (col||'var(--text)') + ';font-family:DM Mono,monospace;">' + val + '</span>'
+    + '</div>';
+
+  const avgWin  = winners.length ? winners.reduce((s,t)=>s+t.net,0)/winners.length : 0;
+  const avgLoss = losers.length  ? losers.reduce((s,t)=>s+t.net,0)/losers.length   : 0;
+  const avgWinDays = winners.length ? winners.reduce((s,t)=>s+t.days,0)/winners.length : 0;
+  const avgLossDays= losers.length  ? losers.reduce((s,t)=>s+t.days,0)/losers.length  : 0;
+  const avgWinPct  = winners.length ? winners.reduce((s,t)=>s+t.retPct,0)/winners.length : 0;
+  const avgLossPct = losers.length  ? losers.reduce((s,t)=>s+t.retPct,0)/losers.length  : 0;
+
+  const winnersEl = document.getElementById('st_winners');
+  if (winnersEl) winnersEl.innerHTML = winners.length === 0 ? '<div style="color:var(--text3);font-size:12px;padding:8px 0;">No winners yet</div>'
+    : statRow('Count', winners.length + ' trades', 'var(--green)')
+    + statRow('Avg net profit', '+₹'+avgWin.toFixed(0), 'var(--green)')
+    + statRow('Avg return %', '+'+avgWinPct.toFixed(2)+'%', 'var(--green)')
+    + statRow('Avg days held', avgWinDays.toFixed(1)+' days');
+
+  const losersEl = document.getElementById('st_losers');
+  if (losersEl) losersEl.innerHTML = losers.length === 0 ? '<div style="color:var(--green);font-size:12px;padding:8px 0;">No losses yet 🎉</div>'
+    : statRow('Count', losers.length + ' trades', 'var(--red)')
+    + statRow('Avg net loss', '₹'+avgLoss.toFixed(0), 'var(--red)')
+    + statRow('Avg return %', avgLossPct.toFixed(2)+'%', 'var(--red)')
+    + statRow('Avg days held', avgLossDays.toFixed(1)+' days');
+
+  // ── R-Multiple bar chart ───────────────────────────────────────────────────
+  const rChartEl = document.getElementById('st_rChart');
+  if (rChartEl && validR.length > 0) {
+    const recent = validR.slice(-20); // last 20 trades
+    const W = 560, H = 120, PAD_L = 36, PAD_R = 10, PAD_T = 16, PAD_B = 24;
+    const plotW = W - PAD_L - PAD_R;
+    const maxAbs = Math.max(...recent.map(t => Math.abs(t.actualR)), 2);
+    const barW  = Math.max(6, Math.floor(plotW/recent.length*0.65));
+    const gap   = plotW / recent.length;
+    const zeroY = PAD_T + (H-PAD_T-PAD_B)/2;
+
+    let svg = '<svg width="100%" viewBox="0 0 '+W+' '+H+'" style="display:block;">';
+    // Zero line + reference lines
+    svg += '<line x1="'+PAD_L+'" y1="'+zeroY+'" x2="'+(W-PAD_R)+'" y2="'+zeroY+'" stroke="var(--border)" stroke-width="1.5"/>';
+    // 1R and 2R lines
+    [{r:1,lbl:'1R'},{r:2,lbl:'2R'}].forEach(ref => {
+      const ry = (zeroY - ref.r/maxAbs*((H-PAD_T-PAD_B)/2)).toFixed(1);
+      svg += '<line x1="'+PAD_L+'" y1="'+ry+'" x2="'+(W-PAD_R)+'" y2="'+ry+'" stroke="var(--green)" stroke-width="0.8" stroke-dasharray="3,3" opacity="0.5"/>';
+      svg += '<text x="'+(PAD_L-2)+'" y="'+(parseFloat(ry)+3)+'" text-anchor="end" font-size="9" fill="var(--green)" font-family="DM Mono,monospace">'+ref.lbl+'</text>';
+    });
+
+    recent.forEach((t, i) => {
+      const r    = t.actualR;
+      const col  = r >= 0 ? '#1e7a4e' : '#c0392b';
+      const barH = Math.abs(r)/maxAbs * ((H-PAD_T-PAD_B)/2);
+      const x    = PAD_L + i*gap + gap/2 - barW/2;
+      const y    = r >= 0 ? zeroY-barH : zeroY;
+      svg += '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+barW+'" height="'+barH.toFixed(1)+'" fill="'+col+'" rx="2" opacity="0.85"/>';
+      // Symbol label
+      svg += '<text x="'+(x+barW/2).toFixed(1)+'" y="'+(H-PAD_B+13)+'" text-anchor="middle" font-size="8" fill="var(--text3)" font-family="DM Sans,sans-serif">'+t.sym.slice(0,5)+'</text>';
+      // R value on bar
+      if (barH > 12) {
+        const lblY = r >= 0 ? (y+barH/2+3).toFixed(1) : (y+barH/2+3).toFixed(1);
+        svg += '<text x="'+(x+barW/2).toFixed(1)+'" y="'+lblY+'" text-anchor="middle" font-size="8" fill="white" font-family="DM Mono,monospace">'+(r>=0?'+':'')+r.toFixed(1)+'</text>';
+      }
+    });
+    svg += '</svg>';
+    rChartEl.innerHTML = svg;
+    if (validR.length > 20) {
+      rChartEl.insertAdjacentHTML('afterend', '<div style="font-size:10px;color:var(--text3);margin-top:4px;">Showing last 20 of '+validR.length+' trades</div>');
+    }
+  } else if (rChartEl) {
+    rChartEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:8px 0;">Not enough data — ensure SL is set on trades</div>';
+  }
+
+  // ── Monthly P&L chart ──────────────────────────────────────────────────────
+  const mEl = document.getElementById('st_monthlyChart');
+  if (mEl) {
+    const monthMap = {};
+    tradeData.forEach(t => {
+      const key = t.exitDate.slice(0,7);
+      monthMap[key] = (monthMap[key]||0) + t.net;
+    });
+    const months = Object.keys(monthMap).sort().slice(-8);
+    if (months.length) {
+      const vals = months.map(m => monthMap[m]);
+      const maxAbs = Math.max(...vals.map(Math.abs), 1);
+      const W=560,H=140,PAD_L=50,PAD_R=12,PAD_T=16,PAD_B=28;
+      const plotW=W-PAD_L-PAD_R, plotH=H-PAD_T-PAD_B;
+      const barW=Math.floor(plotW/months.length*0.6), gap=plotW/months.length;
+      const zeroY=PAD_T+plotH/2;
+      let svg='<svg width="100%" viewBox="0 0 '+W+' '+H+'" style="display:block;">';
+      svg+='<line x1="'+PAD_L+'" y1="'+zeroY+'" x2="'+(W-PAD_R)+'" y2="'+zeroY+'" stroke="var(--border)" stroke-width="1.5"/>';
+      months.forEach((m,i) => {
+        const val=monthMap[m], barH=Math.abs(val)/maxAbs*(plotH/2-4);
+        const x=PAD_L+i*gap+gap/2-barW/2, y=val>=0?zeroY-barH:zeroY;
+        const col=val>=0?'#1e7a4e':'#c0392b';
+        svg+='<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+barW+'" height="'+barH.toFixed(1)+'" fill="'+col+'" rx="3" opacity="0.85"/>';
+        svg+='<text x="'+(x+barW/2).toFixed(1)+'" y="'+(val>=0?y-4:y+barH+12).toFixed(1)+'" text-anchor="middle" font-size="9" fill="'+col+'" font-family="DM Mono,monospace" font-weight="600">'+(val>=0?'+':'-')+'₹'+Math.abs(val).toFixed(0)+'</text>';
+        svg+='<text x="'+(x+barW/2).toFixed(1)+'" y="'+(H-PAD_B+14)+'" text-anchor="middle" font-size="9" fill="var(--text3)" font-family="DM Sans,sans-serif">'+new Date(m+'-15').toLocaleDateString('en-IN',{month:'short',year:'2-digit'})+'</text>';
+      });
+      svg+='<text x="'+(PAD_L-4)+'" y="'+(PAD_T+6)+'" text-anchor="end" font-size="9" fill="var(--text3)" font-family="DM Mono,monospace">+₹'+maxAbs.toFixed(0)+'</text>';
+      svg+='<text x="'+(PAD_L-4)+'" y="'+(zeroY+3)+'" text-anchor="end" font-size="9" fill="var(--text3)" font-family="DM Mono,monospace">0</text>';
+      svg+='<text x="'+(PAD_L-4)+'" y="'+(H-PAD_B-2)+'" text-anchor="end" font-size="9" fill="var(--text3)" font-family="DM Mono,monospace">-₹'+maxAbs.toFixed(0)+'</text>';
+      svg+='</svg>';
+      mEl.innerHTML = svg;
+    } else {
+      mEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:8px 0;">No monthly data yet</div>';
+    }
+  }
+
+  // ── Best / Worst trades ────────────────────────────────────────────────────
+  const sortedByNet = [...tradeData].sort((a,b) => b.net - a.net);
+  const best  = sortedByNet[0];
+  const worst = sortedByNet[sortedByNet.length-1];
+
+  const tradeSummaryHTML = (t, col) =>
+    '<div style="font-size:13px;font-weight:700;color:'+col+';font-family:DM Mono,monospace;margin-bottom:8px;">'+t.sym+'</div>'
+    + statRow('Net P&L', (t.net>=0?'+':'-')+'₹'+Math.abs(t.net).toFixed(0), col)
+    + statRow('Return %', (t.retPct>=0?'+':'')+t.retPct.toFixed(2)+'%', col)
+    + statRow('Entry → Exit', '₹'+t.entry+' → ₹'+t.exit)
+    + statRow('Days held', t.days+' trading days')
+    + (t.actualR !== null ? statRow('R achieved', (t.actualR>=0?'+':'')+t.actualR.toFixed(2)+'R', col) : '');
+
+  const bestEl = document.getElementById('st_best');
+  if (bestEl) bestEl.innerHTML = best  ? tradeSummaryHTML(best,  'var(--green)') : '—';
+  const worstEl = document.getElementById('st_worst');
+  if (worstEl) worstEl.innerHTML = worst ? tradeSummaryHTML(worst, 'var(--red)')   : '—';
+
+  // ── Exit quality ───────────────────────────────────────────────────────────
+  const eqEl = document.getElementById('st_exitQuality');
+  if (eqEl && validR.length > 0) {
+    const hitTarget    = validR.filter(t => t.plannedR && t.actualR >= t.plannedR * 0.9).length;
+    const exitedEarly  = validR.filter(t => t.plannedR && t.actualR > 0 && t.actualR < t.plannedR * 0.9).length;
+    const stoppedOut   = validR.filter(t => t.actualR !== null && t.actualR < 0).length;
+    const total        = validR.length;
+
+    const pct = n => (n/total*100).toFixed(0)+'%';
+    const barHtml = (label, count, col) => {
+      const pctVal = count/total*100;
+      return '<div style="margin-bottom:10px;">'
+        + '<div style="display:flex;justify-content:space-between;margin-bottom:3px;">'
+        + '<span style="font-size:12px;color:var(--text2);">'+label+'</span>'
+        + '<span style="font-size:12px;font-weight:600;color:'+col+';font-family:DM Mono,monospace;">'+count+' trades ('+pct(count)+')</span>'
+        + '</div>'
+        + '<div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;">'
+        + '<div style="height:100%;width:'+pctVal.toFixed(0)+'%;background:'+col+';border-radius:4px;transition:width 0.4s;"></div>'
+        + '</div></div>';
+    };
+
+    const avgActualR = validR.reduce((s,t)=>s+t.actualR,0)/validR.length;
+    const avgPlannedR= validR.filter(t=>t.plannedR).reduce((s,t)=>s+(t.plannedR||0),0)/validR.filter(t=>t.plannedR).length;
+
+    eqEl.innerHTML =
+      barHtml('Hit target (≥ 90% of planned R)', hitTarget,   'var(--green)')
+      + barHtml('Exited early (won but left money)', exitedEarly, 'var(--orange)')
+      + barHtml('Stopped out (loss)',                stoppedOut,  'var(--red)')
+      + '<div style="margin-top:12px;padding:10px 12px;background:var(--surface2);border-radius:8px;font-size:12px;color:var(--text2);line-height:1.8;">'
+      + '<strong>Avg planned R:R:</strong> 1:' + (avgPlannedR||0).toFixed(2)
+      + ' &nbsp;·&nbsp; <strong>Avg actual R achieved:</strong> ' + (avgActualR>=0?'+':'')+avgActualR.toFixed(2)+'R'
+      + (avgActualR < avgPlannedR*0.7 && avgPlannedR > 0
+         ? '<br/><span style="color:var(--orange);">⚠️ Consistently exiting before planned target — consider holding longer.</span>'
+         : avgActualR >= avgPlannedR*0.9
+         ? '<br/><span style="color:var(--green);">✓ Holding to target — excellent discipline.</span>'
+         : '')
+      + '</div>';
+  } else if (eqEl) {
+    eqEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:8px 0;">Not enough data — ensure SL and Target are set on trades</div>';
+  }
 }
 
 </script>
