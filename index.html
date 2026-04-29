@@ -691,6 +691,7 @@
         <div id="r_allocation" style="font-size:13px;color:var(--text2);line-height:1.7;">
           Enter your values above to see allocation breakdown.
         </div>
+        <div id="r_capital_check" style="display:none;margin-top:8px;"></div>
       </div>
 
       <div class="card">
@@ -716,18 +717,18 @@
         <div id="pyramid_result" style="margin-top:4px;"></div>
       </div>
       <div class="card">
-        <div class="card-title">📋 Save as Sunday Plan</div>
-        <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Lock in your plan from Sunday. On Monday morning enter the actual open price to get instant go/no-go.</div>
-        <button class="btn btn-secondary" onclick="saveSundayPlan()" style="width:100%;">💾 Save Plan for Monday</button>
+        <div class="card-title">📋 Save as Trade Plan</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Lock in your trade plan any day. Enter the actual open price on entry day to get instant go/no-go.</div>
+        <button class="btn btn-secondary" onclick="saveSundayPlan()" style="width:100%;">💾 Save Plan</button>
       </div>
     </div>
   </div>
 
-  <!-- Sunday Plans List -->
+  <!-- Trade Plans List -->
   <div id="sundayPlansWrap" style="margin-top:16px;">
     <div class="section-head">
-      <div class="section-title">📋 Monday Plans</div>
-      <div style="font-size:12px;color:var(--text3);">Enter Monday open price → get go/no-go instantly</div>
+      <div class="section-title">📋 Trade Plans</div>
+      <div style="font-size:12px;color:var(--text3);">Enter next-day open price → get go/no-go instantly</div>
     </div>
     <div id="sundayPlansList"></div>
   </div>
@@ -1095,7 +1096,7 @@
             </div></div>
             <div class="guide-step"><div class="step-num">4</div><div>
               <div class="step-title">Enter qty and price → Place order</div>
-              <div class="step-desc">Qty from Risk Calculator. Price = your planned entry from Sunday plan. Confirm and place.</div>
+              <div class="step-desc">Qty from Risk Calculator. Price = your planned entry from trade plan. Confirm and place.</div>
             </div></div>
             <div class="guide-step"><div class="step-num">5</div><div>
               <div class="step-title">Verify buy executed</div>
@@ -1731,6 +1732,85 @@ const NSE_STOCKS = {
   'DELHIVERY':   'Delhivery Ltd',
   'INDIGO':      'InterGlobe Aviation',
   'SULA':        'Sula Vineyards',
+
+  // ── Missing Nifty 50 / Next 50 / common NSE stocks ────────────────────────
+  'IOCL':        'Indian Oil Corporation',
+  'HPCL':        'Hindustan Petroleum Corp',
+  'GAIL':        'GAIL India',
+  'MRF':         'MRF Ltd',
+  'INFY':        'Infosys',
+  'IOB':         'Indian Overseas Bank',
+  'UNIONBANK':   'Union Bank of India',
+  'IDBI':        'IDBI Bank',
+  'IDFC':        'IDFC Ltd',
+  'IDFCFIRSTB':  'IDFC First Bank',
+  'RBLBANK':     'RBL Bank',
+  'BANDHANBNK':  'Bandhan Bank',
+  'AUBANK':      'AU Small Finance Bank',
+  'UJJIVANSFB':  'Ujjivan Small Finance Bank',
+  'FINPIPE':     'Finolex Industries',
+  'FINOLEXCAB':  'Finolex Cables',
+  'CASTROLIND':  'Castrol India',
+  'GSPL':        'Gujarat State Petronet',
+  'PETRONET':    'Petronet LNG',
+  'GUJGASLTD':   'Gujarat Gas',
+  'IGL':         'Indraprastha Gas',
+  'MGL':         'Mahanagar Gas',
+  'CONCOR':      'Container Corp of India',
+  'GMRINFRA':    'GMR Airports Infra',
+  'NIACL':       'New India Assurance',
+  'GICRE':       'GIC Re',
+  'HDFCAMC':     'HDFC Asset Management',
+  'NAM-INDIA':   'Nippon India AMC',
+  '360ONE':      '360 One WAM',
+  'ANGELONE':    'Angel One',
+  'CDSL':        'Central Depository Services',
+  'BSE':         'BSE Ltd',
+  'MCX':         'Multi Commodity Exchange',
+  'IRFC':        'Indian Railway Finance Corp',
+  'KPITTECH':    'KPIT Technologies',
+  'PERSISTENT':  'Persistent Systems',
+  'MPHASIS':     'Mphasis Ltd',
+  'LTIM':        'LTIMindtree',
+  'COFORGE':     'Coforge Ltd',
+  'ZEEL':        'Zee Entertainment',
+  'SUNTVNETWORK':'Sun TV Network',
+  'PVRINOX':     'PVR Inox Ltd',
+  'INOXGREEN':   'INOX Green Energy',
+  'KAYNES':      'Kaynes Technology',
+  'DIXON':       'Dixon Technologies',
+  'AMBER':       'Amber Enterprises',
+  'VOLTAS':      'Voltas Ltd',
+  'BLUESTARCO':  'Blue Star Ltd',
+  'WHIRLPOOL':   'Whirlpool of India',
+  'GODREJIND':   'Godrej Industries',
+  'GODREJPROP':  'Godrej Properties',
+  'OBEROIRLTY':  'Oberoi Realty',
+  'PRESTIGE':    'Prestige Estates',
+  'PHOENIXLTD':  'Phoenix Mills',
+  'SOBHA':       'Sobha Ltd',
+  'BRIGADE':     'Brigade Enterprises',
+  'ABBOTINDIA':  'Abbott India',
+  'PFIZER':      'Pfizer Ltd',
+  'GLAXO':       'GSK Pharma',
+  'ASTRAZEN':    'AstraZeneca Pharma',
+  'ALKEM':       'Alkem Laboratories',
+  'IPCALAB':     'IPCA Laboratories',
+  'NATCOPHARM':  'Natco Pharma',
+  'GRANULES':    'Granules India',
+  'SEQUENT':     'SeQuent Scientific',
+  'MAXHEALTH':   'Max Healthcare',
+  'FORTIS':      'Fortis Healthcare',
+  'NHPC':        'NHPC Ltd',
+  'SJVN':        'SJVN Ltd',
+  'CESC':        'CESC Ltd',
+  'TORNTPOWER':  'Torrent Power',
+  'JSL':         'Jindal Stainless',
+  'JSWENERGY':   'JSW Energy',
+  'WELCORP':     'Welspun Corp',
+  'RATNAMANI':   'Ratnamani Metals',
+  'APL':         'APL Apollo Tubes',
+  'APLLTD':      'APL Apollo Tubes',
 };
 
 const DEFAULT_PRESET = [
@@ -3313,6 +3393,16 @@ function prefillRisk(sym, price) {
 }
 
 // ═══════════════════ RISK CALCULATOR ═══════════════════
+
+// ── Returns available (free) capital after locked trades + plans ─────────────
+function getFreeCapital(totalCapital) {
+  var lockedTrades = trades.filter(function(t) { return !t.exit; })
+    .reduce(function(sum, t) { return sum + (t.entry * t.qty); }, 0);
+  var lockedPlans  = plans.filter(function(p) { return p.status === 'pending'; })
+    .reduce(function(sum, p) { return sum + (p.entry * p.qty); }, 0);
+  return Math.max(0, totalCapital - lockedTrades - lockedPlans);
+}
+
 function calcRisk() {
   const capital = +document.getElementById('r_capital').value || 0;
   const riskPct = +document.getElementById('r_riskPct').value || 2;
@@ -3382,14 +3472,68 @@ function calcRisk() {
     if (cWrap) cWrap.style.display = 'none';
   }
 
-  // Allocation
+  // ── Capital availability check ──────────────────────────────────────────────
+  // Risk is always sized on TOTAL capital (professional standard).
+  // But we separately check if you have enough FREE cash to actually buy the shares.
+  var capCheckEl = document.getElementById('r_capital_check');
+
   if (qty && deployed) {
-    const pctUsed = (deployed / capital * 100).toFixed(1);
-    document.getElementById('r_allocation').innerHTML = `
-      You'd deploy <strong>₹${deployed.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} (${pctUsed}%)</strong> of your capital on this trade.<br/>
-      Remaining capital: <strong>₹${(capital - deployed).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</strong> — keep 50%+ in reserve.<br/>
-      Max concurrent trades at this size: <strong>${Math.floor(capital / deployed)}</strong>
-    `;
+    var freeCapital   = getFreeCapital(capital);
+    var shortfall     = deployed - freeCapital;
+    var pctOfTotal    = (deployed / capital * 100).toFixed(1);
+    var pctOfFree     = freeCapital > 0 ? (deployed / freeCapital * 100).toFixed(1) : '—';
+    var maxQtyFree    = freeCapital > 0 && entry > 0 ? Math.floor(freeCapital / entry) : 0;
+    var fmt           = function(n) { return '₹' + Math.round(Math.abs(n)).toLocaleString('en-IN'); };
+
+    // Allocation breakdown (always shown)
+    document.getElementById('r_allocation').innerHTML =
+      'Risk sizing: 2% of <strong>' + fmt(capital) + ' total capital</strong> = <strong>' + fmt(capital * riskPct / 100) + ' max loss</strong><br/>'
+      + 'Capital needed: <strong>' + fmt(deployed) + '</strong> (' + pctOfTotal + '% of total)<br/>'
+      + 'Free capital now: <strong style="color:' + (freeCapital >= deployed ? 'var(--green)' : 'var(--red)') + ';">' + fmt(freeCapital) + '</strong>'
+      + ' (after open trades + plans)';
+
+    // Capital check warning (conditional)
+    if (capCheckEl) {
+      if (freeCapital <= 0) {
+        capCheckEl.style.display = 'block';
+        capCheckEl.innerHTML =
+          '<div style="padding:10px 12px;background:var(--red-bg);border-radius:8px;border-left:3px solid var(--red);">'
+          + '<div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:4px;">🔴 No free capital available</div>'
+          + '<div style="font-size:12px;color:var(--red);line-height:1.6;">All your capital is locked in open trades and plans. Wait for an existing position to close before entering a new trade.</div>'
+          + '</div>';
+      } else if (shortfall > 0) {
+        // Can't afford full qty — suggest reduced qty
+        var reducedRisk   = maxQtyFree * (entry - sl);
+        var reducedRRStr  = (target && reducedRisk > 0) ? '1:' + ((target - entry) * maxQtyFree / reducedRisk).toFixed(2) : '—';
+        capCheckEl.style.display = 'block';
+        capCheckEl.innerHTML =
+          '<div style="padding:10px 12px;background:var(--orange-bg);border-radius:8px;border-left:3px solid var(--orange);">'
+          + '<div style="font-size:12px;font-weight:700;color:var(--orange);margin-bottom:6px;">⚠️ Insufficient free capital for full position</div>'
+          + '<div style="display:grid;gap:4px;margin-bottom:8px;">'
+          + '<div style="display:flex;justify-content:space-between;font-size:12px;"><span style="color:var(--text3);">Need</span><span style="color:var(--red);font-weight:600;font-family:DM Mono,monospace;">' + fmt(deployed) + '</span></div>'
+          + '<div style="display:flex;justify-content:space-between;font-size:12px;"><span style="color:var(--text3);">Available</span><span style="color:var(--green);font-weight:600;font-family:DM Mono,monospace;">' + fmt(freeCapital) + '</span></div>'
+          + '<div style="display:flex;justify-content:space-between;font-size:12px;border-top:1px solid var(--border);padding-top:4px;"><span style="color:var(--text3);">Shortfall</span><span style="color:var(--red);font-weight:700;font-family:DM Mono,monospace;">-' + fmt(shortfall) + '</span></div>'
+          + '</div>'
+          + (maxQtyFree > 0
+            ? '<div style="padding:8px 10px;background:var(--surface);border-radius:6px;font-size:12px;color:var(--text2);line-height:1.7;">'
+              + '<strong>Alternative:</strong> Buy <strong>' + maxQtyFree + ' shares</strong> instead of ' + qty + ' (fits your free capital).<br/>'
+              + 'Max loss: <strong>' + fmt(reducedRisk) + '</strong>'
+              + (target ? ' · R:R: <strong>' + reducedRRStr + '</strong>' : '')
+              + '<br/><span style="color:var(--text3);">Note: Risk % on total capital drops to ' + (reducedRisk / capital * 100).toFixed(2) + '% — still within safe limits.</span>'
+              + '</div>'
+            : '<div style="font-size:12px;color:var(--red);">Not enough free capital to buy even 1 share at ₹' + entry.toFixed(2) + '.</div>')
+          + '</div>';
+      } else {
+        // Sufficient capital — show green confirmation
+        capCheckEl.style.display = 'block';
+        capCheckEl.innerHTML =
+          '<div style="padding:8px 12px;background:var(--green-bg);border-radius:8px;border-left:3px solid var(--green);font-size:12px;color:var(--green);">'
+          + '✓ Free capital sufficient — ' + fmt(freeCapital) + ' available, need ' + fmt(deployed) + '.'
+          + '</div>';
+      }
+    }
+  } else {
+    if (capCheckEl) capCheckEl.style.display = 'none';
   }
 }
 
@@ -3515,7 +3659,7 @@ function saveSundayPlan() {
   plans.unshift(plan);
   savePlans();
   renderSundayPlans();
-  alert('Plan saved for ' + sym + '! On Monday morning, enter the open price below to get your go/no-go decision.');
+  alert('Plan saved for ' + sym + '! Enter the open price on the day of entry to get your go/no-go decision.');
 }
 
 function deletePlan(id) {
@@ -3547,7 +3691,7 @@ function markPlan(id, status) {
         date:     new Date().toISOString().split('T')[0],
         exit:     null,
         exitDate: null,
-        notes:    'From Sunday plan · Planned entry ₹' + p.entry + (execPrice !== p.entry ? ' · Executed at ₹' + execPrice : '')
+        notes:    'From trade plan · Planned entry ₹' + p.entry + (execPrice !== p.entry ? ' · Executed at ₹' + execPrice : '')
       };
       trades.unshift(trade);
       saveTrades();
@@ -3703,7 +3847,7 @@ function renderSundayPlans() {
   const done    = plans.filter(p => p.status !== 'pending');
 
   if (!plans.length) {
-    wrap.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text3);font-size:13px;">No plans saved yet. Use the Risk Calculator on Sunday evening and click "Save Plan for Monday".</div>';
+    wrap.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text3);font-size:13px;">No plans saved yet. Use the Risk Calculator and click "Save Plan" any day.</div>';
     return;
   }
 
@@ -3755,7 +3899,7 @@ function renderSundayPlans() {
       + (isDone ? '' :
         '<div style="display:flex;align-items:center;gap:8px;">'
         + '<label style="font-size:12px;color:var(--text2);white-space:nowrap;font-weight:500;text-transform:none;letter-spacing:0;">Monday open ₹</label>'
-        + '<input type="number" id="mon_' + p.id + '" placeholder="Enter open price" style="flex:1;" oninput="checkMonday(' + p.id + ')"/>'
+        + '<input type="number" id="mon_' + p.id + '" placeholder="Enter next open price" style="flex:1;" oninput="checkMonday(' + p.id + ')"/>'
         + '</div>'
         + '<div id="monResult_' + p.id + '"></div>'
       )
