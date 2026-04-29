@@ -1477,6 +1477,8 @@
     <div class="stat-box"><div class="stat-value" id="pf_invested">—</div><div class="stat-label">Total Invested</div></div>
     <div class="stat-box"><div class="stat-value" id="pf_gross">—</div><div class="stat-label">Gross P&amp;L</div></div>
     <div class="stat-box"><div class="stat-value" id="pf_net">—</div><div class="stat-label">Net P&amp;L (after charges)</div></div>
+    <div class="stat-box"><div class="stat-value" id="pf_retpct">—</div><div class="stat-label">Portfolio Return %</div></div>
+    <div class="stat-box"><div class="stat-value" id="pf_cagr">—</div><div class="stat-label">Ann. Return % (simple)</div><div style="font-size:10px;color:var(--text3);margin-top:2px;" id="pf_vsfd">vs FD 7%: —</div></div>
   </div>
 
   <!-- Header -->
@@ -1494,7 +1496,7 @@
 
   <!-- Charges note -->
   <div style="margin-top:12px;padding:10px 14px;background:var(--surface2);border-radius:var(--radius-sm);font-size:12px;color:var(--text3);line-height:1.6;">
-    💡 <strong>Zerodha delivery charges included:</strong> STT 0.1% on sell · NSE exchange 0.00297% · Stamp 0.015% on buy · CDSL DP ₹15.93 per sell · SEBI ₹10/crore · GST 18% on exchange+SEBI. Brokerage ₹0.
+    💡 <strong>Ann. Return note:</strong> Simple linear annualisation — no compounding. Directly comparable to FD rate (7%). Meaningful after 5+ trading days. &nbsp;|&nbsp; <strong>Zerodha charges:</strong> STT 0.1% on sell · NSE exchange 0.00297% · Stamp 0.015% on buy · CDSL DP ₹15.93 per sell · SEBI ₹10/crore · GST 18% on exchange+SEBI. Brokerage ₹0.
   </div>
 </div>
 
@@ -3895,7 +3897,7 @@ function renderPortfolioStatic() {
     const barColor = progress === null ? 'var(--border)' : progress >= 75 ? 'var(--green)' : 'var(--accent)';
 
     // P&L + charges
-    let grossPL = null, charges = null, netPL = null;
+    let grossPL = null, charges = null, netPL = null, retPct = null, cagr = null;
     if (cur) {
       hasPrices = true;
       grossPL  = (cur - t.entry) * t.qty;
@@ -3903,6 +3905,16 @@ function renderPortfolioStatic() {
       netPL    = grossPL - charges;
       totalGross   += grossPL;
       totalCharges += charges;
+      // % return on invested capital (net)
+      retPct = netPL / invested * 100;
+      // Simple annualised return: retPct × (365 ÷ days held)
+      // Linear scaling — no compounding. Directly comparable to FD rate.
+      if (tradingDays >= 1) {
+        cagr = retPct * (365 / tradingDays);
+        // Cap at ±9999% — just for display sanity on very short trades
+        if (cagr > 9999) cagr = 9999;
+        if (cagr < -9999) cagr = -9999;
+      }
     }
 
     const plColor    = netPL === null ? 'var(--text3)' : netPL >= 0 ? 'var(--green)' : 'var(--red)';
@@ -3928,6 +3940,21 @@ function renderPortfolioStatic() {
       <td class="mono" style="color:${grossPL!==null?(grossPL>=0?'var(--green)':'var(--red)'):'var(--text3)'};font-weight:600;">${grossPL !== null ? fmtINR(grossPL) : '—'}</td>
       <td class="mono" style="color:var(--orange);font-size:11px;">${charges !== null ? '-₹'+charges.toFixed(0) : '—'}</td>
       <td class="mono" style="color:${plColor};font-weight:700;font-size:14px;">${netPL !== null ? fmtINR(netPL) : '—'}</td>
+      <td class="mono" style="color:${retPct!==null?(retPct>=0?'var(--green)':'var(--red)'):'var(--text3)'};font-weight:600;">
+        ${retPct !== null ? (retPct>=0?'+':'')+retPct.toFixed(1)+'%' : '—'}
+      </td>
+      <td class="mono" style="font-size:11px;">
+        ${cagr !== null ? (() => {
+          const FD_RATE = 7;
+          const beat = cagr >= FD_RATE;
+          const diff = Math.abs(cagr - FD_RATE).toFixed(0);
+          const col  = beat ? 'var(--green)' : 'var(--red)';
+          const sign = cagr >= 0 ? '+' : '';
+          const diffSign = beat ? '+' : '-';
+          return '<span style=\"color:'+col+';font-weight:700;\">'+sign+cagr.toFixed(0)+'%</span>'
+            + '<br/><span style=\"font-size:9px;color:'+col+';">'+diffSign+diff+'pp vs FD</span>';
+        })() : '—'}
+      </td>
       <td style="color:${dayColor};font-size:12px;font-weight:600;">D${tradingDays}</td>
       <td>
         <button class="btn btn-sm btn-secondary" title="Pyramid add" onclick="pfPyramid('${t.sym}',${t.entry},${t.sl},${t.tgt||0},${t.qty})" style="font-size:14px;">△</button>
@@ -3937,16 +3964,57 @@ function renderPortfolioStatic() {
 
   // Update summary
   if (hasPrices) {
-    const totalNet = totalGross - totalCharges;
-    const gi = document.getElementById('pf_gross');
-    const ni = document.getElementById('pf_net');
-    gi.textContent = fmtINR(totalGross);
-    gi.style.color = totalGross >= 0 ? 'var(--green)' : 'var(--red)';
-    ni.textContent = fmtINR(totalNet);
-    ni.style.color = totalNet >= 0 ? 'var(--green)' : 'var(--red)';
+    const totalNet      = totalGross - totalCharges;
+    const totalInvested2 = open.reduce((s, t) => s + t.entry * t.qty, 0);
+    // Portfolio-level % return on invested capital (net)
+    const portRetPct    = totalInvested2 > 0 ? (totalNet / totalInvested2 * 100) : null;
+    // Weighted average trading days across open positions
+    const avgDays       = open.reduce((s, t) => {
+      let d = 0; let dd = new Date(t.date); const today = new Date();
+      while (dd <= today) { if (dd.getDay()!==0&&dd.getDay()!==6) d++; dd=new Date(dd.getTime()+86400000); }
+      return s + Math.max(0, d-1);
+    }, 0) / (open.length || 1);
+    // Portfolio simple annualised return
+    const portCAGR = portRetPct !== null && avgDays >= 1
+      ? Math.min(9999, Math.max(-9999, portRetPct * (365 / avgDays)))
+      : null;
+
+    const setEl = (id, val, col) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.innerHTML = val;
+      if (col) el.style.color = col;
+    };
+
+    setEl('pf_gross',  fmtINR(totalGross),  totalGross >= 0 ? 'var(--green)' : 'var(--red)');
+    setEl('pf_net',    fmtINR(totalNet),     totalNet   >= 0 ? 'var(--green)' : 'var(--red)');
+
+    if (portRetPct !== null) {
+      const retCol = portRetPct >= 0 ? 'var(--green)' : 'var(--red)';
+      setEl('pf_retpct', (portRetPct>=0?'+':'')+portRetPct.toFixed(2)+'%', retCol);
+    }
+    if (portCAGR !== null) {
+      const FD = 7;
+      const beat = portCAGR >= FD;
+      const diff = Math.abs(portCAGR - FD).toFixed(0);
+      const cagrCol = beat ? 'var(--green)' : 'var(--red)';
+      const diffSign = beat ? '+' : '-';
+      setEl('pf_cagr',
+        (portCAGR>=0?'+':'')+portCAGR.toFixed(0)+'% p.a.',
+        cagrCol
+      );
+      // Update vs FD label
+      const vsFdEl = document.getElementById('pf_vsfd');
+      if (vsFdEl) {
+        vsFdEl.textContent = 'vs FD 7%: ' + diffSign + diff + 'pp';
+        vsFdEl.style.color = cagrCol;
+      }
+    }
   } else {
-    document.getElementById('pf_gross').textContent = '—';
-    document.getElementById('pf_net').textContent   = '—';
+    ['pf_gross','pf_net','pf_retpct','pf_cagr'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.textContent = '—'; el.style.color = ''; }
+    });
   }
 
   el.innerHTML = `<div class="tbl-wrap">
@@ -3954,7 +4022,7 @@ function renderPortfolioStatic() {
       <thead><tr>
         <th>Symbol</th><th>Qty</th><th>Entry / SL</th><th>Invested</th>
         <th>Live Price</th><th>Gross P&L</th><th>Charges</th>
-        <th>Net P&L</th><th>Days</th><th>△</th>
+        <th>Net P&L</th><th>Return %</th><th title="Simple annualised return vs FD 7%">Ann. Return</th><th>Days</th><th>△</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
