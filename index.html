@@ -4551,42 +4551,7 @@ function renderJournal() {
     else if (t.exit > t.entry) { status = '✅ Win'; statusClass = 'status-win'; }
     else { status = '❌ Loss'; statusClass = 'status-loss'; }
 
-    // ── Potential outcomes ───────────────────────────────────────────────────
-    var potProfit = null, potLoss = null, currentR = null;
-    if (t.tgt && t.sl) {
-      var planRisk  = (t.entry - t.sl) * t.qty;
-      var chAtTgt   = calcCharges(invested, t.tgt * t.qty);
-      var chAtSL    = calcCharges(invested, t.sl  * t.qty);
-      potProfit = (t.tgt  - t.entry) * t.qty - chAtTgt.total;
-      potLoss   = (t.entry - t.sl)   * t.qty + chAtSL.total;
-    }
-    if (cur && t.sl && (t.entry - t.sl) > 0) {
-      currentR = (cur - t.entry) / (t.entry - t.sl);
-    }
-
-    // ── Health badge ─────────────────────────────────────────────────────────
-    var health = '', healthCol = '';
-    if (cur) {
-      if (cur <= t.sl)               { health = '🔴 At SL';             healthCol = 'var(--red)'; }
-      else if (tradingDays >= 15)    { health = '🔴 Day '+tradingDays+' exit'; healthCol = 'var(--red)'; }
-      else if (cur < t.entry)        { health = '🟠 Below entry';       healthCol = 'var(--orange)'; }
-      else if (tradingDays >= 10)    { health = '🟡 Day '+tradingDays;  healthCol = 'var(--orange)'; }
-      else if (t.tgt && cur >= t.tgt * 0.98) { health = '🎯 Near target'; healthCol = 'var(--green)'; }
-      else if (progress !== null && progress >= 50) { health = '🟢 On track'; healthCol = 'var(--green)'; }
-      else                           { health = '🟢 Active';            healthCol = 'var(--green)'; }
-    }
-
-    var potProfitStr = potProfit !== null
-      ? '<span style="color:var(--green);font-weight:600;">+₹'+Math.round(potProfit).toLocaleString('en-IN')+'</span>' : '—';
-    var potLossStr   = potLoss !== null
-      ? '<span style="color:var(--red);font-weight:600;">-₹'+Math.round(potLoss).toLocaleString('en-IN')+'</span>' : '—';
-    var plannedR     = (t.tgt && t.sl && (t.entry-t.sl)>0) ? ((t.tgt-t.entry)/(t.entry-t.sl)).toFixed(2) : '—';
-    var currentRStr  = currentR !== null
-      ? '<span style="color:'+(currentR>=1?'var(--green)':currentR>=0?'var(--orange)':'var(--red)')+';font-weight:700;">'+(currentR>=0?'+':'')+currentR.toFixed(2)+'R</span>'
-        +'<br/><span style="font-size:10px;color:var(--text3);">of '+plannedR+'R planned</span>'
-      : '—';
-
-        return `<tr>
+    return `<tr>
       <td><strong class="mono">${t.sym}</strong></td>
       <td class="mono">${t.date}</td>
       <td class="mono">₹${t.entry.toFixed(2)}</td>
