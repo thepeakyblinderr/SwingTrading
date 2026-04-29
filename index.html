@@ -620,7 +620,8 @@
           </div>
           <div>
             <label>Stop-Loss Price (₹)</label>
-            <input type="number" id="r_sl" placeholder="e.g. 232.00" oninput="calcRisk()"/>
+            <input type="number" id="r_sl" placeholder="e.g. 232.00" oninput="calcRisk(); var n=document.getElementById('r_sl_note'); if(n) n.style.display='none';"/>
+            <div id="r_sl_note" style="display:none;"></div>
           </div>
           <div>
             <label>Target Price (₹) — optional</label>
@@ -869,7 +870,7 @@
             <div class="guide-step">
               <div class="step-num">4</div>
               <div><div class="step-title">Set Entry, SL &amp; Target</div>
-              <div class="step-desc">Buy on breakout. SL below recent swing low. Target = 2x–3x the SL distance. Minimum 1:2 R:R.</div></div>
+              <div class="step-desc">Buy on breakout. SL at confirmed swing low (app auto-calculates via ⚖️ button — verify on chart). Target = nearest swing high resistance or 2:1 R:R minimum.</div></div>
             </div>
             <div class="guide-step">
               <div class="step-num">5</div>
@@ -911,7 +912,7 @@
             <div style="display:flex;align-items:center;gap:8px;"><span style="width:22px;height:22px;background:var(--accent);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">4</span> Risk Calc → check R:R ≥ 1:2</div>
             <div style="display:flex;align-items:center;gap:8px;"><span style="width:22px;height:22px;background:var(--accent);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">5</span> Kite → Buy (CNC) + OCO GTT immediately</div>
             <div style="display:flex;align-items:center;gap:8px;"><span style="width:22px;height:22px;background:var(--accent);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">6</span> Journal → log trade + write reason</div>
-            <div style="display:flex;align-items:center;gap:8px;"><span style="width:22px;height:22px;background:var(--accent);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">7</span> Sunday review → trail SL or plan exit</div>
+            <div style="display:flex;align-items:center;gap:8px;"><span style="width:22px;height:22px;background:var(--accent);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">7</span> Weekly review → trail SL if needed or plan exit</div>
           </div>
         </div>
       </div>
@@ -931,7 +932,7 @@
             <strong>EMA Pullback</strong><br/>Stock dips to 20 EMA on low volume then bounces with a green candle. Buy on the bounce candle.
           </div>
           <div style="padding:10px;background:var(--green-bg);border-radius:8px;border:1px solid #b8e0cc;color:var(--green);">
-            <strong>Gap Up</strong><br/>Stock opens 2%+ above previous close with high volume. Buy after 15 minutes if price holds.
+            <strong>Gap Up</strong><br/>Stock opens above previous close with volume. The Trade Plans tab runs a 5-tier check: SL distance, live R:R, gap %. A gap >5% is auto NO-GO regardless of setup.
           </div>
           <div style="padding:10px;background:var(--red-bg);border-radius:8px;border:1px solid #f5c6c2;color:var(--red);">
             <strong>Never buy</strong> just because score is 70+. Wait for an actual trigger candle on the chart.
@@ -942,7 +943,7 @@
         <div class="card-title">📍 Stop-Loss Placement Guide</div>
         <div style="display:grid;gap:10px;font-size:13px;color:var(--text2);">
           <div style="padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
-            🕯️ <strong>Candle SL (best):</strong> Below the low of the last 3–5 days. Respects market structure.
+            🕯️ <strong>Swing Low SL (best):</strong> Below the most recent confirmed swing low — a candle whose low is lower than both neighbours. App auto-calculates this with 0.5×ATR buffer when you tap ⚖️.
           </div>
           <div style="padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
             📉 <strong>EMA SL:</strong> Below the 20 EMA. Works well for pullback entries.
@@ -976,7 +977,7 @@
       <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px;">3 mandatory exits — no flexibility</div>
       <div style="display:grid;gap:8px;margin-bottom:14px;">
         <div style="padding:10px;background:var(--red-bg);border-radius:8px;border-left:3px solid var(--red);color:var(--text);">
-          <strong style="color:var(--red);">SL hit</strong> — Exit immediately. Groww auto-sells. Never cancel your SL hoping it recovers.
+          <strong style="color:var(--red);">SL hit</strong> — Exit immediately. Your OCO GTT SL leg handles this automatically. Never cancel your GTT hoping it recovers.
         </div>
         <div style="padding:10px;background:var(--orange-bg);border-radius:8px;border-left:3px solid var(--orange);color:var(--text);">
           <strong style="color:var(--orange);">Close below 20 EMA</strong> — Exit next morning open. Momentum broken even if SL not hit.
@@ -993,15 +994,15 @@
         </div>
         <div style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--green-bg);border-radius:8px;color:var(--green);">
           <span style="font-family:'DM Mono',monospace;font-size:12px;font-weight:600;min-width:36px;">50%</span>
-          <span>Halfway to target → move SL to entry price. Risk = ₹0 now.</span>
+          <span>Halfway to target → edit OCO GTT in Kite: update SL leg trigger to your entry price. Risk = ₹0 now.</span>
         </div>
         <div style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--green-bg);border-radius:8px;color:var(--green);">
           <span style="font-family:'DM Mono',monospace;font-size:12px;font-weight:600;min-width:36px;">75%</span>
-          <span>75% of target → move SL to lock in 50% of profit.</span>
+          <span>75% of target → edit OCO GTT in Kite: update SL leg trigger to the 50% level. Locks profit.</span>
         </div>
         <div style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--green-bg);border-radius:8px;color:var(--green);">
           <span style="font-family:'DM Mono',monospace;font-size:12px;font-weight:600;min-width:36px;">100%</span>
-          <span>Target hit → cancel SL, place limit sell. Exit clean.</span>
+          <span>Target hit → your OCO GTT target leg fires automatically. Approve CDSL TPIN notification in Kite. No manual action needed.</span>
         </div>
       </div>
     </div>
@@ -1037,7 +1038,7 @@
           <div class="guide-step">
             <div class="step-num">1</div>
             <div><div class="step-title">Is price above 20 EMA?</div>
-            <div class="step-desc">Open TradingView → daily chart → EMA 20. Friday's candle above the line? Yes = hold. No = exit Monday open.</div></div>
+            <div class="step-desc">Open TradingView → daily chart → EMA 20. Latest candle above the line? Yes = hold. No = exit on next open day.</div></div>
           </div>
           <div class="guide-step">
             <div class="step-num">2</div>
@@ -1058,7 +1059,7 @@
           <div class="card-title">✅ Sunday Checklist</div>
           <div id="guideChecklist" style="display:grid;gap:6px;font-size:13px;">
             <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;"><input type="checkbox" style="margin-top:2px;width:auto;"/> Reviewed all open trades on TradingView (EMA + RSI)</label>
-            <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;"><input type="checkbox" style="margin-top:2px;width:auto;"/> Updated trailing SL in Groww if needed</label>
+            <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;"><input type="checkbox" style="margin-top:2px;width:auto;"/> Updated trailing SL in Kite GTT if needed (edit OCO GTT → update SL trigger)</label>
             <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;"><input type="checkbox" style="margin-top:2px;width:auto;"/> Refreshed Discover heat — noted top 2 sectors</label>
             <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;"><input type="checkbox" style="margin-top:2px;width:auto;"/> Ran screener — shortlisted 2–3 candidates</label>
             <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;"><input type="checkbox" style="margin-top:2px;width:auto;"/> Confirmed candidates on TradingView chart</label>
@@ -1070,7 +1071,7 @@
         <div class="card">
           <div class="card-title">📍 Friday 3:20 PM (2 min check)</div>
           <div style="font-size:13px;color:var(--text2);display:grid;gap:8px;">
-            <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">Is SL order still active in Groww? Check Orders tab.</div>
+            <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">Is OCO GTT still active in Kite? Check GTT tab — should show status Active.</div>
             <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">RSI still above 50 on my open trades?</div>
             <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">Am I within 2–3% of target? Place sell order.</div>
             <div style="padding:8px 10px;background:var(--orange-bg);border-radius:8px;border:1px solid #f0c070;color:var(--orange);">During the week: do NOT check during the day. Your SL handles it.</div>
@@ -1121,7 +1122,7 @@
             </div></div>
             <div class="guide-step"><div class="step-num">11</div><div>
               <div class="step-title">Log exit in Journal</div>
-              <div class="step-desc">SwingTrader → Journal tab → find trade → tap Exit → enter actual exit price → P&amp;L auto-calculates. Mark as Win or Loss.</div>
+              <div class="step-desc">SwingTrader → Journal tab → find trade → tap Exit → enter actual exit price → P&amp;L and R:R auto-calculate. Stats tab updates automatically.</div>
             </div></div>
             <div class="guide-step"><div class="step-num">12</div><div>
               <div class="step-title">Update capital in Settings</div>
@@ -1187,7 +1188,7 @@
         </div>
         <div style="padding:10px;background:var(--surface2);border-radius:8px;text-align:center;border:1px solid var(--border);">
           <div style="font-size:18px;margin-bottom:4px;">2️⃣</div>
-          <strong>Mon 9:30 AM</strong><br/>
+          <strong>Entry day AM</strong><br/>
           <span style="color:var(--text2);">Check open price → GO/NO-GO</span>
         </div>
         <div style="padding:10px;background:var(--green-bg);border-radius:8px;text-align:center;border:1px solid #b8e0cc;">
@@ -1260,7 +1261,7 @@
         <div style="padding:8px 10px;background:var(--green-bg);border-radius:8px;color:var(--green);font-size:12px;">R:R passes 1:2 minimum. You tap Send to Journal.</div>
       </div>
       <div id="sim3" class="sim-panel" style="display:none;">
-        <div style="font-size:11px;color:var(--text3);margin-bottom:8px;font-weight:600;text-transform:uppercase;">Mon 14 Oct · 9:42 AM — Groww orders</div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:8px;font-weight:600;text-transform:uppercase;">Mon 14 Oct · 9:42 AM — Kite orders</div>
         <div style="display:grid;gap:6px;font-size:12px;">
           <div style="padding:8px 10px;background:var(--green-bg);border-radius:8px;color:var(--green);border:1px solid #b8e0cc;">9:42 AM — Buy Limit placed: BEL · CNC · 34 qty · ₹282.40</div>
           <div style="padding:8px 10px;background:var(--green-bg);border-radius:8px;color:var(--green);border:1px solid #b8e0cc;">9:44 AM — Buy executed ✓ · ₹9,601 deployed</div>
@@ -1277,12 +1278,12 @@
           <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text2);">Unrealised P&amp;L</span><span style="font-family:'DM Mono',monospace;color:var(--green);">+₹828</span></div>
           <div style="display:flex;justify-content:space-between;padding:5px 0;"><span style="color:var(--text2);">Action</span><span style="color:var(--orange);font-size:12px;">At 50% target → move SL to ₹282</span></div>
         </div>
-        <div style="padding:8px 10px;background:var(--orange-bg);border-radius:8px;color:var(--orange);font-size:12px;">You update SL in Groww from ₹268 → ₹282. Now risk-free trade.</div>
+        <div style="padding:8px 10px;background:var(--orange-bg);border-radius:8px;color:var(--orange);font-size:12px;">You edit OCO GTT in Kite: update SL trigger from ₹268 → ₹282. Now risk-free trade.</div>
       </div>
       <div id="sim5" class="sim-panel" style="display:none;">
         <div style="font-size:11px;color:var(--text3);margin-bottom:8px;font-weight:600;text-transform:uppercase;">4 Nov 2024 — BEL at ₹311.50, near target</div>
         <div style="display:grid;gap:6px;font-size:12px;margin-bottom:10px;">
-          <div style="padding:8px 10px;background:var(--orange-bg);border-radius:8px;color:var(--orange);">2:15 PM — Cancel SL order in Groww Orders tab first</div>
+          <div style="padding:8px 10px;background:var(--orange-bg);border-radius:8px;color:var(--orange);">2:15 PM — Kite: GTT target leg fires automatically at target price</div>
           <div style="padding:8px 10px;background:var(--green-bg);border-radius:8px;color:var(--green);">2:17 PM — Limit sell: ₹311.50 · CNC · 34 qty</div>
           <div style="padding:8px 10px;background:var(--green-bg);border-radius:8px;color:var(--green);">2:19 PM — Sold ✓ ₹10,591 received</div>
         </div>
@@ -1312,7 +1313,7 @@
               <div style="padding:6px 10px;background:var(--surface2);border-radius:6px;font-size:12px;">40–55 = Neutral — weak, wait</div>
               <div style="padding:6px 10px;background:var(--red-bg);border-radius:6px;font-size:12px;color:var(--red);">Below 50 = Exit warning for open trades</div>
             </div>
-            <div><strong style="color:var(--text);">In the app:</strong> Score capped at 60 if RSI above 70. Trade Monitor warns if RSI drops below 50.</div>
+            <div><strong style="color:var(--text);">In the app:</strong> Score capped at 60 if RSI above 70. Trade Monitor warns if RSI drops below 50. Screener chart shows RSI as a purple line in the sub-panel below candles — sweet spot (55–70) highlighted in green.</div>
           </div>
         </div>
         <div class="card" style="margin-bottom:12px;">
@@ -1352,8 +1353,9 @@
             <div><strong style="color:var(--text);">How calculated:</strong> True Range each day = biggest of (High−Low), |High−Prev Close|, |Low−Prev Close|. ATR = average of last 14 days.</div>
             <div><strong style="color:var(--text);">Why better than % SL:</strong> A 5% SL ignores actual volatility. ATR respects how each stock actually moves.</div>
             <div style="display:grid;gap:4px;">
-              <div style="padding:6px 10px;background:var(--surface2);border-radius:6px;font-size:12px;"><strong>1.5× ATR SL</strong> — tighter, for low volatility stocks (ATR% below 2%)</div>
-              <div style="padding:6px 10px;background:var(--surface2);border-radius:6px;font-size:12px;"><strong>2× ATR SL</strong> — wider, for high volatility stocks (ATR% above 4%)</div>
+              <div style="padding:6px 10px;background:var(--green-bg);border-radius:6px;font-size:12px;color:var(--green);"><strong>Primary use:</strong> Buffer below swing low SL = 0.5×ATR. Adapts to each stock's actual daily movement.</div>
+              <div style="padding:6px 10px;background:var(--surface2);border-radius:6px;font-size:12px;"><strong>Fallback SL:</strong> Entry − 1.5×ATR when no valid swing low found</div>
+              <div style="padding:6px 10px;background:var(--surface2);border-radius:6px;font-size:12px;"><strong>Rule of thumb:</strong> If ATR% > 4% (high vol stock), the SL will be further away — check that R:R still ≥ 1:2</div>
             </div>
             <div style="padding:8px 10px;background:var(--orange-bg);border-radius:6px;font-size:12px;color:var(--orange);"><strong>Example:</strong> BEL ₹282, ATR ₹11<br/>1.5× ATR SL = ₹282 − ₹16.50 = ₹265.50<br/>Better than guessing 5% = ₹268</div>
             <div style="display:grid;gap:4px;">
@@ -1361,7 +1363,7 @@
               <div style="padding:6px 10px;background:var(--orange-bg);border-radius:6px;font-size:12px;color:var(--orange);">ATR% 2–4% = medium, normal for midcaps</div>
               <div style="padding:6px 10px;background:var(--red-bg);border-radius:6px;font-size:12px;color:var(--red);">ATR% above 4% = high volatility, use 2× ATR SL</div>
             </div>
-            <div><strong style="color:var(--text);">In the app:</strong> ATR column in screener. Chart shows 1.5× and 2× ATR SL levels below the candles.</div>
+            <div><strong style="color:var(--text);">In the app:</strong> ATR column in screener (value + % of price). When you tap ⚖️ on a screener result, ATR is used as a buffer (0.5×ATR) below the confirmed swing low to set SL. If no valid swing low found, falls back to 1.5×ATR SL directly.</div>
           </div>
         </div>
         <div class="card" style="margin-bottom:12px;">
@@ -1392,6 +1394,55 @@
         </div>
       </div>
     </div>
+
+
+        <!-- ── NEW CONCEPT CARDS ── -->
+        <div class="card" style="margin-bottom:12px;">
+          <div class="card-title">🔽 Swing Low — What it is and why it matters for SL</div>
+          <div style="display:grid;gap:8px;font-size:13px;color:var(--text2);">
+            <div><strong style="color:var(--text);">Definition:</strong> A candle whose low is lower than both the candle before it AND the candle after it. A genuine local minimum in price — not just the lowest candle in a range.</div>
+            <div style="padding:8px 10px;background:var(--surface2);border-radius:6px;font-size:12px;">
+              Candle A: low ₹330 &nbsp;→&nbsp; Candle B: low <strong>₹318</strong> &nbsp;→&nbsp; Candle C: low ₹325<br/>
+              Candle B is a swing low ✓ (both neighbours higher)
+            </div>
+            <div><strong style="color:var(--text);">Why it makes a better SL than % SL:</strong> A swing low is where price actually found support — buyers stepped in there before. If price breaks below it, the market is saying that support is gone. That's when your trade thesis is invalid.</div>
+            <div style="display:grid;gap:4px;">
+              <div style="padding:6px 10px;background:var(--green-bg);border-radius:6px;font-size:12px;color:var(--green);">SL at swing low = technically meaningful support level</div>
+              <div style="padding:6px 10px;background:var(--red-bg);border-radius:6px;font-size:12px;color:var(--red);">SL at arbitrary % = random level with no market logic</div>
+            </div>
+            <div><strong style="color:var(--text);">In the app:</strong> When you tap ⚖️, the app scans last 20 candles for confirmed swing lows below your entry, picks the highest valid one (tightest support), adds a 0.5×ATR buffer below it. Always verify it on the TradingView chart before saving.</div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:12px;">
+          <div class="card-title">📐 R-Multiple — Measuring trade quality</div>
+          <div style="display:grid;gap:8px;font-size:13px;color:var(--text2);">
+            <div><strong style="color:var(--text);">What it is:</strong> R = your initial risk per share (Entry − SL). R-Multiple = how many R's you made or lost on a trade.</div>
+            <div style="padding:8px 10px;background:var(--surface2);border-radius:6px;font-size:12px;">
+              Entry ₹282 · SL ₹268 · Exit ₹310<br/>
+              R = ₹14 &nbsp;·&nbsp; Gain = ₹28 &nbsp;·&nbsp; R-Multiple = <strong>+2R</strong>
+            </div>
+            <div style="display:grid;gap:4px;">
+              <div style="padding:6px 10px;background:var(--green-bg);border-radius:6px;font-size:12px;color:var(--green);">+2R = hit full target ✓ trade went as planned</div>
+              <div style="padding:6px 10px;background:var(--orange-bg);border-radius:6px;font-size:12px;color:var(--orange);">+0.8R = exited early (profitable but left money behind)</div>
+              <div style="padding:6px 10px;background:var(--red-bg);border-radius:6px;font-size:12px;color:var(--red);">-1R = SL hit (lost exactly your planned risk)</div>
+            </div>
+            <div><strong style="color:var(--text);">Why track it:</strong> R-multiple tells you if you're executing your plan or cutting winners short. If your planned R:R was 1:2 but average actual R is +0.6, you're consistently exiting too early.</div>
+            <div><strong style="color:var(--text);">In the app:</strong> Stats tab shows avg R-multiple, R-multiple bar chart per trade, and exit quality analysis comparing planned vs actual R.</div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:12px;">
+          <div class="card-title">📅 Annualised Return — Comparing to FD</div>
+          <div style="display:grid;gap:8px;font-size:13px;color:var(--text2);">
+            <div><strong style="color:var(--text);">What it is:</strong> If your trade returned +4.5% in 10 days, annualised return = 4.5% × (365 ÷ 10) = <strong>+164% per year</strong>. Linear scaling — no compounding assumed.</div>
+            <div><strong style="color:var(--text);">Why compare to FD:</strong> A bank FD gives ~7% per year. Swing trading only makes sense if your annualised return meaningfully beats this — otherwise you'd be better off in a FD with zero risk.</div>
+            <div style="display:grid;gap:4px;">
+              <div style="padding:6px 10px;background:var(--green-bg);border-radius:6px;font-size:12px;color:var(--green);">Ann. return > 7% = beating FD ✓</div>
+              <div style="padding:6px 10px;background:var(--red-bg);border-radius:6px;font-size:12px;color:var(--red);">Ann. return < 7% = underperforming FD</div>
+            </div>
+            <div style="padding:8px 10px;background:var(--orange-bg);border-radius:6px;font-size:12px;color:var(--orange);">Note: Meaningful only after 5+ trading days. A 1-day trade annualises to absurd numbers — ignore until trade has had time to develop.</div>
+            <div><strong style="color:var(--text);">In the app:</strong> Portfolio tab shows Ann. Return per trade and a ✓ Beats FD / ✗ Below FD badge. Stats tab shows portfolio-level annualised return.</div>
+          </div>
+        </div>
 
     <!-- Sector Notes -->
     <div style="margin-top:4px;">
@@ -2408,6 +2459,7 @@ async function fetchPriceData(symbol) {
 
 
 let _scoredBaskets = [];
+let _screenerCache = {}; // sym → full result object from last screen run
 
 function renderSectorHeat() {
   const container = document.getElementById('discoverSectors');
@@ -2942,6 +2994,8 @@ async function runScreener() {
       </td></tr>`;
   } else {
     results.sort((a, b) => b.score - a.score);
+    // Cache full result objects for smart prefill
+    results.forEach(function(r) { _screenerCache[r.symbol] = r; });
     renderScreenerResults(results);
   }
 
@@ -3389,14 +3443,166 @@ function prefillRiskWithSL(sym, price, sl, tgt) {
   switchTab('risk', tabs[2]);
 }
 
+// ── SL calculation helpers ────────────────────────────────────────────────────
+function calcSwingLowSL(candles, entry, atr) {
+  // A proper swing low = candle[i].low < candle[i-1].low AND candle[i].low < candle[i+1].low
+  // We search the last 20 candles for confirmed swing lows below entry,
+  // then take the most recent one that is below entry.
+  // Buffer = 0.5 × ATR (volatility-adjusted, not arbitrary %)
+  if (!candles || candles.length < 5) return null;
+
+  var last20 = candles.slice(-20);
+  var swingLows = [];
+
+  for (var i = 1; i < last20.length - 1; i++) {
+    var prev = last20[i - 1].l;
+    var curr = last20[i].l;
+    var next = last20[i + 1].l;
+    // Confirmed swing low: both neighbours have higher lows
+    if (curr < prev && curr < next) {
+      swingLows.push(curr);
+    }
+  }
+
+  // Filter to only swing lows BELOW entry (must be a valid support below current price)
+  var validLows = swingLows.filter(function(low) { return low < entry; });
+  if (!validLows.length) return null;
+
+  // Take the highest valid swing low (most recent meaningful support, tightest SL)
+  var bestLow = Math.max.apply(null, validLows);
+
+  // Buffer = 0.5 × ATR (if ATR available), else 0.5% of price
+  var buffer = atr ? (0.5 * atr) : (bestLow * 0.005);
+  var sl = parseFloat((bestLow - buffer).toFixed(2));
+
+  // Final guard: SL must be below entry and not too tight (< 0.5%) or too loose (> 10%)
+  var distPct = (entry - sl) / entry * 100;
+  if (sl >= entry || distPct < 0.5 || distPct > 10) return null;
+
+  return sl;
+}
+
+function calcATRSL(entry, atr) {
+  // Entry - (1.5 × ATR14) — standard ATR-based SL
+  if (!atr || atr <= 0) return null;
+  return parseFloat((entry - 1.5 * atr).toFixed(2));
+}
+
+function calcSwingHighTarget(candles, entry, sl, atr) {
+  // A proper swing high = candle[i].high > candle[i-1].high AND candle[i].high > candle[i+1].high
+  // Search last 30 candles (wider lookback for resistance — relevant levels can be older)
+  // Buffer below swing high = 0.5 × ATR (volatility-adjusted exit zone)
+  if (!candles || candles.length < 5) return null;
+
+  var lookback = candles.slice(-30);
+  var swingHighs = [];
+
+  for (var i = 1; i < lookback.length - 1; i++) {
+    var prev = lookback[i - 1].h;
+    var curr = lookback[i].h;
+    var next = lookback[i + 1].h;
+    // Confirmed swing high: both neighbours have lower highs
+    if (curr > prev && curr > next) {
+      swingHighs.push(curr);
+    }
+  }
+
+  // Filter to only swing highs meaningfully above entry (at least 1% above)
+  var above = swingHighs
+    .filter(function(h) { return h > entry * 1.01; })
+    .sort(function(a, b) { return a - b; }); // ascending — nearest first
+
+  if (above.length > 0) {
+    // Buffer = 0.5 × ATR below the swing high (where price typically stalls)
+    var buffer = atr ? (0.5 * atr) : (above[0] * 0.005);
+    var tgt    = parseFloat((above[0] - buffer).toFixed(2));
+
+    // Verify target is still meaningfully above entry and gives R:R >= 1.5
+    var risk = sl ? (entry - sl) : (entry * 0.05);
+    var rr   = (tgt - entry) / risk;
+    if (tgt > entry && rr >= 1.5) return tgt;
+  }
+
+  // Fallback: clean 2:1 R:R from SL
+  var risk2 = sl ? (entry - sl) : (entry * 0.05);
+  return parseFloat((entry + 2 * risk2).toFixed(2));
+}
+
 function prefillRisk(sym, price) {
+  // Clear any previous override
+  var overrideEl = document.getElementById('r_qty_override');
+  if (overrideEl) overrideEl.value = '';
+
+  // Set symbol and entry
   document.getElementById('r_symbol').value = sym;
-  document.getElementById('r_entry').value = price;
-  document.getElementById('r_sl').value = (price * 0.95).toFixed(2);
-  document.getElementById('r_target').value = (price * 1.10).toFixed(2);
+  document.getElementById('r_entry').value  = price;
+
+  // Try to get cached screener data for smart SL/target
+  var r       = _screenerCache[sym];
+  var atr     = r ? r.atr     : null;
+  var candles = r ? r.chartCandles : null;
+
+  // ── Calculate both SL options ─────────────────────────────────────────────
+  var slSwing = calcSwingLowSL(candles, price, atr);
+  var slATR   = calcATRSL(price, atr);
+
+  // Choose best SL: prefer swing low if available and > ATR SL (tighter is better)
+  // but reject if SL is too close (< 1% from entry) — would get wicked immediately
+  var sl = null;
+  var slMethod = '';
+
+  if (slSwing && slATR) {
+    var swingDist = (price - slSwing) / price * 100;
+    var atrDist   = (price - slATR)   / price * 100;
+    if (swingDist >= 1.0 && swingDist <= 8.0) {
+      sl = slSwing; slMethod = 'swing low';
+    } else if (atrDist >= 1.0 && atrDist <= 8.0) {
+      sl = slATR; slMethod = 'ATR×1.5';
+    } else {
+      // Both out of range — use whichever is closer to 3%
+      sl = Math.abs(swingDist - 3) < Math.abs(atrDist - 3) ? slSwing : slATR;
+      slMethod = sl === slSwing ? 'swing low' : 'ATR×1.5';
+    }
+  } else if (slSwing) {
+    sl = slSwing; slMethod = 'swing low';
+  } else if (slATR) {
+    sl = slATR; slMethod = 'ATR×1.5';
+  } else {
+    sl = parseFloat((price * 0.95).toFixed(2)); slMethod = '5% fallback';
+  }
+
+  // ── Calculate target ──────────────────────────────────────────────────────
+  var tgt = calcSwingHighTarget(candles, price, sl, atr);
+  // Verify R:R ≥ 1.5, else use 2:1 from SL
+  var risk = price - sl;
+  if (!tgt || (tgt - price) / risk < 1.5) {
+    tgt = parseFloat((price + 2 * risk).toFixed(2));
+  }
+
+  document.getElementById('r_sl').value     = sl;
+  document.getElementById('r_target').value = tgt;
   calcRisk();
-  const tabs = document.querySelectorAll('.tab-btn');
+
+  // Switch to Risk tab
+  var tabs = document.querySelectorAll('.tab-btn');
   switchTab('risk', tabs[2]);
+
+  // Show SL method note after short delay (DOM needs to render first)
+  setTimeout(function() {
+    var noteEl = document.getElementById('r_sl_note');
+    if (noteEl) {
+      var slPct   = ((price - sl) / price * 100).toFixed(1);
+      var tgtPct  = ((tgt - price) / price * 100).toFixed(1);
+      var altSL   = slMethod === 'swing low' && slATR ? '· ATR SL alt: ₹' + slATR : (slMethod === 'ATR×1.5' && slSwing ? '· Swing SL alt: ₹' + slSwing : '');
+      noteEl.innerHTML =
+        '<div style="padding:8px 12px;background:var(--orange-bg);border-radius:8px;font-size:12px;color:var(--orange);line-height:1.7;margin-top:6px;">'
+        + '⚡ Auto-calculated from screener data · SL method: <strong>' + slMethod + '</strong> (' + slPct + '% below entry) ' + altSL
+        + '<br/>Target: nearest swing high or 2:1 R:R (' + tgtPct + '% above entry)'
+        + '<br/><span style="color:var(--text3);">Always verify on chart before saving plan.</span>'
+        + '</div>';
+      noteEl.style.display = 'block';
+    }
+  }, 100);
 }
 
 // ═══════════════════ RISK CALCULATOR ═══════════════════
@@ -4688,7 +4894,8 @@ function renderStats() {
     days = Math.max(1, days - 1);
 
     // R-Multiple: actual gain / initial risk per share
-    const riskPerShare  = t.entry - t.sl;
+    // Guard: SL must be set and > 0 and < entry, else R is meaningless
+    const riskPerShare  = (t.sl && t.sl > 0 && t.sl < t.entry) ? (t.entry - t.sl) : 0;
     const actualR       = riskPerShare > 0 ? (t.exit - t.entry) / riskPerShare : null;
     // Planned R:R
     const plannedR      = (t.tgt && riskPerShare > 0) ? (t.tgt - t.entry) / riskPerShare : null;
