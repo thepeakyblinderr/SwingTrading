@@ -3436,176 +3436,195 @@ function drawChart(idx, container) {
     return;
   }
 
-  // Use last 45 candles — less cramped, more readable
-  const candles = r.chartCandles.slice(-45);
-  const W = Math.max(container.offsetWidth || 600, 320);
-  const H = 260;
-  const VBAR_H = 40;
-  const PAD_L = 54; const PAD_R = 14; const PAD_T = 16; const PAD_B = 8;
-  const plotW = W - PAD_L - PAD_R;
-  const plotH = H - PAD_T - PAD_B - VBAR_H;
-  // RSI sub-panel constants
-  const RSI_H   = 64;
-  const RSI_GAP = 10;
-  const RSI_TOP = H - PAD_B + RSI_GAP;
-  const H_TOTAL = RSI_TOP + RSI_H + 20;
-  function rsiPY(v) { return RSI_TOP + RSI_H * (1 - Math.max(0,Math.min(100,v))/100); }
+  const candles  = r.chartCandles.slice(-45);
+  const closes   = candles.map(c => c.c);
+  const W        = Math.max(container.offsetWidth || 600, 320);
+  const H        = 260;
+  const VBAR_H   = 40;
+  const PAD_L    = 58; const PAD_R = 14; const PAD_T = 28; const PAD_B = 8;
+  const plotW    = W - PAD_L - PAD_R;
+  const plotH    = H - PAD_T - PAD_B - VBAR_H;
+  const RSI_H    = 64;
+  const RSI_GAP  = 10;
+  const RSI_TOP  = H - PAD_B + RSI_GAP;
+  const H_TOTAL  = RSI_TOP + RSI_H + 24;
 
-  const prices = candles.flatMap(c => [c.h, c.l]);
-  const minP = Math.min(...prices);
-  const maxP = Math.max(...prices);
-  const priceRange = maxP - minP || 1;
-
-  const maxVol = Math.max(...candles.map(c => c.v)) || 1;
-
-  const n = candles.length;
-  const gap     = Math.floor(plotW / n);
-  const candleW = Math.max(3, gap - 2); // minimum 3px wide, with 2px gap between
-
-  // EMA arrays over closes
-  const closes = candles.map(c => c.c);
   const ema20arr = calcEMAArray(closes, 20);
   const ema50arr = calcEMAArray(closes, 50);
-  const rsiArr14  = calcRSIArray(closes.map(c => c.c), 14);
+  const rsiArr14 = calcRSIArray(closes, 14);
 
-  // SL: use 1.5× ATR below current price if ATR available, else swing low
+  // SL / Target levels
   const recentLows = candles.slice(-10).map(c => c.l);
   const swingLowSL = Math.min(...recentLows) * 0.995;
   const atrSL      = r.atr ? (r.price - r.atr * 1.5) : null;
-  // Use ATR SL if it's tighter than swing low SL (more precise)
   const suggestSL  = atrSL && atrSL > swingLowSL ? atrSL : swingLowSL;
   const slMethod   = atrSL && atrSL > swingLowSL ? 'ATR' : 'Swing';
-  const suggestTgt = r.price + (r.price - suggestSL) * 2;
+  const suggestTgt = r.price + 2 * (r.price - suggestSL);
+  const entryPrice = r.price;
 
-  function px(i) { return PAD_L + i * gap + gap / 2; }
-  function py(price) { return PAD_T + plotH - ((price - minP) / priceRange * plotH); }
-  function vy(vol)   { return H - PAD_B - (vol / maxVol * VBAR_H); }
+  // Price range for Y axis
+  const allPrices = candles.flatMap(c => [c.h, c.l]).concat([suggestSL, suggestTgt]);
+  const minP = Math.min(...allPrices) * 0.997;
+  const maxP = Math.max(...allPrices) * 1.003;
+  const priceRange = maxP - minP || 1;
+
+  const py      = p  => PAD_T + plotH * (1 - (p - minP) / priceRange);
+  const px      = i  => PAD_L + (i / (candles.length - 1 || 1)) * plotW;
+  const rsiPY   = v  => RSI_TOP + RSI_H * (1 - Math.max(0, Math.min(100, v)) / 100);
+
+  const candleW = Math.max(3, Math.floor(plotW / candles.length * 0.65));
+
+  // Trend direction: last 10 vs first 10 closes
+  const avgFirst = closes.slice(0, 10).reduce((a,b)=>a+b,0)/10;
+  const avgLast  = closes.slice(-10).reduce((a,b)=>a+b,0)/10;
+  const trendUp  = avgLast > avgFirst;
+  const trendLabel = trendUp ? '📈 Uptrend' : '📉 Downtrend';
+  const trendCol   = trendUp ? '#1e7a4e' : '#7a1e1e';
 
   let svg = '<svg width="100%" viewBox="0 0 ' + W + ' ' + H_TOTAL + '" style="display:block;border-radius:6px;background:var(--surface);">';
 
-  // Grid lines — 5 horizontal lines
-  for (let i = 0; i <= 5; i++) {
-    const y = PAD_T + (plotH / 5) * i;
-    const price = maxP - (priceRange / 5) * i;
-    svg += '<line x1="' + PAD_L + '" y1="' + y.toFixed(1) + '" x2="' + (W - PAD_R) + '" y2="' + y.toFixed(1) + '" stroke="var(--border)" stroke-width="0.5"/>';
-    svg += '<text x="' + (PAD_L - 6) + '" y="' + (y + 3).toFixed(1) + '" text-anchor="end" font-size="10" fill="var(--text3)" font-family="DM Mono,monospace">₹' + price.toFixed(0) + '</text>';
+  // ── Trend label (top left) ─────────────────────────────────────────────────
+  svg += '<text x="' + PAD_L + '" y="16" font-size="11" font-weight="700" fill="' + trendCol + '" font-family="DM Sans,sans-serif">' + trendLabel + '</text>';
+
+  // ── Grid lines ─────────────────────────────────────────────────────────────
+  for (var gi = 0; gi <= 4; gi++) {
+    const gy = PAD_T + plotH * gi / 4;
+    const gp = maxP - priceRange * gi / 4;
+    svg += '<line x1="' + PAD_L + '" y1="' + gy.toFixed(1) + '" x2="' + (W-PAD_R) + '" y2="' + gy.toFixed(1) + '" stroke="var(--border)" stroke-width="0.5"/>';
+    svg += '<text x="' + (PAD_L-4) + '" y="' + (gy+3).toFixed(1) + '" text-anchor="end" font-size="9" fill="var(--text3)" font-family="DM Mono,monospace">₹' + gp.toFixed(0) + '</text>';
   }
 
-  // Volume bars
+  // ── Volume bars ────────────────────────────────────────────────────────────
+  const maxVol = Math.max(...candles.map(c => c.v || 0)) || 1;
   candles.forEach((c, i) => {
-    const x = px(i) - candleW / 2;
-    const vh = H - PAD_B - vy(c.v);
-    const vcol = c.c >= c.o ? '#1e7a4e44' : '#c0392b44';
-    svg += '<rect x="' + x.toFixed(1) + '" y="' + vy(c.v).toFixed(1) + '" width="' + candleW + '" height="' + vh.toFixed(1) + '" fill="' + vcol + '"/>';
+    const x   = px(i) - candleW / 2;
+    const vh  = VBAR_H * ((c.v || 0) / maxVol);
+    const vy2 = H - PAD_B - vh;
+    // Accessibility: use fill pattern instead of colour only
+    const isBull = c.c >= c.o;
+    svg += '<rect x="' + x.toFixed(1) + '" y="' + vy2.toFixed(1) + '" width="' + candleW + '" height="' + vh.toFixed(1) + '" fill="' + (isBull ? '#1e7a4e' : '#333') + '" opacity="0.35"/>';
   });
 
-  // Candles
+  // ── Candles — shape-based for colour blindness ─────────────────────────────
+  // Bullish = FILLED dark body, Bearish = HOLLOW (outline only)
   candles.forEach((c, i) => {
-    const x   = px(i);
-    const col = c.c >= c.o ? '#1e7a4e' : '#c0392b';
+    const x      = px(i);
+    const isBull = c.c >= c.o;
     const top    = py(Math.max(c.o, c.c));
     const bot    = py(Math.min(c.o, c.c));
-    const bodyH  = Math.max(1, bot - top);
-    // Wick
-    svg += '<line x1="' + x.toFixed(1) + '" y1="' + py(c.h).toFixed(1) + '" x2="' + x.toFixed(1) + '" y2="' + py(c.l).toFixed(1) + '" stroke="' + col + '" stroke-width="0.8"/>';
-    // Body
-    svg += '<rect x="' + (x - candleW / 2).toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + candleW + '" height="' + bodyH.toFixed(1) + '" fill="' + col + '"/>';
+    const bodyH  = Math.max(1.5, bot - top);
+
+    // Wick — same dark colour for all
+    svg += '<line x1="' + x.toFixed(1) + '" y1="' + py(c.h).toFixed(1) + '" x2="' + x.toFixed(1) + '" y2="' + py(c.l).toFixed(1) + '" stroke="var(--text2)" stroke-width="0.8"/>';
+
+    if (isBull) {
+      // FILLED body — clearly distinct from hollow
+      svg += '<rect x="' + (x - candleW/2).toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + candleW + '" height="' + bodyH.toFixed(1) + '" fill="var(--text)" rx="1"/>';
+    } else {
+      // HOLLOW body (outline only) — shape difference, not just colour
+      svg += '<rect x="' + (x - candleW/2).toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + candleW + '" height="' + bodyH.toFixed(1) + '" fill="none" stroke="var(--text2)" stroke-width="1.2" rx="1"/>';
+    }
   });
 
-  // EMA 20
+  // ── EMA lines — solid vs dashed (pattern, not just colour) ────────────────
+  // 20 EMA: SOLID thin line
   let ema20path = '';
   ema20arr.forEach((v, i) => {
     if (v == null) return;
     ema20path += (ema20path === '' ? 'M' : 'L') + px(i).toFixed(1) + ',' + py(v).toFixed(1) + ' ';
   });
-  if (ema20path) svg += '<path d="' + ema20path + '" fill="none" stroke="#c8722a" stroke-width="1.8" opacity="0.95"/>';
+  if (ema20path) {
+    svg += '<path d="' + ema20path + '" fill="none" stroke="#2a6bc8" stroke-width="1.5"/>';
+    // Label at end
+    const lastEma20 = ema20arr[ema20arr.length-1];
+    if (lastEma20) svg += '<text x="' + (W-PAD_R+2) + '" y="' + (py(lastEma20)+3).toFixed(1) + '" font-size="8" fill="#2a6bc8" font-family="DM Mono,monospace">20E</text>';
+  }
 
-  // EMA 50
+  // 50 EMA: DASHED line (pattern difference)
   let ema50path = '';
   ema50arr.forEach((v, i) => {
     if (v == null) return;
     ema50path += (ema50path === '' ? 'M' : 'L') + px(i).toFixed(1) + ',' + py(v).toFixed(1) + ' ';
   });
-  if (ema50path) svg += '<path d="' + ema50path + '" fill="none" stroke="#2a6bc8" stroke-width="1.8" opacity="0.95"/>';
-
-  // EMA inline labels at end of line
-  const last20 = ema20arr.filter(v => v != null).pop();
-  const last50 = ema50arr.filter(v => v != null).pop();
-  // Clamp labels within the price plot area (PAD_T to PAD_T + plotH)
-  const clamp = (y, min, max) => Math.min(Math.max(y, min), max);
-  if (last20) {
-    const ly = clamp(py(last20) - 4, PAD_T + 10, PAD_T + plotH - 4);
-    svg += '<text x="' + (PAD_L + 4) + '" y="' + ly.toFixed(1) + '" font-size="10" fill="#c8722a" font-family="DM Mono,monospace" font-weight="600">20E</text>';
-  }
-  if (last50) {
-    const ly = clamp(py(last50) + 12, PAD_T + 10, PAD_T + plotH - 4);
-    svg += '<text x="' + (PAD_L + 4) + '" y="' + ly.toFixed(1) + '" font-size="10" fill="#2a6bc8" font-family="DM Mono,monospace" font-weight="600">50E</text>';
+  if (ema50path) {
+    svg += '<path d="' + ema50path + '" fill="none" stroke="#c8722a" stroke-width="1.5" stroke-dasharray="5,3"/>';
+    const lastEma50 = ema50arr[ema50arr.length-1];
+    if (lastEma50) svg += '<text x="' + (W-PAD_R+2) + '" y="' + (py(lastEma50)+3).toFixed(1) + '" font-size="8" fill="#c8722a" font-family="DM Mono,monospace">50E</text>';
   }
 
-  // Current price line
-  svg += '<line x1="' + PAD_L + '" y1="' + py(r.price).toFixed(1) + '" x2="' + (W - PAD_R) + '" y2="' + py(r.price).toFixed(1) + '" stroke="var(--text2)" stroke-width="1" stroke-dasharray="4,3"/>';
-  svg += '<text x="' + (W - PAD_R - 2) + '" y="' + (py(r.price) - 4).toFixed(1) + '" text-anchor="end" font-size="10" fill="var(--text2)" font-family="DM Mono,monospace">₹' + r.price.toFixed(0) + '</text>';
+  // ── Entry / SL / Target price lines with ₹ labels ─────────────────────────
+  const levels = [
+    { price: suggestTgt, label: 'T ₹' + suggestTgt.toFixed(0),  col: '#1e7a4e', dash: '4,3' },
+    { price: entryPrice, label: 'E ₹' + entryPrice.toFixed(0),  col: '#2a6bc8', dash: '' },
+    { price: suggestSL,  label: slMethod + ' SL ₹' + suggestSL.toFixed(0), col: '#7a3a1e', dash: '4,3' },
+  ];
+  levels.forEach(function(lv) {
+    if (lv.price < minP || lv.price > maxP) return;
+    const ly = py(lv.price).toFixed(1);
+    svg += '<line x1="' + PAD_L + '" y1="' + ly + '" x2="' + (W-PAD_R) + '" y2="' + ly + '" stroke="' + lv.col + '" stroke-width="1" stroke-dasharray="' + lv.dash + '" opacity="0.8"/>';
+    svg += '<text x="4" y="' + (parseFloat(ly)+3) + '" font-size="9" fill="' + lv.col + '" font-family="DM Mono,monospace" font-weight="600">' + lv.label + '</text>';
+  });
 
-  // Suggest SL line
-  if (suggestSL > minP) {
-    svg += '<line x1="' + PAD_L + '" y1="' + py(suggestSL).toFixed(1) + '" x2="' + (W - PAD_R) + '" y2="' + py(suggestSL).toFixed(1) + '" stroke="#c0392b" stroke-width="1.2" stroke-dasharray="5,3" opacity="0.8"/>';
-    svg += '<text x="' + (W - PAD_R - 2) + '" y="' + (py(suggestSL) - 3).toFixed(1) + '" text-anchor="end" font-size="10" fill="#c0392b" font-family="DM Mono,monospace">SL ₹' + suggestSL.toFixed(0) + '</text>';
-  }
+  // ── Signal badges row below chart (text, no colour reliance) ──────────────
+  const sig     = r.signals || {};
+  const sigList = [
+    { label: '20EMA', pass: sig.ema20   === 'pass' },
+    { label: '50EMA', pass: sig.ema50   === 'pass' },
+    { label: 'VOL',   pass: sig.vol     === 'pass', neutral: sig.vol === 'neutral' },
+    { label: '52WH',  pass: sig.high52  === 'pass' },
+  ];
+  const badgeY = H - PAD_B + 3;
+  let bx = PAD_L;
+  sigList.forEach(function(s) {
+    const sym2 = s.pass ? '✓' : (s.neutral ? '~' : '✗');
+    const col2 = s.pass ? '#1e7a4e' : (s.neutral ? '#d4780a' : '#888');
+    const txt  = sym2 + ' ' + s.label;
+    svg += '<text x="' + bx + '" y="' + badgeY + '" font-size="9" fill="' + col2 + '" font-weight="700" font-family="DM Sans,sans-serif">' + txt + '</text>';
+    bx += txt.length * 5.5 + 8;
+  });
 
-  // Suggest Target line
-  if (suggestTgt < maxP * 1.1) {
-    const ty = py(Math.min(suggestTgt, maxP));
-    svg += '<line x1="' + PAD_L + '" y1="' + ty.toFixed(1) + '" x2="' + (W - PAD_R) + '" y2="' + ty.toFixed(1) + '" stroke="#1e7a4e" stroke-width="1.2" stroke-dasharray="5,3" opacity="0.8"/>';
-    svg += '<text x="' + (W - PAD_R - 2) + '" y="' + (ty - 3).toFixed(1) + '" text-anchor="end" font-size="10" fill="#1e7a4e" font-family="DM Mono,monospace">TGT ₹' + suggestTgt.toFixed(0) + '</text>';
-  }
-
-
-  // ── RSI Sub-panel ──────────────────────────────────────────────────────
+  // ── RSI sub-panel ─────────────────────────────────────────────────────────
   svg += '<line x1="' + PAD_L + '" y1="' + (RSI_TOP - RSI_GAP/2).toFixed(1) + '" x2="' + (W-PAD_R) + '" y2="' + (RSI_TOP - RSI_GAP/2).toFixed(1) + '" stroke="var(--border)" stroke-width="1"/>';
   svg += '<rect x="' + PAD_L + '" y="' + RSI_TOP.toFixed(1) + '" width="' + plotW + '" height="' + RSI_H + '" fill="var(--surface2)" opacity="0.4" rx="2"/>';
-  svg += '<text x="4" y="' + (RSI_TOP+10).toFixed(1) + '" font-size="9" fill="var(--text3)" font-family="DM Mono,monospace">RSI</text>';
-  [{v:70,col:'#c0392b',lbl:'70'},{v:55,col:'#1e7a4e',lbl:'55'},{v:50,col:'var(--text3)',lbl:'50'},{v:30,col:'#2a6bc8',lbl:'30'}].forEach(function(l) {
-    var ry = rsiPY(l.v).toFixed(1);
-    svg += '<line x1="' + PAD_L + '" y1="' + ry + '" x2="' + (W-PAD_R) + '" y2="' + ry + '" stroke="' + l.col + '" stroke-width="0.6" stroke-dasharray="3,2" opacity="0.7"/>';
-    svg += '<text x="' + (PAD_L-4) + '" y="' + (parseFloat(ry)+3) + '" text-anchor="end" font-size="9" fill="' + l.col + '" font-family="DM Mono,monospace">' + l.lbl + '</text>';
+
+  // Reference lines with labels
+  [{v:70,lbl:'70 OB'},{v:55,lbl:'55'},{v:50,lbl:'50'},{v:30,lbl:'30'}].forEach(function(l) {
+    const ry = rsiPY(l.v).toFixed(1);
+    const isKey = l.v === 70 || l.v === 55;
+    svg += '<line x1="' + PAD_L + '" y1="' + ry + '" x2="' + (W-PAD_R) + '" y2="' + ry + '" stroke="var(--text3)" stroke-width="0.6" stroke-dasharray="' + (l.v===55?'':'3,2') + '" opacity="0.6"/>';
+    svg += '<text x="' + (PAD_L-3) + '" y="' + (parseFloat(ry)+3) + '" text-anchor="end" font-size="9" fill="var(--text3)" font-family="DM Mono,monospace">' + l.lbl + '</text>';
   });
-  svg += '<rect x="' + PAD_L + '" y="' + rsiPY(70).toFixed(1) + '" width="' + plotW + '" height="' + (rsiPY(55)-rsiPY(70)).toFixed(1) + '" fill="#1e7a4e" opacity="0.07"/>';
-  var rsiPath14 = '';
-  rsiArr14.forEach(function(v,i){ if(v==null)return; rsiPath14+=(rsiPath14===''?'M':'L')+px(i).toFixed(1)+','+rsiPY(v).toFixed(1)+' '; });
-  if(rsiPath14) svg += '<path d="'+rsiPath14+'" fill="none" stroke="#7c3aed" stroke-width="1.6" opacity="0.9"/>';
-  var lastRSIIdx=rsiArr14.length-1; while(lastRSIIdx>=0&&rsiArr14[lastRSIIdx]==null)lastRSIIdx--;
-  if(lastRSIIdx>=0){
-    var lv=rsiArr14[lastRSIIdx],lvc=lv>=70?'#c0392b':lv>=55?'#1e7a4e':'var(--text3)';
-    svg+='<circle cx="'+px(lastRSIIdx).toFixed(1)+'" cy="'+rsiPY(lv).toFixed(1)+'" r="3" fill="'+lvc+'"/>';
-    svg+='<text x="'+(W-PAD_R-2)+'" y="'+(rsiPY(lv)-4).toFixed(1)+'" text-anchor="end" font-size="10" fill="'+lvc+'" font-family="DM Mono,monospace" font-weight="600">RSI '+lv.toFixed(1)+(lv>=70?' OB':lv>=55?' ✓':lv<50?' ✗':'')+' </text>';
+
+  // Sweet-spot shading
+  svg += '<rect x="' + PAD_L + '" y="' + rsiPY(70).toFixed(1) + '" width="' + plotW + '" height="' + (rsiPY(55)-rsiPY(70)).toFixed(1) + '" fill="#2a6bc8" opacity="0.08"/>';
+
+  // RSI line
+  let rsiPath = '';
+  rsiArr14.forEach(function(v, i) {
+    if (v == null) return;
+    rsiPath += (rsiPath === '' ? 'M' : 'L') + px(i).toFixed(1) + ',' + rsiPY(v).toFixed(1) + ' ';
+  });
+  if (rsiPath) svg += '<path d="' + rsiPath + '" fill="none" stroke="#7c3aed" stroke-width="1.6" opacity="0.9"/>';
+
+  // RSI current value — large prominent label
+  let lastRSIIdx = rsiArr14.length - 1;
+  while (lastRSIIdx >= 0 && rsiArr14[lastRSIIdx] == null) lastRSIIdx--;
+  if (lastRSIIdx >= 0) {
+    const lv  = rsiArr14[lastRSIIdx];
+    const rsiStatus = lv >= 70 ? ' OB ⚠️' : lv >= 55 ? ' ✓ Sweet spot' : lv >= 50 ? ' Neutral' : ' ✗ Weak';
+    const rsiLabelCol = lv >= 70 ? '#c0392b' : lv >= 55 ? '#1e7a4e' : 'var(--text3)';
+    svg += '<circle cx="' + px(lastRSIIdx).toFixed(1) + '" cy="' + rsiPY(lv).toFixed(1) + '" r="3" fill="' + rsiLabelCol + '"/>';
+    // Large RSI label top-right of panel
+    svg += '<text x="' + (W-PAD_R) + '" y="' + (RSI_TOP+12) + '" text-anchor="end" font-size="11" fill="' + rsiLabelCol + '" font-family="DM Mono,monospace" font-weight="700">RSI ' + lv.toFixed(1) + rsiStatus + '</text>';
   }
+
   svg += '</svg>';
 
-  // Legend + action row
-  const slAmt   = (r.price - suggestSL).toFixed(2);
-  const tgtAmt  = (suggestTgt - r.price).toFixed(2);
-  const rrRatio = (parseFloat(tgtAmt) / parseFloat(slAmt)).toFixed(2);
-
-  container.innerHTML = svg
-    + '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:11px;align-items:center;">'
-    + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:16px;height:2px;background:#c8722a;"></span> 20 EMA</span>'
-    + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:16px;height:2px;background:#2a6bc8;"></span> 50 EMA</span>'
-    + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:16px;height:1px;background:var(--text2);border-top:1px dashed var(--text2);"></span> Current</span>'
-    + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:16px;height:1px;border-top:1px dashed #c0392b;"></span> SL (' + slMethod + ')</span>'
-    + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:16px;height:1px;border-top:1px dashed #1e7a4e;"></span> Target</span>'
-    + '<span style="margin-left:auto;font-weight:600;color:' + (parseFloat(rrRatio) >= 2 ? 'var(--green)' : 'var(--orange)') + ';">R:R ' + rrRatio + '</span>'
-    + '</div>'
-    + (r.atr ? '<div style="margin-top:6px;padding:6px 10px;background:var(--surface2);border-radius:6px;font-size:11px;color:var(--text2);display:flex;gap:16px;flex-wrap:wrap;">'
-      + '<span>ATR(14): <strong style="font-family:\'DM Mono\',monospace;">₹' + r.atr.toFixed(1) + '</strong></span>'
-      + '<span>ATR%: <strong style="font-family:\'DM Mono\',monospace;">' + r.atrPct.toFixed(1) + '%</strong></span>'
-      + '<span>1.5× ATR SL: <strong style="font-family:\'DM Mono\',monospace;color:var(--red);">₹' + (r.price - r.atr * 1.5).toFixed(0) + '</strong></span>'
-      + '<span>2× ATR SL: <strong style="font-family:\'DM Mono\',monospace;color:var(--orange);">₹' + (r.price - r.atr * 2).toFixed(0) + '</strong></span>'
-      + '<span style="color:var(--text3);">Higher ATR% = more volatile stock</span>'
-      + '</div>' : '')
-    + '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">'
-    + '<button class="btn btn-sm btn-secondary" onclick="prefillRiskWithSL(\'' + r.symbol + '\',' + r.price.toFixed(2) + ',' + suggestSL.toFixed(2) + ',' + suggestTgt.toFixed(2) + ')">⚖️ Use these levels in Risk Calc</button>'
-    + '</div>';
+  // Score summary text below chart
+  const scoreCol = r.score >= 70 ? '#1e7a4e' : r.score >= 50 ? '#d4780a' : '#888';
+  container.innerHTML = svg + '<div style="font-size:11px;color:' + scoreCol + ';font-weight:600;margin-top:6px;padding:0 4px;">Score ' + r.score + '/100 · ' + trendLabel + ' · ' + (r.atr ? 'ATR ₹' + r.atr.toFixed(1) + ' (' + r.atrPct.toFixed(1) + '%)' : '') + '</div>';
 }
+
 
 function calcRSIArray(data, period=14) {
   const result = new Array(data.length).fill(null);
