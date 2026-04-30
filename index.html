@@ -3439,15 +3439,30 @@ function drawChart(idx, container) {
   const candles  = r.chartCandles.slice(-45);
   const closes   = candles.map(c => c.c);
   const W        = Math.max(container.offsetWidth || 600, 320);
-  const H        = 260;
-  const VBAR_H   = 40;
-  const PAD_L    = 58; const PAD_R = 14; const PAD_T = 28; const PAD_B = 8;
+
+  // Layout constants — generous padding so labels never overlap
+  const PAD_L   = 52;   // Y-axis labels
+  const PAD_R   = 36;   // EMA end labels
+  const PAD_T   = 30;   // Trend label
+  const PAD_B   = 6;
+  const SIG_H   = 18;   // Signal badges row height
+  const VBAR_H  = 36;   // Volume bars
+  const CHART_H = 200;  // Price chart
+  const GAP_RSI = 12;
+  const RSI_H   = 60;
+  const LABEL_H = 16;   // Score summary text
+
+  // Y positions of each section
+  const priceTop  = PAD_T;
+  const priceBot  = priceTop + CHART_H;
+  const vbarTop   = priceBot + 2;
+  const vbarBot   = vbarTop + VBAR_H;
+  const sigTop    = vbarBot + 4;          // signal badges BELOW volume
+  const rsiTop    = sigTop + SIG_H + GAP_RSI;
+  const H_TOTAL   = rsiTop + RSI_H + LABEL_H + 8;
+
   const plotW    = W - PAD_L - PAD_R;
-  const plotH    = H - PAD_T - PAD_B - VBAR_H;
-  const RSI_H    = 64;
-  const RSI_GAP  = 10;
-  const RSI_TOP  = H - PAD_B + RSI_GAP;
-  const H_TOTAL  = RSI_TOP + RSI_H + 24;
+  const plotH    = CHART_H;
 
   const ema20arr = calcEMAArray(closes, 20);
   const ema50arr = calcEMAArray(closes, 50);
@@ -3462,19 +3477,19 @@ function drawChart(idx, container) {
   const suggestTgt = r.price + 2 * (r.price - suggestSL);
   const entryPrice = r.price;
 
-  // Price range for Y axis
+  // Price range for Y axis — include SL/Target
   const allPrices = candles.flatMap(c => [c.h, c.l]).concat([suggestSL, suggestTgt]);
   const minP = Math.min(...allPrices) * 0.997;
   const maxP = Math.max(...allPrices) * 1.003;
   const priceRange = maxP - minP || 1;
 
-  const py      = p  => PAD_T + plotH * (1 - (p - minP) / priceRange);
-  const px      = i  => PAD_L + (i / (candles.length - 1 || 1)) * plotW;
-  const rsiPY   = v  => RSI_TOP + RSI_H * (1 - Math.max(0, Math.min(100, v)) / 100);
+  const py    = p => priceTop + plotH * (1 - (p - minP) / priceRange);
+  const px    = i => PAD_L + (i / (candles.length - 1 || 1)) * plotW;
+  const rsiPY = v => rsiTop + RSI_H * (1 - Math.max(0, Math.min(100, v)) / 100);
 
   const candleW = Math.max(3, Math.floor(plotW / candles.length * 0.65));
 
-  // Trend direction: last 10 vs first 10 closes
+  // Trend direction
   const avgFirst = closes.slice(0, 10).reduce((a,b)=>a+b,0)/10;
   const avgLast  = closes.slice(-10).reduce((a,b)=>a+b,0)/10;
   const trendUp  = avgLast > avgFirst;
@@ -3483,30 +3498,46 @@ function drawChart(idx, container) {
 
   let svg = '<svg width="100%" viewBox="0 0 ' + W + ' ' + H_TOTAL + '" style="display:block;border-radius:6px;background:var(--surface);">';
 
-  // ── Trend label (top left) ─────────────────────────────────────────────────
-  svg += '<text x="' + PAD_L + '" y="16" font-size="11" font-weight="700" fill="' + trendCol + '" font-family="DM Sans,sans-serif">' + trendLabel + '</text>';
+  // ── Trend label ─────────────────────────────────────────────────────────
+  svg += '<text x="' + PAD_L + '" y="18" font-size="11" font-weight="700" fill="' + trendCol + '" font-family="DM Sans,sans-serif">' + trendLabel + '</text>';
 
-  // ── Grid lines ─────────────────────────────────────────────────────────────
+  // ── Grid lines (Y axis — price labels on LEFT only) ─────────────────────
   for (var gi = 0; gi <= 4; gi++) {
-    const gy = PAD_T + plotH * gi / 4;
+    const gy = priceTop + plotH * gi / 4;
     const gp = maxP - priceRange * gi / 4;
     svg += '<line x1="' + PAD_L + '" y1="' + gy.toFixed(1) + '" x2="' + (W-PAD_R) + '" y2="' + gy.toFixed(1) + '" stroke="var(--border)" stroke-width="0.5"/>';
-    svg += '<text x="' + (PAD_L-4) + '" y="' + (gy+3).toFixed(1) + '" text-anchor="end" font-size="9" fill="var(--text3)" font-family="DM Mono,monospace">₹' + gp.toFixed(0) + '</text>';
+    svg += '<text x="' + (PAD_L-3) + '" y="' + (gy+3).toFixed(1) + '" text-anchor="end" font-size="9" fill="var(--text3)" font-family="DM Mono,monospace">₹' + gp.toFixed(0) + '</text>';
   }
 
-  // ── Volume bars ────────────────────────────────────────────────────────────
+  // ── Entry / SL / Target lines — labels on RIGHT side with background box ──
+  const levels = [
+    { price: suggestTgt, label: 'T ₹' + suggestTgt.toFixed(0),            col: '#1e7a4e', dash: '4,3' },
+    { price: entryPrice, label: 'E ₹' + entryPrice.toFixed(0),            col: '#2a6bc8', dash: '' },
+    { price: suggestSL,  label: slMethod + ' SL ₹' + suggestSL.toFixed(0), col: '#8b3a1e', dash: '4,3' },
+  ];
+  levels.forEach(function(lv) {
+    if (lv.price < minP || lv.price > maxP) return;
+    const ly   = py(lv.price).toFixed(1);
+    const llen = lv.label.length * 5.5 + 4;
+    // Horizontal dashed line across chart
+    svg += '<line x1="' + PAD_L + '" y1="' + ly + '" x2="' + (W-PAD_R) + '" y2="' + ly + '" stroke="' + lv.col + '" stroke-width="1" stroke-dasharray="' + lv.dash + '" opacity="0.75"/>';
+    // Label with background box on RIGHT side
+    const lx = W - PAD_R + 2;
+    svg += '<rect x="' + lx + '" y="' + (parseFloat(ly)-8) + '" width="' + (PAD_R-2) + '" height="11" fill="var(--surface)" opacity="0.9"/>';
+    svg += '<text x="' + (lx+1) + '" y="' + (parseFloat(ly)+2) + '" font-size="8" fill="' + lv.col + '" font-family="DM Mono,monospace" font-weight="700">' + lv.label.substring(0, 7) + '</text>';
+  });
+
+  // ── Volume bars ──────────────────────────────────────────────────────────
   const maxVol = Math.max(...candles.map(c => c.v || 0)) || 1;
   candles.forEach((c, i) => {
     const x   = px(i) - candleW / 2;
     const vh  = VBAR_H * ((c.v || 0) / maxVol);
-    const vy2 = H - PAD_B - vh;
-    // Accessibility: use fill pattern instead of colour only
+    const vy2 = vbarBot - vh;
     const isBull = c.c >= c.o;
-    svg += '<rect x="' + x.toFixed(1) + '" y="' + vy2.toFixed(1) + '" width="' + candleW + '" height="' + vh.toFixed(1) + '" fill="' + (isBull ? '#1e7a4e' : '#333') + '" opacity="0.35"/>';
+    svg += '<rect x="' + x.toFixed(1) + '" y="' + vy2.toFixed(1) + '" width="' + candleW + '" height="' + vh.toFixed(1) + '" fill="' + (isBull ? '#1e7a4e' : '#555') + '" opacity="0.4"/>';
   });
 
-  // ── Candles — shape-based for colour blindness ─────────────────────────────
-  // Bullish = FILLED dark body, Bearish = HOLLOW (outline only)
+  // ── Candles — filled=bullish, hollow=bearish ─────────────────────────────
   candles.forEach((c, i) => {
     const x      = px(i);
     const isBull = c.c >= c.o;
@@ -3514,115 +3545,105 @@ function drawChart(idx, container) {
     const bot    = py(Math.min(c.o, c.c));
     const bodyH  = Math.max(1.5, bot - top);
 
-    // Wick — same dark colour for all
     svg += '<line x1="' + x.toFixed(1) + '" y1="' + py(c.h).toFixed(1) + '" x2="' + x.toFixed(1) + '" y2="' + py(c.l).toFixed(1) + '" stroke="var(--text2)" stroke-width="0.8"/>';
 
     if (isBull) {
-      // FILLED body — clearly distinct from hollow
       svg += '<rect x="' + (x - candleW/2).toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + candleW + '" height="' + bodyH.toFixed(1) + '" fill="var(--text)" rx="1"/>';
     } else {
-      // HOLLOW body (outline only) — shape difference, not just colour
       svg += '<rect x="' + (x - candleW/2).toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + candleW + '" height="' + bodyH.toFixed(1) + '" fill="none" stroke="var(--text2)" stroke-width="1.2" rx="1"/>';
     }
   });
 
-  // ── EMA lines — solid vs dashed (pattern, not just colour) ────────────────
-  // 20 EMA: SOLID thin line
-  let ema20path = '';
-  ema20arr.forEach((v, i) => {
-    if (v == null) return;
-    ema20path += (ema20path === '' ? 'M' : 'L') + px(i).toFixed(1) + ',' + py(v).toFixed(1) + ' ';
-  });
+  // ── EMA lines — solid (20) vs dashed (50) ───────────────────────────────
+  let ema20path = '', ema50path = '';
+  ema20arr.forEach((v, i) => { if (v != null) ema20path += (ema20path===''?'M':'L') + px(i).toFixed(1) + ',' + py(v).toFixed(1) + ' '; });
+  ema50arr.forEach((v, i) => { if (v != null) ema50path += (ema50path===''?'M':'L') + px(i).toFixed(1) + ',' + py(v).toFixed(1) + ' '; });
+
   if (ema20path) {
     svg += '<path d="' + ema20path + '" fill="none" stroke="#2a6bc8" stroke-width="1.5"/>';
-    // Label at end
-    const lastEma20 = ema20arr[ema20arr.length-1];
-    if (lastEma20) svg += '<text x="' + (W-PAD_R+2) + '" y="' + (py(lastEma20)+3).toFixed(1) + '" font-size="8" fill="#2a6bc8" font-family="DM Mono,monospace">20E</text>';
+    // Label inside chart area (right edge, above last candle)
+    const lv20 = ema20arr[ema20arr.length-1];
+    if (lv20) {
+      svg += '<rect x="' + (W-PAD_R+2) + '" y="' + (py(lv20)-8).toFixed(1) + '" width="28" height="10" fill="var(--surface)" opacity="0.9"/>';
+      svg += '<text x="' + (W-PAD_R+3) + '" y="' + (py(lv20)+1).toFixed(1) + '" font-size="8.5" fill="#2a6bc8" font-weight="700" font-family="DM Mono,monospace">─20E</text>';
+    }
   }
-
-  // 50 EMA: DASHED line (pattern difference)
-  let ema50path = '';
-  ema50arr.forEach((v, i) => {
-    if (v == null) return;
-    ema50path += (ema50path === '' ? 'M' : 'L') + px(i).toFixed(1) + ',' + py(v).toFixed(1) + ' ';
-  });
   if (ema50path) {
     svg += '<path d="' + ema50path + '" fill="none" stroke="#c8722a" stroke-width="1.5" stroke-dasharray="5,3"/>';
-    const lastEma50 = ema50arr[ema50arr.length-1];
-    if (lastEma50) svg += '<text x="' + (W-PAD_R+2) + '" y="' + (py(lastEma50)+3).toFixed(1) + '" font-size="8" fill="#c8722a" font-family="DM Mono,monospace">50E</text>';
+    const lv50 = ema50arr[ema50arr.length-1];
+    if (lv50) {
+      svg += '<rect x="' + (W-PAD_R+2) + '" y="' + (py(lv50)-8).toFixed(1) + '" width="28" height="10" fill="var(--surface)" opacity="0.9"/>';
+      svg += '<text x="' + (W-PAD_R+3) + '" y="' + (py(lv50)+1).toFixed(1) + '" font-size="8.5" fill="#c8722a" font-weight="700" font-family="DM Mono,monospace">╌50E</text>';
+    }
   }
 
-  // ── Entry / SL / Target price lines with ₹ labels ─────────────────────────
-  const levels = [
-    { price: suggestTgt, label: 'T ₹' + suggestTgt.toFixed(0),  col: '#1e7a4e', dash: '4,3' },
-    { price: entryPrice, label: 'E ₹' + entryPrice.toFixed(0),  col: '#2a6bc8', dash: '' },
-    { price: suggestSL,  label: slMethod + ' SL ₹' + suggestSL.toFixed(0), col: '#7a3a1e', dash: '4,3' },
-  ];
-  levels.forEach(function(lv) {
-    if (lv.price < minP || lv.price > maxP) return;
-    const ly = py(lv.price).toFixed(1);
-    svg += '<line x1="' + PAD_L + '" y1="' + ly + '" x2="' + (W-PAD_R) + '" y2="' + ly + '" stroke="' + lv.col + '" stroke-width="1" stroke-dasharray="' + lv.dash + '" opacity="0.8"/>';
-    svg += '<text x="4" y="' + (parseFloat(ly)+3) + '" font-size="9" fill="' + lv.col + '" font-family="DM Mono,monospace" font-weight="600">' + lv.label + '</text>';
-  });
-
-  // ── Signal badges row below chart (text, no colour reliance) ──────────────
+  // ── Signal badges — BELOW volume, above RSI panel ───────────────────────
   const sig     = r.signals || {};
   const sigList = [
-    { label: '20EMA', pass: sig.ema20   === 'pass' },
-    { label: '50EMA', pass: sig.ema50   === 'pass' },
-    { label: 'VOL',   pass: sig.vol     === 'pass', neutral: sig.vol === 'neutral' },
-    { label: '52WH',  pass: sig.high52  === 'pass' },
+    { label: '20EMA', pass: sig.ema20  === 'pass' },
+    { label: '50EMA', pass: sig.ema50  === 'pass' },
+    { label: 'VOL',   pass: sig.vol    === 'pass', neutral: sig.vol === 'neutral' },
+    { label: '52WH',  pass: sig.high52 === 'pass' },
   ];
-  const badgeY = H - PAD_B + 3;
   let bx = PAD_L;
+  const badgeY = sigTop + 12;
   sigList.forEach(function(s) {
     const sym2 = s.pass ? '✓' : (s.neutral ? '~' : '✗');
     const col2 = s.pass ? '#1e7a4e' : (s.neutral ? '#d4780a' : '#888');
+    const bg2  = s.pass ? '#eaf5ef' : (s.neutral ? '#fef5e7' : 'var(--surface2)');
     const txt  = sym2 + ' ' + s.label;
-    svg += '<text x="' + bx + '" y="' + badgeY + '" font-size="9" fill="' + col2 + '" font-weight="700" font-family="DM Sans,sans-serif">' + txt + '</text>';
-    bx += txt.length * 5.5 + 8;
+    const tw   = txt.length * 5.8 + 8;
+    svg += '<rect x="' + bx + '" y="' + (badgeY-10) + '" width="' + tw + '" height="13" rx="3" fill="' + bg2 + '"/>';
+    svg += '<text x="' + (bx+4) + '" y="' + badgeY + '" font-size="9" fill="' + col2 + '" font-weight="700" font-family="DM Sans,sans-serif">' + txt + '</text>';
+    bx += tw + 5;
   });
 
-  // ── RSI sub-panel ─────────────────────────────────────────────────────────
-  svg += '<line x1="' + PAD_L + '" y1="' + (RSI_TOP - RSI_GAP/2).toFixed(1) + '" x2="' + (W-PAD_R) + '" y2="' + (RSI_TOP - RSI_GAP/2).toFixed(1) + '" stroke="var(--border)" stroke-width="1"/>';
-  svg += '<rect x="' + PAD_L + '" y="' + RSI_TOP.toFixed(1) + '" width="' + plotW + '" height="' + RSI_H + '" fill="var(--surface2)" opacity="0.4" rx="2"/>';
+  // ── RSI panel separator ──────────────────────────────────────────────────
+  const rsiSepY = rsiTop - GAP_RSI/2;
+  svg += '<line x1="' + PAD_L + '" y1="' + rsiSepY + '" x2="' + (W-PAD_R) + '" y2="' + rsiSepY + '" stroke="var(--border)" stroke-width="1"/>';
+  svg += '<rect x="' + PAD_L + '" y="' + rsiTop + '" width="' + plotW + '" height="' + RSI_H + '" fill="var(--surface2)" opacity="0.35" rx="2"/>';
 
-  // Reference lines with labels
-  [{v:70,lbl:'70 OB'},{v:55,lbl:'55'},{v:50,lbl:'50'},{v:30,lbl:'30'}].forEach(function(l) {
+  // RSI reference lines — only 70, 55, 30 (removed 50 to avoid crowding)
+  [{v:70,lbl:'70'},{v:55,lbl:'55'},{v:30,lbl:'30'}].forEach(function(l) {
     const ry = rsiPY(l.v).toFixed(1);
-    const isKey = l.v === 70 || l.v === 55;
-    svg += '<line x1="' + PAD_L + '" y1="' + ry + '" x2="' + (W-PAD_R) + '" y2="' + ry + '" stroke="var(--text3)" stroke-width="0.6" stroke-dasharray="' + (l.v===55?'':'3,2') + '" opacity="0.6"/>';
+    svg += '<line x1="' + PAD_L + '" y1="' + ry + '" x2="' + (W-PAD_R) + '" y2="' + ry + '" stroke="var(--text3)" stroke-width="0.6" stroke-dasharray="3,2" opacity="0.5"/>';
     svg += '<text x="' + (PAD_L-3) + '" y="' + (parseFloat(ry)+3) + '" text-anchor="end" font-size="9" fill="var(--text3)" font-family="DM Mono,monospace">' + l.lbl + '</text>';
   });
 
-  // Sweet-spot shading
-  svg += '<rect x="' + PAD_L + '" y="' + rsiPY(70).toFixed(1) + '" width="' + plotW + '" height="' + (rsiPY(55)-rsiPY(70)).toFixed(1) + '" fill="#2a6bc8" opacity="0.08"/>';
+  // Sweet-spot shading 55–70
+  svg += '<rect x="' + PAD_L + '" y="' + rsiPY(70).toFixed(1) + '" width="' + plotW + '" height="' + (rsiPY(55)-rsiPY(70)).toFixed(1) + '" fill="#2a6bc8" opacity="0.07"/>';
 
   // RSI line
   let rsiPath = '';
-  rsiArr14.forEach(function(v, i) {
-    if (v == null) return;
-    rsiPath += (rsiPath === '' ? 'M' : 'L') + px(i).toFixed(1) + ',' + rsiPY(v).toFixed(1) + ' ';
-  });
+  rsiArr14.forEach(function(v, i) { if (v != null) rsiPath += (rsiPath===''?'M':'L') + px(i).toFixed(1) + ',' + rsiPY(v).toFixed(1) + ' '; });
   if (rsiPath) svg += '<path d="' + rsiPath + '" fill="none" stroke="#7c3aed" stroke-width="1.6" opacity="0.9"/>';
 
-  // RSI current value — large prominent label
+  // RSI current value — large label top-right of RSI panel
   let lastRSIIdx = rsiArr14.length - 1;
   while (lastRSIIdx >= 0 && rsiArr14[lastRSIIdx] == null) lastRSIIdx--;
   if (lastRSIIdx >= 0) {
-    const lv  = rsiArr14[lastRSIIdx];
-    const rsiStatus = lv >= 70 ? ' OB ⚠️' : lv >= 55 ? ' ✓ Sweet spot' : lv >= 50 ? ' Neutral' : ' ✗ Weak';
-    const rsiLabelCol = lv >= 70 ? '#c0392b' : lv >= 55 ? '#1e7a4e' : 'var(--text3)';
-    svg += '<circle cx="' + px(lastRSIIdx).toFixed(1) + '" cy="' + rsiPY(lv).toFixed(1) + '" r="3" fill="' + rsiLabelCol + '"/>';
-    // Large RSI label top-right of panel
-    svg += '<text x="' + (W-PAD_R) + '" y="' + (RSI_TOP+12) + '" text-anchor="end" font-size="11" fill="' + rsiLabelCol + '" font-family="DM Mono,monospace" font-weight="700">RSI ' + lv.toFixed(1) + rsiStatus + '</text>';
+    const lv    = rsiArr14[lastRSIIdx];
+    const rsitx = lv >= 70 ? ' OB ⚠️' : lv >= 55 ? ' ✓ Sweet spot' : lv >= 50 ? ' Neutral' : ' ✗ Weak';
+    const rsicl = lv >= 70 ? '#c0392b' : lv >= 55 ? '#1e7a4e' : 'var(--text2)';
+    svg += '<circle cx="' + px(lastRSIIdx).toFixed(1) + '" cy="' + rsiPY(lv).toFixed(1) + '" r="3" fill="' + rsicl + '"/>';
+    svg += '<text x="' + (W-PAD_R-2) + '" y="' + (rsiTop+11) + '" text-anchor="end" font-size="11" fill="' + rsicl + '" font-family="DM Mono,monospace" font-weight="700">RSI ' + lv.toFixed(1) + rsitx + '</text>';
   }
+
+  // RSI panel label
+  svg += '<text x="' + PAD_L + '" y="' + (rsiTop+11) + '" font-size="9" fill="var(--text3)" font-family="DM Mono,monospace">RSI(14)</text>';
 
   svg += '</svg>';
 
-  // Score summary text below chart
+  // Score summary below chart
   const scoreCol = r.score >= 70 ? '#1e7a4e' : r.score >= 50 ? '#d4780a' : '#888';
-  container.innerHTML = svg + '<div style="font-size:11px;color:' + scoreCol + ';font-weight:600;margin-top:6px;padding:0 4px;">Score ' + r.score + '/100 · ' + trendLabel + ' · ' + (r.atr ? 'ATR ₹' + r.atr.toFixed(1) + ' (' + r.atrPct.toFixed(1) + '%)' : '') + '</div>';
+  container.innerHTML = svg
+    + '<div style="font-size:11px;color:' + scoreCol + ';font-weight:600;margin-top:4px;padding:0 4px;">'
+    + 'Score ' + r.score + '/100 · ' + trendLabel
+    + (r.atr ? ' · ATR ₹' + r.atr.toFixed(1) + ' (' + r.atrPct.toFixed(1) + '%)' : '')
+    + '</div>'
+    + '<div style="font-size:10px;color:var(--text3);margin-top:2px;padding:0 4px;">'
+    + '■ Filled = bullish candle · □ Hollow = bearish candle · ─ = 20 EMA · ╌ = 50 EMA'
+    + '</div>';
 }
 
 
