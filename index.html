@@ -605,8 +605,20 @@
         <div class="card-title">⚖️ Position Sizing Calculator</div>
         <div style="display:grid;gap:12px;">
           <div>
-            <label>Total Capital (₹)</label>
-            <input type="number" id="r_capital" value="25000" oninput="calcRisk()"/>
+            <label>Total Capital (₹) <span id="r_ec_label" style="font-size:10px;color:var(--text3);"></span></label>
+            <input type="number" id="r_capital" value="25000" oninput="updateECLabel(); calcRisk()"/>
+            <div style="display:flex;gap:6px;margin-top:6px;">
+              <button class="btn btn-sm btn-secondary" id="r_use_effective"
+                onclick="useEffectiveCapital()"
+                title="Use base capital + all realised P&L">
+                🔄 Use Effective
+              </button>
+              <button class="btn btn-sm btn-secondary" id="r_use_base"
+                onclick="useBaseCapital()"
+                title="Use original starting capital only">
+                🔒 Use Base
+              </button>
+            </div>
           </div>
           <div>
             <label>Risk Per Trade (%)</label>
@@ -2880,16 +2892,68 @@ function showSyncMsg(text, success) {
 }
 
 
+
+// ── Effective capital = base capital + all realised net P&L (closed trades) ──
+function getEffectiveCapital() {
+  var s = JSON.parse(localStorage.getItem('st_settings') || '{}');
+  var base = parseFloat(s.capital) || 25000;
+  // Sum net P&L of all closed trades (after Zerodha charges)
+  var realisedPnL = trades.filter(function(t) { return t.exit; }).reduce(function(sum, t) {
+    var gross = (parseFloat(t.exit) - parseFloat(t.entry)) * (parseInt(t.qty) || 0);
+    var ch    = calcCharges(parseFloat(t.entry) * parseInt(t.qty), parseFloat(t.exit) * parseInt(t.qty));
+    return sum + gross - ch.total;
+  }, 0);
+  return { base: base, pnl: realisedPnL, effective: Math.max(0, base + realisedPnL) };
+}
+
+
+
+function useEffectiveCapital() {
+  var ec = getEffectiveCapital();
+  document.getElementById('r_capital').value = Math.round(ec.effective);
+  updateECLabel();
+  calcRisk();
+  renderCapitalDashboard();
+}
+
+function useBaseCapital() {
+  var ec = getEffectiveCapital();
+  document.getElementById('r_capital').value = Math.round(ec.base);
+  updateECLabel();
+  calcRisk();
+  renderCapitalDashboard();
+}
+
+function updateECLabel() {
+  var ec  = getEffectiveCapital();
+  var lbl = document.getElementById('r_ec_label');
+  if (!lbl) return;
+  var cur = parseFloat(document.getElementById('r_capital').value) || 0;
+  if (Math.abs(cur - ec.effective) > 1) {
+    // User overrode the capital — show a note
+    lbl.textContent = '(effective: ₹' + Math.round(ec.effective).toLocaleString('en-IN') + ')';
+    lbl.style.color = 'var(--accent2)';
+  } else if (ec.pnl !== 0) {
+    var sign = ec.pnl > 0 ? '+₹' : '-₹';
+    lbl.textContent = 'base ₹' + Math.round(ec.base).toLocaleString('en-IN') + ' ' + sign + Math.round(Math.abs(ec.pnl)).toLocaleString('en-IN') + ' P&L';
+    lbl.style.color = ec.pnl > 0 ? 'var(--green)' : 'var(--red)';
+  } else {
+    lbl.textContent = 'no closed trades yet';
+    lbl.style.color = 'var(--text3)';
+  }
+}
+
 function loadSettings() {
-  const s = JSON.parse(localStorage.getItem('st_settings') || '{}');
-  const capital  = s.capital  || 25000;
-  const universe = s.universe || 'Midcap · Smallcap';
-  // Apply capital to risk calculator
-  document.getElementById('r_capital').value = capital;
-  updateGuideRules(capital);
-  // Update badge
+  var s = JSON.parse(localStorage.getItem('st_settings') || '{}');
+  var base     = parseFloat(s.capital) || 25000;
+  var universe = s.universe || 'Midcap · Smallcap';
+  // Use effective capital (base + realised P&L) for position sizing
+  var ec = getEffectiveCapital();
+  document.getElementById('r_capital').value = ec.effective.toFixed(0);
+  updateGuideRules(ec.effective);
+  // Update badge — show effective capital
   document.getElementById('badgeText').textContent =
-    `${universe} · ₹${Number(capital).toLocaleString('en-IN')} Capital`;
+    universe + ' · ₹' + Math.round(ec.effective).toLocaleString('en-IN') + ' Capital';
   return s;
 }
 
@@ -3645,11 +3709,13 @@ function prefillRisk(sym, price) {
 
 // ── Returns available (free) capital after locked trades + plans ─────────────
 function getFreeCapital(totalCapital) {
+  // If totalCapital not passed, use effective capital
+  var cap = totalCapital || getEffectiveCapital().effective;
   var lockedTrades = trades.filter(function(t) { return !t.exit; })
-    .reduce(function(sum, t) { return sum + (t.entry * t.qty); }, 0);
+    .reduce(function(sum, t) { return sum + (parseFloat(t.entry)||0) * (parseInt(t.qty)||0); }, 0);
   var lockedPlans  = plans.filter(function(p) { return p.status === 'pending'; })
-    .reduce(function(sum, p) { return sum + (p.entry * p.qty); }, 0);
-  return Math.max(0, totalCapital - lockedTrades - lockedPlans);
+    .reduce(function(sum, p) { return sum + (parseFloat(p.entry)||0) * (parseInt(p.qty)||0); }, 0);
+  return Math.max(0, cap - lockedTrades - lockedPlans);
 }
 
 function calcRisk() {
@@ -3805,9 +3871,9 @@ function renderCapitalDashboard() {
   const el = document.getElementById('capitalDashboard');
   if (!el) return;
 
-  const totalCapital = parseFloat(localStorage.getItem('st_settings')
-    ? JSON.parse(localStorage.getItem('st_settings')).capital || 25000
-    : 25000);
+  var ecData      = getEffectiveCapital();
+  var baseCapital  = ecData.base;
+  var totalCapital = ecData.effective; // sizing uses effective capital
 
   // Capital locked in open trades
   const openTrades    = trades.filter(t => !t.exit);
@@ -3855,7 +3921,10 @@ function renderCapitalDashboard() {
 
     // Stats grid
     + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">'
-    + statBox('Total Capital',    fmt(totalCapital),  'var(--text)')
+    + statBox('Effective Capital', fmt(totalCapital),  'var(--text)',
+        ecData.pnl >= 0
+          ? 'Base ₹'+Math.round(baseCapital).toLocaleString('en-IN')+' + P&L +₹'+Math.round(ecData.pnl).toLocaleString('en-IN')
+          : 'Base ₹'+Math.round(baseCapital).toLocaleString('en-IN')+' − Loss ₹'+Math.round(Math.abs(ecData.pnl)).toLocaleString('en-IN'))
     + statBox('In Open Trades',   fmt(lockedTrades),  '#c8722a',  openTrades.length + ' trade' + (openTrades.length !== 1 ? 's' : ''))
     + statBox('In Saved Plans',   fmt(lockedPlans),   '#2a6bc8',  pendingPlans.length + ' plan' + (pendingPlans.length !== 1 ? 's' : ''))
     + statBox('Available Now',    fmt(available),     available > totalCapital * 0.3 ? 'var(--green)' : 'var(--orange)')
@@ -4611,6 +4680,7 @@ if (watchlist.length === 0) {
 }
 
 loadSettings();
+updateECLabel();
 renderWatchlist();
 renderJournal();
 renderSundayPlans();
@@ -5218,7 +5288,8 @@ function renderStats() {
   // ── Best / Worst trades ────────────────────────────────────────────────────
   const sortedByNet = [...tradeData].sort((a,b) => b.net - a.net);
   const best  = sortedByNet[0];
-  const worst = sortedByNet[sortedByNet.length-1];
+  // Only show worst if it's a different trade (needs at least 2 closed trades)
+  const worst = sortedByNet.length > 1 ? sortedByNet[sortedByNet.length-1] : null;
 
   const tradeSummaryHTML = (t, col) =>
     '<div style="font-size:13px;font-weight:700;color:'+col+';font-family:DM Mono,monospace;margin-bottom:8px;">'+t.sym+'</div>'
@@ -5231,7 +5302,9 @@ function renderStats() {
   const bestEl = document.getElementById('st_best');
   if (bestEl) bestEl.innerHTML = best  ? tradeSummaryHTML(best,  'var(--green)') : '—';
   const worstEl = document.getElementById('st_worst');
-  if (worstEl) worstEl.innerHTML = worst ? tradeSummaryHTML(worst, 'var(--red)')   : '—';
+  if (worstEl) worstEl.innerHTML = worst
+    ? tradeSummaryHTML(worst, 'var(--red)')
+    : '<div style="font-size:12px;color:var(--text3);padding:8px 0;">Need at least 2 closed trades to show worst.</div>';
 
   // ── Exit quality ───────────────────────────────────────────────────────────
   const eqEl = document.getElementById('st_exitQuality');
