@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>    try {
-
+<head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="theme-color" content="#f5f0e8"/>
@@ -4685,6 +4684,14 @@ function renderPortfolioStatic() {
   let totalPotProfit = 0, totalPotLoss = 0;
 
   const rows = open.map(t => {
+    try {
+    // Normalise fields — guard against null/string from Firebase sync
+    const entry    = parseFloat(t.entry) || 0;
+    const sl       = parseFloat(t.sl)    || 0;
+    const tgt      = t.tgt ? parseFloat(t.tgt) : null;
+    const qty      = parseInt(t.qty)     || 0;
+    t = Object.assign({}, t, { entry, sl, tgt, qty });
+
     const pfData  = pfPrices[t.sym];
     const cur     = pfData ? pfData.price : undefined;
     const chg1d   = pfData ? pfData.chg1d : undefined;
@@ -4772,40 +4779,46 @@ function renderPortfolioStatic() {
         +'<br/><span style="font-size:10px;color:var(--text3);">of '+plannedR+'R planned</span>'
       : '—';
 
-    return `<tr>
-      <td>
-        <strong class="mono">${t.sym}</strong>
-        ${health ? `<br/><span style="font-size:11px;color:${healthCol};">${health}</span>` : ''}
-        <div style="margin-top:4px;height:4px;background:var(--border);border-radius:2px;width:64px;overflow:hidden;">
-          <div style="height:100%;width:${(progress||0).toFixed(0)}%;background:${barColor};border-radius:2px;"></div>
-        </div>
-        <div style="font-size:9px;color:var(--text3);margin-top:1px;">${progress!==null?progress.toFixed(0)+'% to tgt':'No target'}</div>
-      </td>
-      <td class="mono">${t.qty}</td>
-      <td class="mono">₹${t.entry.toFixed(2)}
-        <br/><span style="font-size:10px;color:var(--red);">SL ₹${t.sl.toFixed(0)}</span>
-        ${t.tgt?`<br/><span style="font-size:10px;color:var(--green);">T ₹${t.tgt.toFixed(0)}</span>`:''}
-      </td>
-      <td class="mono">₹${Math.round(invested).toLocaleString('en-IN')}</td>
-      <td class="mono">${cur
-        ? `₹${cur.toFixed(2)}<br/><span style="font-size:10px;color:${chg1dColor};">${chg1d>=0?'+':''}${chg1d!==undefined?chg1d.toFixed(1)+'%':''}</span>`
-        : '<span style="color:var(--text3);">—</span>'}</td>
-      <td class="mono" style="color:${plColor};font-weight:700;">${netPL!==null?(netPL>=0?'+₹':'-₹')+Math.abs(netPL).toFixed(0):'—'}</td>
-      <td class="mono" style="color:${retPct!==null?(retPct>=0?'var(--green)':'var(--red)'):'var(--text3)'};">${retPct!==null?(retPct>=0?'+':'')+retPct.toFixed(1)+'%':'—'}</td>
-      <td style="font-size:11px;">${cagr !== null ? (() => {
-          const beat = cagr >= 7;
-          const col  = beat ? 'var(--green)' : 'var(--red)';
-          return '<span style="color:'+col+';font-weight:600;">'+(cagr>=0?'+':'')+cagr.toFixed(0)+'%</span>'
-            + '<br/><span style="font-size:9px;color:'+col+';">'+(beat?'✓ Beats FD':'✗ Below FD')+'</span>';
-        })() : '—'}</td>
-      <td>${currentRStr}</td>
-      <td>${potProfitStr}</td>
-      <td>${potLossStr}</td>
-      <td style="color:${dayColor};font-size:12px;font-weight:600;">D${tradingDays}</td>
-      <td>
-        <button class="btn btn-sm btn-secondary" onclick="pfPyramid('${t.sym}',${t.entry.toFixed(2)},${t.sl.toFixed(2)},${t.tgt?t.tgt.toFixed(2):0},${t.qty})" style="font-size:14px;">△</button>
-      </td>
-    </tr>`;
+    // Build row using string concatenation — no nested template literals (iOS-safe)
+    var healthCell = health
+      ? '<br/><span style="font-size:11px;color:'+healthCol+';">'+health+'</span>'
+      : '';
+    var progressCell = progress !== null
+      ? progress.toFixed(0)+'% to tgt'
+      : 'No target';
+    var tgtCell = t.tgt
+      ? '<br/><span style="font-size:10px;color:var(--green);">T ₹'+t.tgt.toFixed(0)+'</span>'
+      : '';
+    var curCell = cur
+      ? '₹'+cur.toFixed(2)+'<br/><span style="font-size:10px;color:'+chg1dColor+';">'+(chg1d>=0?'+':'')+(chg1d!==undefined?chg1d.toFixed(1)+'%':'')+'</span>'
+      : '<span style="color:var(--text3);">—</span>';
+    var annCell = cagr !== null ? (function() {
+      var beat = cagr >= 7;
+      var col2 = beat ? 'var(--green)' : 'var(--red)';
+      return '<span style="color:'+col2+';font-weight:600;">'+(cagr>=0?'+':'')+cagr.toFixed(0)+'%</span>'
+        + '<br/><span style="font-size:9px;color:'+col2+';">'+(beat?'✓ Beats FD':'✗ Below FD')+'</span>';
+    })() : '—';
+
+    return '<tr>'
+      + '<td><strong class="mono">'+t.sym+'</strong>'+healthCell
+        +'<div style="margin-top:4px;height:4px;background:var(--border);border-radius:2px;width:64px;overflow:hidden;">'
+        +'<div style="height:100%;width:'+(progress||0).toFixed(0)+'%;background:'+barColor+';border-radius:2px;"></div></div>'
+        +'<div style="font-size:9px;color:var(--text3);margin-top:1px;">'+progressCell+'</div></td>'
+      + '<td class="mono">'+t.qty+'</td>'
+      + '<td class="mono">₹'+t.entry.toFixed(2)
+        +'<br/><span style="font-size:10px;color:var(--red);">SL ₹'+t.sl.toFixed(0)+'</span>'+tgtCell+'</td>'
+      + '<td class="mono">₹'+Math.round(invested).toLocaleString('en-IN')+'</td>'
+      + '<td class="mono">'+curCell+'</td>'
+      + '<td class="mono" style="color:'+plColor+';font-weight:700;">'+(netPL!==null?(netPL>=0?'+₹':'-₹')+Math.abs(netPL).toFixed(0):'—')+'</td>'
+      + '<td class="mono" style="color:'+(retPct!==null?(retPct>=0?'var(--green)':'var(--red)'):'var(--text3)')+';">'+(retPct!==null?(retPct>=0?'+':'')+retPct.toFixed(1)+'%':'—')+'</td>'
+      + '<td style="font-size:11px;">'+annCell+'</td>'
+      + '<td>'+currentRStr+'</td>'
+      + '<td>'+potProfitStr+'</td>'
+      + '<td>'+potLossStr+'</td>'
+      + '<td style="color:'+dayColor+';font-size:12px;font-weight:600;">D'+tradingDays+'</td>'
+      + '<td><button class="btn btn-sm btn-secondary" onclick="pfPyramid(&#39;'+t.sym+'&#39;,'+t.entry.toFixed(2)+','+t.sl.toFixed(2)+','+(t.tgt?t.tgt.toFixed(2):0)+','+t.qty+')" style="font-size:14px;">△</button></td>'
+      + '</tr>';
+    } catch(e) { return '<tr><td colspan="13" style="color:var(--red);font-size:12px;padding:8px;">Row error: ' + (t&&t.sym||'?') + '</td></tr>'; }
   }).join('');
 
   // Update summary
@@ -5012,6 +5025,13 @@ function renderStats() {
 
   // ── Per-trade metrics ─────────────────────────────────────────────────────
   const tradeData = closed.map(t => {
+    // Normalise — closed trades from old Firebase format may have string fields
+    const entry2 = parseFloat(t.entry) || 0;
+    const exit2  = parseFloat(t.exit)  || 0;
+    const sl2    = parseFloat(t.sl)    || 0;
+    const tgt2   = t.tgt ? parseFloat(t.tgt) : null;
+    const qty2   = parseInt(t.qty)     || 0;
+    t = Object.assign({}, t, { entry: entry2, exit: exit2, sl: sl2, tgt: tgt2, qty: qty2 });
     const gross    = (t.exit - t.entry) * t.qty;
     const ch       = calcCharges(t.entry * t.qty, t.exit * t.qty);
     const net      = gross - ch.total;
