@@ -662,10 +662,22 @@
       <div class="card">
         <div class="card-title">📐 SL Placement Guide</div>
         <div style="display:grid;gap:8px;font-size:13px;color:var(--text2);">
-          <div>🕯️ <strong>Candle SL:</strong> Below recent swing low (last 3–5 days low)</div>
-          <div>📊 <strong>ATR-based:</strong> Entry − (1.5 × ATR14). Wider, avoids noise.</div>
-          <div>📉 <strong>EMA SL:</strong> Below 20 EMA for momentum trades</div>
-          <div>📏 <strong>% SL:</strong> Fixed 4–6% below entry. Simple for beginners.</div>
+          <div style="padding:8px 10px;background:var(--green-bg);border-radius:8px;border-left:3px solid var(--green);">
+            <strong>✅ Primary — Confirmed Swing Low SL (auto-calculated)</strong><br/>
+            <span style="font-size:12px;">A candle whose low is lower than both its neighbours. The app scans the last 20 candles, picks the highest valid swing low below entry, then subtracts a 0.5×ATR buffer. This is what ⚖️ fills automatically.</span>
+          </div>
+          <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;border-left:3px solid var(--border);">
+            <strong>🔄 Fallback — ATR SL (auto-calculated)</strong><br/>
+            <span style="font-size:12px;">Used when no valid swing low is found. Entry − (1.5 × ATR14). Adapts to each stock's daily volatility. ⚖️ uses this automatically as backup.</span>
+          </div>
+          <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;border-left:3px solid var(--border);">
+            <strong>👁️ EMA SL — manual judgment only</strong><br/>
+            <span style="font-size:12px;">Place SL just below the 20 EMA. Works well for EMA Bounce setups. Not auto-calculated — check on TradingView chart and override the SL field manually if you prefer this level.</span>
+          </div>
+          <div style="padding:8px 10px;background:var(--orange-bg);border-radius:8px;border-left:3px solid var(--orange);">
+            <strong>⚠️ % SL — avoid</strong><br/>
+            <span style="font-size:12px;">Fixed 4–6% below entry has no technical basis. The app no longer uses this. A swing low or ATR-based SL is always more meaningful.</span>
+          </div>
         </div>
       </div>
     </div>
