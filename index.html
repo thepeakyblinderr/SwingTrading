@@ -422,6 +422,7 @@
       <span id="syncDot" style="width:7px;height:7px;border-radius:50%;background:var(--text3);flex-shrink:0;"></span>
       <span id="syncPillText">Sync</span>
     </div>
+    <span id="regimeBadge" onclick="refreshMarketRegime()" title="Click to refresh · Nifty 50 vs 50 EMA" style="cursor:pointer;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--text3);border:1px solid var(--border);margin-right:6px;">⏳ Market</span>
     <div class="header-badge" onclick="openSettings()" style="cursor:pointer;" title="Click to edit">
       ✏️ <span id="badgeText">Midcap · Smallcap · ₹25K Capital</span>
     </div>
@@ -518,6 +519,7 @@
 <!-- ═══════════════════════════════════════════════ SCREENER ═══════════════════════════════════════════════ -->
 <div class="main">
 <div id="tab-screener" class="tab-panel active">
+  <div id="regimeBanner" style="display:none;"></div>
   <div class="card">
     <div class="card-title">🔍 Stock Screener — Swing Signals</div>
     <div class="info-box" style="margin-bottom:14px;">
@@ -590,6 +592,21 @@
 
 <!-- ═══════════════════════════════════════════════ RISK CALCULATOR ═══════════════════════════════════════════════ -->
 <div id="tab-risk" class="tab-panel">
+  <!-- Pre-Market Checklist -->
+  <div class="card" style="margin-bottom:16px;" id="preMarketCard">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <div class="card-title" style="margin-bottom:0;">📋 Morning Checklist</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span id="checklistDate" style="font-size:11px;color:var(--text3);"></span>
+        <button class="btn btn-sm btn-secondary" onclick="refreshChecklist()">🔄 Refresh</button>
+      </div>
+    </div>
+    <div id="checklistBody" style="margin-top:12px;">
+      <div style="color:var(--text3);font-size:12px;">Loading checklist...</div>
+    </div>
+  </div>
+
+
 
   <!-- Capital Dashboard -->
   <div class="card" style="margin-bottom:16px;">
@@ -712,6 +729,7 @@
           Enter your values above to see allocation breakdown.
         </div>
         <div id="r_capital_check" style="display:none;margin-top:8px;"></div>
+        <div id="r_correlation_warn" style="display:none;margin-top:8px;"></div>
       </div>
 
       <div class="card">
@@ -785,7 +803,7 @@
   <div class="card">
     <div class="card-title">➕ Log New Trade</div>
     <div class="trade-form">
-      <div><label>Symbol</label><input type="text" id="j_sym" placeholder="BHEL"/></div>
+      <div><label>Symbol</label><input type="text" id="j_sym" placeholder="BHEL" oninput="autoFillJournalTags(this.value.trim().toUpperCase())"/></div>
       <div><label>Entry Price (₹)</label><input type="number" id="j_entry" placeholder="245.50"/></div>
       <div><label>Stop-Loss (₹)</label><input type="number" id="j_sl" placeholder="232.00"/></div>
       <div><label>Target (₹)</label><input type="number" id="j_tgt" placeholder="278.00"/></div>
@@ -795,6 +813,28 @@
       <div><label>Exit Date</label><input type="date" id="j_exitdate"/></div>
     </div>
     <div style="margin-top:10px;display:grid;gap:8px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div>
+          <label>Sector Tag <span style="font-size:10px;color:var(--text3);">(auto-detected)</span></label>
+          <select id="j_sector">
+            <option value="">— select —</option>
+            <option>Defence</option><option>Railways</option><option>Power</option>
+            <option>Infra</option><option>Banking</option><option>IT</option>
+            <option>Pharma</option><option>Chemicals</option><option>Auto</option>
+            <option>Consumer</option><option>Metals</option><option>Realty</option>
+            <option>New Age Tech</option><option>Other</option>
+          </select>
+        </div>
+        <div>
+          <label>Setup Type <span style="font-size:10px;color:var(--text3);">(auto-detected)</span></label>
+          <select id="j_setup">
+            <option value="">— select —</option>
+            <option>EMA Bounce</option><option>Breakout</option>
+            <option>Volume Spike</option><option>Momentum</option>
+            <option>52W High Break</option><option>Other</option>
+          </select>
+        </div>
+      </div>
       <div><label>Notes / Reason</label><textarea id="j_notes" placeholder="Why did you take this trade? e.g. RSI breakout above 60 with volume spike"></textarea></div>
       <button class="btn btn-primary" onclick="addTrade()" style="width:fit-content;">💾 Save Trade</button>
     </div>
@@ -1638,6 +1678,13 @@
     </div>
   </div>
 
+  <!-- Tag Analysis -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-title">🏷️ Performance by Tag</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">Which sectors and setups work best for you · needs 3+ tagged trades</div>
+    <div id="st_tagAnalysis"></div>
+  </div>
+
   <!-- Exit quality -->
   <div class="card" style="margin-bottom:16px;">
     <div class="card-title">🎯 Exit Quality</div>
@@ -1909,7 +1956,7 @@ function switchTab(name, btn) {
   if (btn) btn.classList.add('active');
   if (name === 'journal') renderJournal();
   if (name === 'discover') { if (!discoverLoaded) runDiscover(); else renderSectorHeat(); }
-  if (name === 'risk') { renderSundayPlans(); renderCapitalDashboard(); }
+  if (name === 'risk') { renderSundayPlans(); renderCapitalDashboard(); renderChecklist(); }
   if (name === 'screener' && _screenerHTML) {
     var bodyEl = document.getElementById('screenerBody');
     var resEl  = document.getElementById('screenerResults');
@@ -2479,7 +2526,8 @@ async function fetchPriceData(symbol) {
 
 
 let _scoredBaskets = [];
-let _screenerCache = {}; // sym → full result object from last screen run
+let _screenerCache = {};
+let _marketRegime = null; // 'bull' | 'choppy' | 'bear' | null // sym → full result object from last screen run
 let _screenerHTML  = null; // last rendered screener results HTML (persists across tab switches)
 
 function renderSectorHeat() {
@@ -2941,6 +2989,63 @@ function updateECLabel() {
     lbl.textContent = 'no closed trades yet';
     lbl.style.color = 'var(--text3)';
   }
+}
+
+
+// Auto-detect sector from symbol using SECTOR_BASKETS
+function getSectorForSym(sym) {
+  for (var i = 0; i < SECTOR_BASKETS.length; i++) {
+    var basket = SECTOR_BASKETS[i];
+    for (var j = 0; j < basket.stocks.length; j++) {
+      if (basket.stocks[j].sym === sym) {
+        // Map basket name to journal sector option
+        var name = basket.name;
+        if (name.indexOf('Defence') >= 0 || name.indexOf('PSU') >= 0) return 'Defence';
+        if (name.indexOf('Railways') >= 0) return 'Railways';
+        if (name.indexOf('Power') >= 0) return 'Power';
+        if (name.indexOf('Infra') >= 0) return 'Infra';
+        if (name.indexOf('Banking') >= 0 || name.indexOf('Finance') >= 0) return 'Banking';
+        if (name.indexOf('IT') >= 0) return 'IT';
+        if (name.indexOf('Pharma') >= 0) return 'Pharma';
+        if (name.indexOf('Chem') >= 0) return 'Chemicals';
+        if (name.indexOf('Auto') >= 0) return 'Auto';
+        if (name.indexOf('Consumer') >= 0 || name.indexOf('FMCG') >= 0) return 'Consumer';
+        if (name.indexOf('Metal') >= 0 || name.indexOf('Steel') >= 0) return 'Metals';
+        if (name.indexOf('Realt') >= 0 || name.indexOf('Housing') >= 0) return 'Realty';
+        if (name.indexOf('Tech') >= 0 || name.indexOf('New Age') >= 0) return 'New Age Tech';
+        return 'Other';
+      }
+    }
+  }
+  return '';
+}
+
+// Auto-detect setup type from screener signals
+function getSetupForSym(sym) {
+  var r = _screenerCache[sym];
+  if (!r) return '';
+  var sig = r.signals || {};
+  // EMA Bounce: above both EMAs, RSI not too high, moderate volume
+  if (sig.ema20 === 'pass' && sig.ema50 === 'pass' && r.rsi <= 65 && r.volSpike < 1.8) return 'EMA Bounce';
+  // Breakout: near 52W high, strong volume
+  if (sig.high52 === 'pass' && sig.vol === 'pass' && r.pctFrom52High <= 5) return '52W High Break';
+  // Volume Spike: strong volume, above EMAs
+  if (sig.vol === 'pass' && r.volSpike >= 2.0) return 'Volume Spike';
+  // Momentum: all signals strong
+  if (sig.ema20 === 'pass' && sig.ema50 === 'pass' && sig.rsi === 'pass') return 'Momentum';
+  // Breakout: above EMAs with volume
+  if (sig.ema20 === 'pass' && sig.vol === 'pass') return 'Breakout';
+  return '';
+}
+
+// Fill journal sector + setup dropdowns for a given symbol
+function autoFillJournalTags(sym) {
+  var sector = getSectorForSym(sym);
+  var setup  = getSetupForSym(sym);
+  var sEl = document.getElementById('j_sector');
+  var stEl = document.getElementById('j_setup');
+  if (sEl  && sector) sEl.value  = sector;
+  if (stEl && setup)  stEl.value = setup;
 }
 
 function loadSettings() {
@@ -3686,6 +3791,8 @@ function prefillRisk(sym, price) {
   // Switch to Risk tab
   var tabs = document.querySelectorAll('.tab-btn');
   switchTab('risk', tabs[2]);
+  // Pre-fill journal tags for when user later logs this trade
+  autoFillJournalTags(sym);
 
   // Show SL method note after short delay (DOM needs to render first)
   setTimeout(function() {
@@ -4013,6 +4120,8 @@ function editPlan(id) {
   // Switch to Risk tab
   var tabs = document.querySelectorAll('.tab-btn');
   switchTab('risk', tabs[2]);
+  // Pre-fill journal tags for when user later logs this trade
+  autoFillJournalTags(sym);
   setTimeout(function() {
     // Show a note that this is an edit
     var note = document.getElementById('r_sl_note');
@@ -4463,14 +4572,16 @@ function addTrade() {
   const date = document.getElementById('j_date').value;
   const exit = parseFloat(document.getElementById('j_exit').value);
   const exitDate = document.getElementById('j_exitdate').value;
-  const notes = document.getElementById('j_notes').value.trim();
+  const notes  = document.getElementById('j_notes').value.trim();
+  const sector = document.getElementById('j_sector') ? document.getElementById('j_sector').value : '';
+  const setup  = document.getElementById('j_setup')  ? document.getElementById('j_setup').value  : '';
 
   if (!sym || !entry || !sl || !qty || !date) { alert('Fill in Symbol, Entry, SL, Qty and Date.'); return; }
 
   const trade = {
     id: Date.now(),
     sym, entry, sl, tgt: tgt || null, qty, date,
-    exit: exit || null, exitDate: exitDate || null, notes
+    exit: exit || null, exitDate: exitDate || null, notes, sector, setup
   };
 
   trades.unshift(trade);
@@ -4481,6 +4592,8 @@ function addTrade() {
   ['j_sym','j_entry','j_sl','j_tgt','j_qty','j_date','j_exit','j_exitdate','j_notes'].forEach(id => {
     document.getElementById(id).value = '';
   });
+  var sEl = document.getElementById('j_sector'); if (sEl) sEl.value = '';
+  var stEl = document.getElementById('j_setup');  if (stEl) stEl.value = '';
 }
 
 function deleteTrade(id) {
@@ -4682,6 +4795,8 @@ if (watchlist.length === 0) {
 loadSettings();
 updateECLabel();
 renderWatchlist();
+refreshMarketRegime();
+renderChecklist();
 renderJournal();
 renderSundayPlans();
 renderCapitalDashboard();
@@ -5347,6 +5462,294 @@ function renderStats() {
     eqEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:8px 0;">Not enough data — ensure SL and Target are set on trades</div>';
   }
 }
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FEATURE 1: MARKET REGIME FILTER
+// Fetches Nifty 50 data, checks price vs 50 EMA → bull/choppy/bear
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function refreshMarketRegime() {
+  var badge = document.getElementById('regimeBadge');
+  if (badge) { badge.textContent = '⏳ Market'; badge.style.background = 'var(--surface2)'; badge.style.color = 'var(--text3)'; }
+
+  try {
+    var yfUrl = 'https://query2.finance.yahoo.com/v8/finance/chart/%5ENSEI?interval=1d&range=3mo';
+    var raw   = await yfFetch(yfUrl, 10000);
+    if (!raw || !raw.chart || !raw.chart.result || !raw.chart.result[0]) throw new Error('no data');
+
+    var closes = (raw.chart.result[0].indicators.quote[0].close || []).filter(function(v) { return v != null; });
+    if (closes.length < 50) throw new Error('not enough data');
+
+    var price = closes[closes.length - 1];
+    var ema50 = calcEMA(closes, 50);
+    var ema20 = calcEMA(closes, 20);
+
+    var regime, emoji, bg, col;
+    if (price > ema50) {
+      if (price > ema20) {
+        regime = 'bull'; emoji = '🟢'; bg = 'var(--green-bg)'; col = 'var(--green)';
+        _marketRegime = 'bull';
+      } else {
+        regime = 'choppy'; emoji = '🟡'; bg = 'var(--orange-bg)'; col = 'var(--orange)';
+        _marketRegime = 'choppy';
+      }
+    } else {
+      regime = 'bear'; emoji = '🔴'; bg = 'var(--red-bg)'; col = 'var(--red)';
+      _marketRegime = 'bear';
+    }
+
+    var label = regime === 'bull' ? 'Bull Market' : regime === 'choppy' ? 'Choppy' : 'Bear Market';
+    if (badge) {
+      badge.textContent = emoji + ' ' + label;
+      badge.style.background = bg;
+      badge.style.color      = col;
+      badge.style.border     = '1px solid ' + col;
+      badge.title = 'Nifty: ₹' + price.toFixed(0) + ' | 50 EMA: ₹' + ema50.toFixed(0) + ' | 20 EMA: ₹' + ema20.toFixed(0) + ' — Click to refresh';
+    }
+
+    // Show screener warning if not bull
+    renderRegimeBanner();
+    // Refresh checklist with new regime data
+    renderChecklist();
+
+  } catch(e) {
+    if (badge) { badge.textContent = '— Market'; badge.title = 'Could not fetch Nifty data'; }
+    _marketRegime = null;
+  }
+}
+
+function renderRegimeBanner() {
+  var bannerEl = document.getElementById('regimeBanner');
+  if (!bannerEl) return;
+  if (_marketRegime === 'bear') {
+    bannerEl.style.display = 'block';
+    bannerEl.innerHTML = '<div style="padding:8px 14px;background:var(--red-bg);border-left:3px solid var(--red);border-radius:8px;font-size:12px;color:var(--red);margin-bottom:12px;">🔴 <strong>Bear Market:</strong> Nifty is below its 50 EMA. Avoid new entries. Manage existing trades only.</div>';
+  } else if (_marketRegime === 'choppy') {
+    bannerEl.style.display = 'block';
+    bannerEl.innerHTML = '<div style="padding:8px 14px;background:var(--orange-bg);border-left:3px solid var(--orange);border-radius:8px;font-size:12px;color:var(--orange);margin-bottom:12px;">🟡 <strong>Choppy Market:</strong> Nifty between 20 and 50 EMA. Reduce risk to 1%, only take 80+ score setups.</div>';
+  } else {
+    bannerEl.style.display = 'none';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FEATURE 2: SECTOR CORRELATION WARNING
+// Checks open trades for sector concentration
+// ═══════════════════════════════════════════════════════════════════════════
+
+function checkSectorCorrelation() {
+  var warnEl = document.getElementById('r_correlation_warn');
+  if (!warnEl) return;
+
+  var sym = (document.getElementById('r_symbol').value || '').trim().toUpperCase();
+  if (!sym) { warnEl.style.display = 'none'; return; }
+
+  // Find sector of the new trade symbol
+  var newSector = null;
+  for (var i = 0; i < SECTOR_BASKETS.length; i++) {
+    var basket = SECTOR_BASKETS[i];
+    for (var j = 0; j < basket.stocks.length; j++) {
+      if (basket.stocks[j].sym === sym) { newSector = basket.name; break; }
+    }
+    if (newSector) break;
+  }
+  if (!newSector) { warnEl.style.display = 'none'; return; }
+
+  // Count open trades in the same sector
+  var sameSectorTrades = trades.filter(function(t) {
+    if (t.exit) return false;
+    for (var i = 0; i < SECTOR_BASKETS.length; i++) {
+      var basket = SECTOR_BASKETS[i];
+      if (basket.name !== newSector) continue;
+      for (var j = 0; j < basket.stocks.length; j++) {
+        if (basket.stocks[j].sym === t.sym) return true;
+      }
+    }
+    return false;
+  });
+
+  if (sameSectorTrades.length === 0) { warnEl.style.display = 'none'; return; }
+
+  var totalExposure = sameSectorTrades.reduce(function(sum, t) {
+    return sum + (parseFloat(t.entry)||0) * (parseInt(t.qty)||0);
+  }, 0);
+  var symsOpen = sameSectorTrades.map(function(t) { return t.sym; }).join(', ');
+  var riskExposure = sameSectorTrades.reduce(function(sum, t) {
+    return sum + (parseFloat(t.entry) - parseFloat(t.sl)) * (parseInt(t.qty)||0);
+  }, 0);
+
+  warnEl.style.display = 'block';
+  warnEl.innerHTML = '<div style="padding:10px 12px;background:var(--orange-bg);border-radius:8px;border-left:3px solid var(--orange);font-size:12px;">'
+    + '<div style="font-weight:700;color:var(--orange);margin-bottom:6px;">⚠️ Sector Concentration — ' + newSector + '</div>'
+    + '<div style="color:var(--text2);line-height:1.7;">'
+    + 'Already open in this sector: <strong>' + symsOpen + '</strong><br/>'
+    + 'Combined capital deployed: <strong>₹' + Math.round(totalExposure).toLocaleString('en-IN') + '</strong><br/>'
+    + 'Combined risk if all SLs hit: <strong style="color:var(--red);">₹' + Math.round(riskExposure).toLocaleString('en-IN') + '</strong><br/>'
+    + '<span style="color:var(--text3);">One sector news event hits all simultaneously. Consider a different sector.</span>'
+    + '</div></div>';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FEATURE 3: TRADE TAGS — save sector + setup with each trade
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Tag analysis section in Stats tab
+function renderTagAnalysis() {
+  var el = document.getElementById('st_tagAnalysis');
+  if (!el) return;
+
+  var closed = trades.filter(function(t) { return t.exit && t.exitDate; });
+  var tagged  = closed.filter(function(t) { return t.sector || t.setup; });
+  if (tagged.length < 3) {
+    el.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:8px 0;">Need 3+ tagged trades to show pattern analysis. Add sector and setup tags when logging trades.</div>';
+    return;
+  }
+
+  function groupAnalysis(trades, keyFn, label) {
+    var groups = {};
+    trades.forEach(function(t) {
+      var key = keyFn(t);
+      if (!key) return;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(t);
+    });
+    var rows = Object.keys(groups).map(function(key) {
+      var grp    = groups[key];
+      var wins   = grp.filter(function(t) {
+        var net = (parseFloat(t.exit)-parseFloat(t.entry))*parseInt(t.qty) - calcCharges(parseFloat(t.entry)*parseInt(t.qty), parseFloat(t.exit)*parseInt(t.qty)).total;
+        return net > 0;
+      });
+      var winRate = (wins.length / grp.length * 100).toFixed(0);
+      var avgR    = grp.map(function(t) {
+        var rsk = parseFloat(t.entry) - parseFloat(t.sl);
+        return rsk > 0 ? (parseFloat(t.exit)-parseFloat(t.entry))/rsk : null;
+      }).filter(function(r) { return r !== null; });
+      var avgRVal = avgR.length ? (avgR.reduce(function(a,b){return a+b;},0)/avgR.length).toFixed(2) : '—';
+      var rCol    = parseFloat(avgRVal) >= 1 ? 'var(--green)' : parseFloat(avgRVal) >= 0 ? 'var(--orange)' : 'var(--red)';
+      var wr      = parseInt(winRate);
+      var wrCol   = wr >= 50 ? 'var(--green)' : wr >= 40 ? 'var(--orange)' : 'var(--red)';
+      return '<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">'
+        + '<span style="font-size:12px;font-weight:600;color:var(--text);">'+key+'</span>'
+        + '<span style="font-size:11px;color:var(--text3);">'+grp.length+' trades</span>'
+        + '<span style="font-size:12px;font-weight:600;color:'+wrCol+';">'+winRate+'% wins</span>'
+        + '<span style="font-size:12px;font-weight:600;color:'+rCol+';">avg '+avgRVal+'R</span>'
+        + '</div>';
+    }).sort().join('');
+    return '<div style="margin-bottom:16px;"><div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">'+label+'</div>'+rows+'</div>';
+  }
+
+  el.innerHTML = groupAnalysis(tagged, function(t){return t.sector;}, 'By Sector')
+               + groupAnalysis(tagged, function(t){return t.setup;},  'By Setup Type');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FEATURE 4: PRE-MARKET CHECKLIST
+// ═══════════════════════════════════════════════════════════════════════════
+
+function refreshChecklist() { renderChecklist(); }
+
+function renderChecklist() {
+  var el   = document.getElementById('checklistBody');
+  var dtEl = document.getElementById('checklistDate');
+  if (!el) return;
+
+  var now  = new Date();
+  var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var mons = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  if (dtEl) dtEl.textContent = days[now.getDay()] + ' ' + now.getDate() + ' ' + mons[now.getMonth()];
+
+  // Is today a trading day?
+  var isWeekend = now.getDay() === 0 || now.getDay() === 6;
+  if (isWeekend) {
+    el.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:8px 0;">Weekend — markets closed. Use this time to plan next week’s trades.</div>';
+    return;
+  }
+
+  var html = '';
+
+  // ── Section 1: Market ─────────────────────────────────────────────
+  html += checkSection('MARKET');
+  if (_marketRegime) {
+    var regLabel = _marketRegime === 'bull' ? '🟢 Bull — trade normally' : _marketRegime === 'choppy' ? '🟡 Choppy — reduce risk to 1%, only 80+ scores' : '🔴 Bear — no new entries today';
+    var regCol   = _marketRegime === 'bull' ? 'var(--green)' : _marketRegime === 'choppy' ? 'var(--orange)' : 'var(--red)';
+    html += checkItem('Nifty regime: <strong style="color:'+regCol+';">'+regLabel+'</strong>');
+  } else {
+    html += checkItem('Nifty regime: <span style="color:var(--text3);">tap 🟢/🔴 badge in header to load</span>');
+  }
+
+  // F&O expiry — last Thursday of month
+  var nextExpiry = getNextFOExpiry();
+  var daysToExpiry = Math.round((nextExpiry - now) / 86400000);
+  var expiryWarn = daysToExpiry <= 2 ? ' <strong style="color:var(--red);">⚠️ EXPIRY THIS WEEK — avoid new entries</strong>' : daysToExpiry <= 5 ? ' <span style="color:var(--orange);">('+daysToExpiry+' days away — be cautious)</span>' : ' <span style="color:var(--text3);">('+daysToExpiry+' days away)</span>';
+  html += checkItem('F&O Expiry: ' + nextExpiry.getDate() + ' ' + mons[nextExpiry.getMonth()] + expiryWarn);
+
+  // ── Section 2: Open Trades ────────────────────────────────────────
+  var open = trades.filter(function(t) { return !t.exit; });
+  html += checkSection('OPEN TRADES (' + open.length + ')');
+  if (!open.length) {
+    html += '<div style="font-size:12px;color:var(--text3);padding:4px 0 8px;">No open trades.</div>';
+  } else {
+    open.forEach(function(t) {
+      var entry = parseFloat(t.entry)||0, sl = parseFloat(t.sl)||0, tgt = t.tgt ? parseFloat(t.tgt) : null;
+      var days2 = 0, d = new Date(t.date), today2 = new Date();
+      while (d <= today2) { if (d.getDay()!==0&&d.getDay()!==6) days2++; d=new Date(d.getTime()+86400000); }
+      days2 = Math.max(0, days2-1);
+      var urgency = days2 >= 15 ? '🔴 Day '+days2+' EXIT TODAY' : days2 >= 10 ? '🟡 Day '+days2+' approaching time stop' : '🟢 Day '+days2;
+      var tgtNote = tgt ? ' · Target ₹'+tgt.toFixed(0) : '';
+      html += checkItem('<strong>'+t.sym+'</strong> — '+urgency+' · SL ₹'+sl.toFixed(0)+tgtNote);
+    });
+  }
+
+  // ── Section 3: Today's Plans ─────────────────────────────────────
+  var pending = plans.filter(function(p) { return p.status === 'pending'; });
+  html += checkSection("TODAY'S PLANS (" + pending.length + ")");
+  if (!pending.length) {
+    html += '<div style="font-size:12px;color:var(--text3);padding:4px 0 8px;">No plans saved. Use Risk Calculator to plan a trade.</div>';
+  } else {
+    pending.forEach(function(p) {
+      html += checkItem('<strong>'+p.sym+'</strong> — Entry ₹'+p.entry+' · SL ₹'+p.sl+' · Enter open price below to get GO/NO-GO');
+    });
+  }
+
+  // ── Section 4: Rules reminder ────────────────────────────────────
+  html += checkSection('RULES REMINDER');
+  html += checkItem('Did not cancel any GTT SL orders');
+  html += checkItem('Position size based on effective capital');
+  if (_marketRegime === 'choppy') html += checkItem('<span style="color:var(--orange);">Using 1% risk today (choppy market)</span>');
+  if (_marketRegime === 'bear')   html += checkItem('<span style="color:var(--red);">NO new entries today (bear market)</span>');
+
+  el.innerHTML = html;
+}
+
+function checkSection(title) {
+  return '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;padding:10px 0 4px;border-top:1px solid var(--border);margin-top:4px;">'+title+'</div>';
+}
+
+function checkItem(text) {
+  return '<label style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;cursor:pointer;">'
+    +'<input type="checkbox" style="margin-top:2px;width:auto;flex-shrink:0;"/>'
+    +'<span style="font-size:12px;color:var(--text2);line-height:1.5;">'+text+'</span>'
+    +'</label>';
+}
+
+function getNextFOExpiry() {
+  // NSE F&O expires last Thursday of every month
+  var now = new Date();
+  var year = now.getFullYear(), month = now.getMonth();
+  // Find last Thursday of current month
+  var lastDay = new Date(year, month+1, 0);
+  while (lastDay.getDay() !== 4) lastDay.setDate(lastDay.getDate()-1);
+  // If already past, get next month's
+  if (lastDay < now) {
+    month++;
+    if (month > 11) { month=0; year++; }
+    lastDay = new Date(year, month+1, 0);
+    while (lastDay.getDay() !== 4) lastDay.setDate(lastDay.getDate()-1);
+  }
+  return lastDay;
+}
+
 
 </script>
 </body>
