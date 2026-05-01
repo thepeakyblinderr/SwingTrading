@@ -3361,11 +3361,43 @@ function renderScreenerResults(results) {
     return;
   }
 
-  tbody.innerHTML = results.map((r, idx) => {
+  // Regime-aware filtering
+  var filteredResults = results;
+  if (_marketRegime === 'choppy') {
+    // Situation 1: only 80+ scores, RSI 58-68, vol 1.8x+
+    filteredResults = results.filter(function(r) {
+      return r.score >= 80
+        && r.rsi >= 58 && r.rsi <= 68
+        && r.volSpike >= 1.8;
+    });
+    if (!filteredResults.length) filteredResults = results; // show all if none pass
+  }
+
+  var filterNote = '';
+  if (_marketRegime === 'choppy' && filteredResults.length < results.length) {
+    filterNote = '<div style="padding:8px 12px;background:var(--orange-bg);border-radius:8px;font-size:12px;color:var(--orange);margin-bottom:10px;">'
+      + '🟡 Choppy market filter active — showing ' + filteredResults.length + '/' + results.length + ' stocks meeting tighter criteria (score 80+, RSI 58-68, vol 1.8×+)</div>';
+  } else if (_marketRegime === 'bear') {
+    filterNote = '<div style="padding:8px 12px;background:var(--red-bg);border-radius:8px;font-size:12px;color:var(--red);margin-bottom:10px;">'
+      + '🔴 Bear market — showing all results. ⭐ stocks are above their own 50 EMA (relative strength) — only these are worth considering.</div>';
+  }
+
+  const tableEl = document.getElementById('screenerResults');
+  var filterNoteEl = document.getElementById('screenerFilterNote');
+  if (!filterNoteEl) {
+    filterNoteEl = document.createElement('div');
+    filterNoteEl.id = 'screenerFilterNote';
+    if (tableEl) tableEl.parentNode.insertBefore(filterNoteEl, tableEl);
+  }
+  filterNoteEl.innerHTML = filterNote;
+
+  tbody.innerHTML = filteredResults.map((r, idx) => {
     const scoreColor  = r.score >= 70 ? 'var(--green)' : r.score >= 50 ? 'var(--orange)' : 'var(--red)';
     const changeColor = r.changePct >= 0 ? 'var(--green)' : 'var(--red)';
     const barColor    = r.score >= 70 ? '#1e7a4e' : r.score >= 50 ? '#d4780a' : '#c0392b';
     const obWarning   = r.signals.rsi === 'overbought';
+    var relStrength   = _marketRegime === 'bear' && r.signals && r.signals.ema50 === 'pass';
+    var rsBadge       = relStrength ? ' <span style="background:#1e5c36;color:white;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;">RELSTR</span>' : '';
     const chgSign     = r.changePct >= 0 ? '+' : '';
 
     // RSI cell
@@ -3402,7 +3434,7 @@ function renderScreenerResults(results) {
       + (r.signals.high52==='pass'?'+20':' 0') + ' 52W';
 
     return '<tr id="row_' + idx + '">'
-      + '<td><strong class="mono">' + r.symbol + '</strong>'
+      + '<td><strong class="mono">' + r.symbol + rsBadge + '</strong>'
       + (r.fullName ? '<br/><span style="font-size:10px;color:var(--text3);">' + r.fullName + '</span>' : '') + '</td>'
       + '<td class="mono">₹' + r.price.toFixed(2) + '<br/><span style="font-size:11px;color:' + changeColor + ';">' + chgSign + r.changePct.toFixed(2) + '%</span></td>'
       + '<td>' + rsiCell + '</td>'
@@ -4063,7 +4095,23 @@ function renderCapitalDashboard() {
     : totalCapital * 0.38; // assume ~38% per trade as default
   const moreTrades    = avgPerTrade > 0 ? Math.floor(available / avgPerTrade) : '—';
 
-  el.innerHTML = ''
+  // ── Regime advisory ─────────────────────────────────────────────────────────
+  var regimeAdvisory = '';
+  if (_marketRegime === 'choppy') {
+    var openCnt = trades.filter(function(t) { return !t.exit; }).length;
+    regimeAdvisory = '<div style="padding:8px 12px;background:var(--orange-bg);border-radius:8px;border-left:3px solid var(--orange);font-size:12px;color:var(--orange);margin-bottom:8px;">'
+      + '<strong>🟡 Choppy Market — Use 1% risk</strong><br/>'
+      + 'Tighter criteria: RSI 58-68 · Vol 1.8×+ · Score 80+ · Max 1 open trade'
+      + (openCnt >= 1 ? '<br/>⚠️ You have ' + openCnt + ' open trade' + (openCnt > 1 ? 's' : '') + ' — no new entries until one closes.' : '')
+      + '</div>';
+  } else if (_marketRegime === 'bear') {
+    regimeAdvisory = '<div style="padding:8px 12px;background:var(--red-bg);border-radius:8px;border-left:3px solid var(--red);font-size:12px;color:var(--red);margin-bottom:8px;">'
+      + '<strong>🔴 Bear Market — No new entries</strong><br/>'
+      + 'Only consider ⭐ relative strength stocks (above their own 50 EMA). Reduce risk to 1% if you must trade.'
+      + '</div>';
+  }
+
+  el.innerHTML = regimeAdvisory + ''
     // Capital bar
     + '<div style="height:10px;border-radius:5px;overflow:hidden;display:flex;margin-bottom:10px;background:var(--border);">'
     + (tradePct > 0 ? '<div style="width:' + tradePct + '%;background:#c8722a;" title="In trades"></div>' : '')
@@ -4123,6 +4171,12 @@ function savePlans() {
 }
 
 function saveSundayPlan() {
+  // Situation 2: warn before saving in bear market
+  if (_marketRegime === 'bear') {
+    if (!confirm('⚠️ Market is in BEAR regime (Nifty below 50 EMA).\n\nMost setups fail in bear markets. Are you sure you want to save this plan?')) {
+      return;
+    }
+  }
   const sym     = document.getElementById('r_symbol').value.trim().toUpperCase();
   const entry   = parseFloat(document.getElementById('r_entry').value);
   const sl      = parseFloat(document.getElementById('r_sl').value);
@@ -5562,8 +5616,25 @@ async function refreshMarketRegime() {
 
     // Show screener warning if not bull
     renderRegimeBanner();
+    // Auto-suggest risk % based on regime
+    var riskEl = document.getElementById('r_riskPct');
+    if (riskEl) {
+      if (regime === 'bear' || regime === 'choppy') {
+        if (parseFloat(riskEl.value) > 1) {
+          riskEl.value = 1;
+          calcRisk();
+        }
+      } else if (regime === 'bull') {
+        if (parseFloat(riskEl.value) < 2) {
+          riskEl.value = 2;
+          calcRisk();
+        }
+      }
+    }
     // Refresh checklist with new regime data
     renderChecklist();
+    // Refresh capital dashboard with regime advisory
+    renderCapitalDashboard();
 
   } catch(e) {
     if (badge) { badge.textContent = '— Market'; badge.title = 'Could not fetch Nifty data'; }
