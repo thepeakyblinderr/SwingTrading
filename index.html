@@ -4500,7 +4500,12 @@ function sendToJournal() {
 
   const riskPerShare = entry - sl;
   const maxLoss = capital * riskPct / 100;
-  const qty = Math.floor(maxLoss / riskPerShare);
+  const calcQty = Math.floor(maxLoss / riskPerShare);
+  const overrideEl = document.getElementById('r_qty_override');
+  const rawOverride = overrideEl ? parseInt(overrideEl.value) : NaN;
+  const maxAffordable = capital > 0 && entry > 0 ? Math.floor(capital / entry) : 99999;
+  const overrideVal = (!isNaN(rawOverride) && rawOverride > 0) ? Math.min(rawOverride, maxAffordable) : NaN;
+  const qty = (!isNaN(overrideVal) && overrideVal > 0) ? overrideVal : calcQty;
 
   document.getElementById('j_sym').value = sym;
   document.getElementById('j_entry').value = entry;
