@@ -576,6 +576,7 @@
             <th title="Above 20 EMA = +20pts">20 EMA 🔵</th>
             <th title="Above 50 EMA = +20pts">50 EMA 🔵</th>
             <th title="Within 15% of 52W High = +20pts">52W High 🔵</th>
+            <th title="Stock 20d return ÷ Nifty 20d return. >1 = outperforming. Load market regime first.">RS vs Nifty</th>
             <th>ATR (14)</th>
             <th>Score /100</th>
             <th>Action</th>
@@ -742,6 +743,7 @@
         </div>
         <div id="r_capital_check" style="display:none;margin-top:8px;"></div>
         <div id="r_correlation_warn" style="display:none;margin-top:8px;"></div>
+        <div id="r_streak_warn" style="margin-top:8px;"></div>
       </div>
 
       <div class="card">
@@ -1704,6 +1706,13 @@
     <div id="st_exitQuality"></div>
   </div>
 
+  <!-- Kelly Criterion -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-title">🎲 Kelly Criterion — Optimal Position Size</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">Based on your actual win rate and average profit/loss from closed trades</div>
+    <div id="st_kelly"></div>
+  </div>
+
   <div id="st_empty" style="display:none;">
     <div class="empty-state">
       <div class="empty-icon">📊</div>
@@ -2350,6 +2359,7 @@ async function runDiscover() {
   const meta = document.getElementById('discoverMeta');
   const container = document.getElementById('discoverSectors');
 
+  discoverData = {};
   btn.disabled = true;
   btn.innerHTML = '<span class="loader"></span> Fetching...';
   container.innerHTML = `<div style="text-align:center;padding:32px;color:var(--text3);">⏳ Fetching price data for all sectors...</div>`;
@@ -2541,6 +2551,7 @@ let _scoredBaskets = [];
 let _screenerCache = {};
 let _marketRegime = null; // 'bull' | 'choppy' | 'bear' | null // sym → full result object from last screen run
 let _screenerHTML  = null; // last rendered screener results HTML (persists across tab switches)
+let _niftyRet20   = null; // Nifty 20-day return %, set by refreshMarketRegime
 
 function renderSectorHeat() {
   const container = document.getElementById('discoverSectors');
@@ -2800,7 +2811,7 @@ function openSync() {
     document.getElementById('syncGistStatus').textContent = 'Connected to Firebase';
     const last = localStorage.getItem('st_lastSync');
     const el = document.getElementById('syncLastSync');
-    if (el) el.textContent = last ? 'Last synced: ' + new Date(parseInt(last)).toLocaleString('en-IN') : 'Never synced on this device';
+    if (el) { const d = last ? new Date(parseInt(last)) : null; el.textContent = d && !isNaN(d) ? 'Last synced: ' + d.toLocaleString('en-IN') : 'Never synced on this device'; }
   } else {
     document.getElementById('syncGistStatus').textContent = 'Not connected';
   }
@@ -2862,9 +2873,10 @@ function applyPayload(payload) {
   if (Object.prototype.hasOwnProperty.call(payload, 'learnings'))     localStorage.setItem('st_learnings',     payload.learnings || '');
   if (Object.prototype.hasOwnProperty.call(payload, 'sectorBaskets') && payload.sectorBaskets)
                                                                         localStorage.setItem('st_sectorBaskets', JSON.stringify(payload.sectorBaskets));
-  watchlist = JSON.parse(localStorage.getItem('st_watchlist') || '[]');
-  trades    = JSON.parse(localStorage.getItem('st_trades')    || '[]');
-  plans     = JSON.parse(localStorage.getItem('st_plans')     || '[]');
+  function safeParse(key, fallback) { try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch(e) { return fallback; } }
+  watchlist = safeParse('st_watchlist', []);
+  trades    = safeParse('st_trades',    []);
+  plans     = safeParse('st_plans',     []);
   localStorage.setItem('st_lastSync', Date.now().toString());
   closeSyncModal();
   setTimeout(() => {
@@ -2926,7 +2938,8 @@ async function firebasePull() {
     const wlCount    = payload.watchlist   ? payload.watchlist.length   : 0;
     const planCount  = payload.plans       ? payload.plans.length       : 0;
     const savedDate  = payload.ts ? new Date(payload.ts).toLocaleString('en-IN') : 'unknown';
-    const confirmMsg = 'Pull from Firebase?\n\nLast saved: ' + savedDate + '\n• ' + wlCount + ' watchlist stocks\n• ' + tradeCount + ' journal trades\n• ' + planCount + ' plans\n\nThis replaces your current local data.';
+    const localTradeCount = trades ? trades.length : 0;
+    const confirmMsg = 'Pull from Firebase?\n\nRemote data (last saved: ' + savedDate + '):\n• ' + wlCount + ' watchlist stocks\n• ' + tradeCount + ' journal trades\n• ' + planCount + ' plans\n\nThis will overwrite your ' + localTradeCount + ' local trade(s). This cannot be undone.';
     if (!confirm(confirmMsg)) {
       btn.disabled = false; btn.textContent = 'Pull Now';
       setSyncStatus('idle'); return;
@@ -3019,7 +3032,7 @@ function getSectorForSym(sym) {
         if (name.indexOf('Banking') >= 0 || name.indexOf('Finance') >= 0) return 'Banking';
         if (name.indexOf('IT') >= 0) return 'IT';
         if (name.indexOf('Pharma') >= 0) return 'Pharma';
-        if (name.indexOf('Chem') >= 0) return 'Chemicals';
+        if (name.indexOf('Chemical') >= 0 || name.indexOf('Pesticide') >= 0 || name.indexOf('Fertilizer') >= 0) return 'Chemicals';
         if (name.indexOf('Auto') >= 0) return 'Auto';
         if (name.indexOf('Consumer') >= 0 || name.indexOf('FMCG') >= 0) return 'Consumer';
         if (name.indexOf('Metal') >= 0 || name.indexOf('Steel') >= 0) return 'Metals';
@@ -3204,7 +3217,8 @@ async function runScreener() {
     document.getElementById('screenerBody').innerHTML =
       `<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--red);">
         ❌ No data fetched. Yahoo Finance may be temporarily unavailable.<br/>
-        <span style="font-size:12px;color:var(--text3);">Wait a few minutes and try again, or try from a different network.</span>
+        <span style="font-size:12px;color:var(--text3);">Wait a few minutes and try again, or try from a different network.</span><br/>
+        <button class="btn btn-sm btn-secondary" style="margin-top:10px;" onclick="runScreener()">🔄 Retry</button>
       </td></tr>`;
   } else {
     results.sort((a, b) => b.score - a.score);
@@ -3273,7 +3287,7 @@ async function fetchStockData(symbol) {
   const ema50     = calcEMA(closes, 50);
   const rsi       = calcRSI(closes, 14);
   const vols      = volumes.filter(v => v > 0);
-  const avgVol20  = vols.slice(-21, -1).reduce((a, b) => a + b, 0) / 20;
+  const avgVol20  = vols.slice(-21, -1).reduce((a, b) => a + b, 0) / Math.min(20, Math.max(1, vols.length - 1));
   const lastVol   = vols[vols.length - 1] || 0;
   const volSpike  = avgVol20 > 0 ? lastVol / avgVol20 : 0;
   const high52    = Math.max(...closes);
@@ -3303,8 +3317,15 @@ async function fetchStockData(symbol) {
   const atr      = calcATR(chartCandles, 14);
   const atrPct   = atr ? (atr / price * 100) : null;
 
+  // Relative Strength vs Nifty (20-day return ratio)
+  var rs = null;
+  if (_niftyRet20 !== null && closes.length >= 21) {
+    var stockRet20 = (closes[closes.length - 1] - closes[closes.length - 21]) / closes[closes.length - 21] * 100;
+    rs = _niftyRet20 !== 0 ? stockRet20 / Math.abs(_niftyRet20) : (stockRet20 > 0 ? 99 : -99);
+  }
+
   return { symbol, fullName, price, changePct, rsi, ema20, volSpike, pctFrom52High,
-           score, signals, chartCandles, closes, atr, atrPct,
+           score, signals, chartCandles, closes, atr, atrPct, rs,
            source: usedTD ? 'TD' : 'YF' };
 }
 
@@ -3433,6 +3454,17 @@ function renderScreenerResults(results) {
       + (r.signals.vol==='pass'?'+20':' 0') + ' VOL | '
       + (r.signals.high52==='pass'?'+20':' 0') + ' 52W';
 
+    // RS vs Nifty cell
+    var rsCell;
+    if (r.rs !== null && r.rs !== undefined) {
+      var rsColor = r.rs >= 1.5 ? 'var(--green)' : r.rs >= 1 ? 'var(--orange)' : 'var(--red)';
+      var rsBg2   = r.rs >= 1.5 ? 'var(--green-bg)' : r.rs >= 1 ? 'var(--orange-bg)' : 'var(--red-bg)';
+      var rsLabel = r.rs >= 1.5 ? ' ✓' : r.rs >= 1 ? ' ~' : ' ✗';
+      rsCell = '<span style="display:inline-block;padding:2px 6px;border-radius:5px;background:' + rsBg2 + ';color:' + rsColor + ';font-family:\'DM Mono\',monospace;font-size:12px;font-weight:600;">' + r.rs.toFixed(2) + 'x' + rsLabel + '</span>';
+    } else {
+      rsCell = '<span style="color:var(--text3);font-size:11px;">Load regime</span>';
+    }
+
     return '<tr id="row_' + idx + '">'
       + '<td><strong class="mono">' + r.symbol + rsBadge + '</strong>'
       + (r.fullName ? '<br/><span style="font-size:10px;color:var(--text3);">' + r.fullName + '</span>' : '') + '</td>'
@@ -3442,6 +3474,7 @@ function renderScreenerResults(results) {
       + '<td>' + ema20Cell + '</td>'
       + '<td>' + ema50Cell + '</td>'
       + '<td>' + h52Cell + '</td>'
+      + '<td>' + rsCell + '</td>'
       + '<td class="mono">'
       + (r.atr ? '₹' + r.atr.toFixed(1) + '<br/><span style="font-size:10px;color:var(--text3);">' + r.atrPct.toFixed(1) + '%</span>' : '—')
       + '</td>'
@@ -3454,7 +3487,7 @@ function renderScreenerResults(results) {
       + '</div></td>'
       + '</tr>'
       + '<tr id="chart_' + idx + '" style="display:none;">'
-      + '<td colspan="10" style="padding:0;background:var(--surface2);">'
+      + '<td colspan="11" style="padding:0;background:var(--surface2);">'
       + (obWarning ? '<div style="padding:8px 16px;background:var(--red-bg);color:var(--red);font-size:12px;border-bottom:1px solid var(--border);">⚠️ RSI ' + r.rsi.toFixed(1) + ' — Overbought. Score capped at 60. Wait for RSI to pull back below 70 before entering.</div>' : '')
       + '<div style="padding:16px 20px;" id="chartWrap_' + idx + '"></div>'
       + '</td></tr>';
@@ -3923,7 +3956,8 @@ function calcRisk() {
 
   const maxLoss      = capital * riskPct / 100;
   const riskPerShare = entry - sl;
-  const calcQty      = Math.floor(maxLoss / riskPerShare);
+  const maxByCapital = entry > 0 ? Math.floor(capital / entry) : 0;
+  const calcQty      = Math.min(Math.floor(maxLoss / riskPerShare), maxByCapital);
   // Allow manual override (e.g. when free capital is limited)
   const overrideEl   = document.getElementById('r_qty_override');
   const rawOverride  = overrideEl ? parseInt(overrideEl.value) : NaN;
@@ -4054,6 +4088,30 @@ function calcRisk() {
     }
   } else {
     if (capCheckEl) capCheckEl.style.display = 'none';
+  }
+
+  // ── Consecutive loss streak warning ────────────────────────────────────────
+  var streakEl = document.getElementById('r_streak_warn');
+  if (streakEl) {
+    var closed = trades.filter(function(t) { return t.exit && t.exitDate; })
+      .slice().sort(function(a, b) { return new Date(b.exitDate) - new Date(a.exitDate); });
+    var streak = 0;
+    for (var si = 0; si < closed.length; si++) {
+      var t2 = closed[si];
+      var net2 = (parseFloat(t2.exit) - parseFloat(t2.entry)) * parseInt(t2.qty);
+      if (net2 < 0) streak++;
+      else break;
+    }
+    if (streak >= 2) {
+      var halfRisk = (riskPct / 2).toFixed(1);
+      streakEl.innerHTML = '<div style="padding:10px 12px;background:var(--orange-bg);border-radius:8px;border-left:3px solid var(--orange);font-size:12px;color:var(--orange);line-height:1.6;">'
+        + '<strong>⚠️ ' + streak + ' consecutive losses detected.</strong> Consider cutting position size to 50% until you get a winner. '
+        + 'Suggested risk: <strong>' + halfRisk + '%</strong> instead of ' + riskPct + '%.'
+        + '<br/><button class="btn btn-sm btn-secondary" style="margin-top:6px;" onclick="document.getElementById(\'r_riskPct\').value=\'' + halfRisk + '\';calcRisk();">Apply ' + halfRisk + '% risk</button>'
+        + '</div>';
+    } else {
+      streakEl.innerHTML = '';
+    }
   }
 }
 
@@ -4188,10 +4246,42 @@ function saveSundayPlan() {
   if (!entry) { alert('Enter an entry price first.'); return; }
   if (!sl)    { alert('Enter a stop-loss price first.'); return; }
 
-  const riskPerShare = entry - sl;
-  const maxLoss      = capital * riskPct / 100;
-  const qty          = riskPerShare > 0 ? Math.floor(maxLoss / riskPerShare) : 0;
-  const rr           = target ? ((target - entry) / riskPerShare).toFixed(2) : null;
+  // Volume confirmation check
+  var cachedResult = _screenerCache[sym];
+  if (cachedResult && cachedResult.volSpike < 1.5) {
+    if (!confirm('⚠️ Volume Warning\n\n' + sym + ' has a volume spike of only ' + cachedResult.volSpike.toFixed(2) + '× (need ≥1.5× for confirmation).\n\nLow volume breakouts have a higher false-breakout rate. Save anyway?')) return;
+  }
+
+  // Sector alignment check — warn if sector is weak in Discover heat
+  var sectorWeak = false;
+  var sectorName = '';
+  if (Object.keys(discoverData).length > 0) {
+    var baskets = getActiveSectorBaskets();
+    for (var bi = 0; bi < baskets.length; bi++) {
+      var basket = baskets[bi];
+      if (basket.stocks && basket.stocks.indexOf(sym) >= 0) {
+        sectorName = basket.name;
+        var sectorChg = basket.stocks.reduce(function(sum, s) {
+          return sum + (discoverData[s] ? discoverData[s].chg5d : 0);
+        }, 0) / basket.stocks.filter(function(s) { return discoverData[s]; }).length;
+        if (!isNaN(sectorChg) && sectorChg < 0) sectorWeak = true;
+        break;
+      }
+    }
+    if (sectorWeak) {
+      if (!confirm('⚠️ Sector Alignment Warning\n\n' + sectorName + ' sector is down ' + Math.abs(0).toFixed(1) + '% over 5 days — sector is in a downtrend.\n\nLongs against a weak sector have lower success rates. Save anyway?')) return;
+    }
+  }
+
+  const riskPerShare  = entry - sl;
+  const maxLoss       = capital * riskPct / 100;
+  const maxByCapital  = entry > 0 ? Math.floor(capital / entry) : 0;
+  const calcPlanQty   = riskPerShare > 0 ? Math.min(Math.floor(maxLoss / riskPerShare), maxByCapital) : 0;
+  const planOverrideEl= document.getElementById('r_qty_override');
+  const planRawOvr    = planOverrideEl ? parseInt(planOverrideEl.value) : NaN;
+  const planOvrVal    = (!isNaN(planRawOvr) && planRawOvr > 0) ? Math.min(planRawOvr, maxByCapital) : NaN;
+  const qty           = (!isNaN(planOvrVal) && planOvrVal > 0) ? planOvrVal : calcPlanQty;
+  const rr            = target ? ((target - entry) / riskPerShare).toFixed(2) : null;
 
   const plan = {
     id: Date.now(),
@@ -4227,7 +4317,7 @@ function editPlan(id) {
   var tabs = document.querySelectorAll('.tab-btn');
   switchTab('risk', tabs[2]);
   // Pre-fill journal tags for when user later logs this trade
-  autoFillJournalTags(sym);
+  autoFillJournalTags(p.sym);
   setTimeout(function() {
     // Show a note that this is an edit
     var note = document.getElementById('r_sl_note');
@@ -4293,7 +4383,7 @@ function checkMonday(id) {
   const openPrice = parseFloat(document.getElementById('mon_' + id).value);
   const resultEl  = document.getElementById('monResult_' + id);
   const p         = plans.find(p => p.id === id);
-  if (!p || isNaN(openPrice) || openPrice <= 0) return;
+  if (!p || isNaN(openPrice) || openPrice < 1) return;
 
   // ── Core metrics — everything is derived from these ───────────────────────
   const capital    = p.capital  || 25000;
@@ -4575,7 +4665,8 @@ function renderTradeMonitor() {
       + '<span>Entry <strong class="mono">₹' + t.entry.toFixed(2) + '</strong></span>'
       + '<span>SL <strong class="mono" style="color:var(--red);">₹' + t.sl.toFixed(2) + '</strong></span>'
       + (t.tgt ? '<span>Target <strong class="mono" style="color:var(--green);">₹' + t.tgt.toFixed(2) + '</strong></span>' : '')
-      + '<span>Qty <strong class="mono">' + t.qty + '</strong></span>'
+      + '<span>Qty <strong class="mono">' + (t.partialExit ? (t.qty - t.partialExit.qty) + ' <span style="color:var(--text3);">(was ' + t.qty + ')</span>' : t.qty) + '</strong></span>'
+      + (t.partialExit ? '<span style="color:var(--green);">✓ 50% exited at ₹' + t.partialExit.price.toFixed(2) + ' · <strong>+₹' + Math.round(t.partialExit.pnl) + '</strong> locked</span>' : '')
       + '</div>'
       + '</div>'
 
@@ -4638,7 +4729,8 @@ function updateMonitor(id, entry, sl, tgt, days, curPriceStr) {
     action = '✅ At 75% of target — Update OCO GTT in Kite: GTT orders → edit → update SL leg trigger to ₹' + newSL + ' (locks ₹' + Math.round((parseFloat(newSL) - entry) * qty) + ' profit). Target leg stays at ₹' + tgt.toFixed(2) + ' — do not touch it. Save the GTT.';
     actionBg = 'var(--green-bg)'; actionColor = 'var(--green)'; actionBorder = 'var(--green)';
   } else if (progress !== null && progress >= 50) {
-    action = '✅ At 50% of target — Update OCO GTT in Kite: GTT orders → edit → update SL leg trigger to ₹' + entry.toFixed(2) + ' (your entry price). Target leg stays at ₹' + (tgt||0).toFixed(2) + ' — do not touch it. Save. You are now RISK-FREE — worst case you break even.';
+    var partialBtn = (!t || t.partialExit) ? '' : ' <button class="btn btn-sm btn-secondary" style="margin-top:6px;" onclick="logPartialExit(' + id + ')">📤 Log 50% exit</button>';
+    action = '✅ At 50% of target — Update OCO GTT in Kite: GTT orders → edit → update SL leg trigger to ₹' + entry.toFixed(2) + ' (your entry price). Target leg stays at ₹' + (tgt||0).toFixed(2) + ' — do not touch it. Save. You are now RISK-FREE — worst case you break even.' + partialBtn;
     actionBg = 'var(--green-bg)'; actionColor = 'var(--green)'; actionBorder = 'var(--green)';
   } else if (days > 15) {
     action = '⏰ TIME STOP — Day ' + days + '. This setup has run its course. Exit Monday morning at market price. Sell ' + qty + ' shares of ' + (t ? t.sym : '') + ' at market open.';
@@ -4711,6 +4803,22 @@ function deleteTrade(id) {
   if (!confirm('Delete this trade?')) return;
   trades = trades.filter(t => t.id !== id);
   saveTrades();
+  renderJournal();
+}
+
+function logPartialExit(id) {
+  var t = trades.find(function(t) { return t.id === id; });
+  if (!t) return;
+  if (t.partialExit) { alert('Partial exit already recorded for this trade.'); return; }
+  var priceStr = prompt('Enter price at which you sold 50%:', t.tgt ? Math.round((t.entry + t.tgt) / 2) : '');
+  var price = parseFloat(priceStr);
+  if (!price || price <= 0) return;
+  var halfQty = Math.floor(t.qty / 2);
+  if (halfQty < 1) { alert('Qty too small to split.'); return; }
+  var pnl = (price - t.entry) * halfQty;
+  t.partialExit = { qty: halfQty, price: price, date: new Date().toISOString().split('T')[0], pnl: pnl };
+  saveTrades();
+  renderTradeMonitor();
   renderJournal();
 }
 
@@ -5572,6 +5680,43 @@ function renderStats() {
   } else if (eqEl) {
     eqEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:8px 0;">Not enough data — ensure SL and Target are set on trades</div>';
   }
+
+  // ── Kelly Criterion ────────────────────────────────────────────────────────
+  const kellyEl = document.getElementById('st_kelly');
+  if (kellyEl) {
+    if (winners.length >= 5 && losers.length >= 3) {
+      const wRate   = winners.length / tradeData.length;
+      const lRate   = 1 - wRate;
+      const avgW    = Math.abs(avgWin);
+      const avgL    = Math.abs(avgLoss);
+      const kelly   = avgW > 0 ? ((wRate * avgW - lRate * avgL) / avgW) * 100 : 0;
+      const halfK   = kelly / 2;
+      const kellyCol  = kelly > 0 ? 'var(--green)' : 'var(--red)';
+      const halfKCol  = halfK > 0 ? 'var(--accent2)' : 'var(--red)';
+      kellyEl.innerHTML =
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">'
+        + '<div style="padding:14px;background:var(--surface2);border-radius:10px;text-align:center;">'
+        + '<div style="font-size:22px;font-weight:700;font-family:DM Mono,monospace;color:' + kellyCol + ';">' + kelly.toFixed(1) + '%</div>'
+        + '<div style="font-size:11px;color:var(--text3);margin-top:4px;">Full Kelly</div>'
+        + '</div>'
+        + '<div style="padding:14px;background:var(--green-bg);border-radius:10px;text-align:center;border:1px solid var(--green);">'
+        + '<div style="font-size:22px;font-weight:700;font-family:DM Mono,monospace;color:' + halfKCol + ';">' + halfK.toFixed(1) + '%</div>'
+        + '<div style="font-size:11px;color:var(--text3);margin-top:4px;">Half-Kelly (recommended)</div>'
+        + '</div>'
+        + '</div>'
+        + '<div style="font-size:12px;color:var(--text2);background:var(--surface2);padding:10px 12px;border-radius:8px;line-height:1.7;">'
+        + 'Based on <strong>' + tradeData.length + '</strong> trades · Win rate <strong>' + winRate + '%</strong> · Avg win <strong>₹' + avgW.toFixed(0) + '</strong> · Avg loss <strong>₹' + avgL.toFixed(0) + '</strong><br/>'
+        + (halfK > 0
+          ? '→ Risk <strong style="color:var(--accent2);">' + halfK.toFixed(1) + '%</strong> of capital per trade (Half-Kelly). '
+            + 'With ₹1,00,000 capital that\'s <strong>₹' + Math.round(1e5 * halfK / 100).toLocaleString('en-IN') + '</strong> deployed per trade.'
+          : '<span style="color:var(--red);">⚠️ Negative Kelly — your edge is not yet positive. Focus on improving win rate or R:R before increasing size.</span>')
+        + '</div>';
+    } else {
+      kellyEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:8px 0;">Need at least 5 winners and 3 losers for a meaningful Kelly estimate.</div>';
+    }
+  }
+
+  renderTagAnalysis();
 }
 
 
@@ -5595,6 +5740,11 @@ async function refreshMarketRegime() {
     var price = closes[closes.length - 1];
     var ema50 = calcEMA(closes, 50);
     var ema20 = calcEMA(closes, 20);
+    // Store Nifty 20-day return for RS calculation in screener
+    if (closes.length >= 21) {
+      var niftyOld = closes[closes.length - 21];
+      _niftyRet20 = niftyOld > 0 ? (price - niftyOld) / niftyOld * 100 : null;
+    }
 
     var regime, emoji, bg, col;
     if (price > ema50) {
