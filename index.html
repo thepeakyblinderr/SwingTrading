@@ -4255,21 +4255,24 @@ function saveSundayPlan() {
   // Sector alignment check — warn if sector is weak in Discover heat
   var sectorWeak = false;
   var sectorName = '';
+  var sectorChgVal = 0;
   if (Object.keys(discoverData).length > 0) {
     var baskets = getActiveSectorBaskets();
     for (var bi = 0; bi < baskets.length; bi++) {
       var basket = baskets[bi];
-      if (basket.stocks && basket.stocks.indexOf(sym) >= 0) {
+      var syms = basket.stocks ? basket.stocks.map(function(s) { return s.sym || s; }) : [];
+      if (syms.indexOf(sym) >= 0) {
         sectorName = basket.name;
-        var sectorChg = basket.stocks.reduce(function(sum, s) {
-          return sum + (discoverData[s] ? discoverData[s].chg5d : 0);
-        }, 0) / basket.stocks.filter(function(s) { return discoverData[s]; }).length;
-        if (!isNaN(sectorChg) && sectorChg < 0) sectorWeak = true;
+        var validSyms = syms.filter(function(s) { return discoverData[s]; });
+        if (validSyms.length > 0) {
+          sectorChgVal = validSyms.reduce(function(sum, s) { return sum + discoverData[s].chg5d; }, 0) / validSyms.length;
+          if (!isNaN(sectorChgVal) && sectorChgVal < 0) sectorWeak = true;
+        }
         break;
       }
     }
     if (sectorWeak) {
-      if (!confirm('⚠️ Sector Alignment Warning\n\n' + sectorName + ' sector is down ' + Math.abs(0).toFixed(1) + '% over 5 days — sector is in a downtrend.\n\nLongs against a weak sector have lower success rates. Save anyway?')) return;
+      if (!confirm('⚠️ Sector Alignment Warning\n\n' + sectorName + ' sector is down ' + Math.abs(sectorChgVal).toFixed(1) + '% over 5 days — sector is in a downtrend.\n\nLongs against a weak sector have lower success rates. Save anyway?')) return;
     }
   }
 
