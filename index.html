@@ -4638,6 +4638,7 @@ function renderTradeMonitor() {
     const riskZone   = t.entry - t.sl;
 
     // SL ladder targets
+    const price1R  = t.entry + riskZone;                              // 1:1 R:R level
     const sl50pct  = t.entry;                                          // breakeven
     const sl75pct  = t.tgt ? (t.entry + (profitZone * 0.5)) : null;  // lock 50% profit
     const price50  = t.tgt ? (t.entry + profitZone * 0.5)  : null;   // price at 50%
@@ -4678,6 +4679,7 @@ function renderTradeMonitor() {
       + '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:8px;">SL Ladder</div>'
       + '<div style="display:grid;gap:5px;">'
       + ladderRow('0%',   'Entry — current SL',                    '₹' + t.sl.toFixed(2),         'At risk ₹' + Math.round(riskZone * t.qty),            'var(--surface2)', 'var(--text2)')
+      + ladderRow('1:1',  'Price reaches ₹' + price1R.toFixed(0) + ' → move SL to entry (breakeven)', '₹' + t.entry.toFixed(2), 'Risk = ₹0 · cannot lose from here', 'rgba(42,107,200,0.08)', 'var(--accent2)')
       + (price50 ? ladderRow('50%',  'Price reaches ₹' + price50.toFixed(0) + ' → move SL to entry', '₹' + sl50pct.toFixed(2) + ' (breakeven)', 'Risk = ₹0',                         'var(--green-bg)', 'var(--green)') : '')
       + (price75 && sl75pct ? ladderRow('75%',  'Price reaches ₹' + price75.toFixed(0) + ' → move SL here',   '₹' + sl75pct.toFixed(2),              'Locks ₹' + Math.round((sl75pct - t.entry) * t.qty) + ' profit', 'var(--green-bg)', 'var(--green)') : '')
       + (price95 ? ladderRow('95%',  'Price reaches ₹' + price95.toFixed(0) + ' → cancel SL, place sell',     '₹' + (t.tgt||0).toFixed(2),           'Full profit ₹' + (t.tgt ? Math.round(profitZone * t.qty) : '—'), 'var(--green-bg)', 'var(--green)') : '')
@@ -4735,6 +4737,13 @@ function updateMonitor(id, entry, sl, tgt, days, curPriceStr) {
     var partialBtn = (!t || t.partialExit) ? '' : ' <button class="btn btn-sm btn-secondary" style="margin-top:6px;" onclick="logPartialExit(' + id + ')">📤 Log 50% exit</button>';
     action = '✅ At 50% of target — Update OCO GTT in Kite: GTT orders → edit → update SL leg trigger to ₹' + entry.toFixed(2) + ' (your entry price). Target leg stays at ₹' + (tgt||0).toFixed(2) + ' — do not touch it. Save. You are now RISK-FREE — worst case you break even.' + partialBtn;
     actionBg = 'var(--green-bg)'; actionColor = 'var(--green)'; actionBorder = 'var(--green)';
+  } else if (cur >= entry + riskZone) {
+    // 1:1 R:R reached — profit now equals initial risk (fires before 50% when R:R > 2)
+    action = '🔵 1:1 R:R reached — price is up ₹' + riskZone.toFixed(0) + ', matching your initial risk. '
+      + 'Move SL to breakeven (₹' + entry.toFixed(2) + ') now. '
+      + 'Update OCO GTT in Kite: GTT → edit → set SL leg to ₹' + entry.toFixed(2) + '. '
+      + 'Worst case from here: ₹0 loss. Hold for target.';
+    actionBg = 'rgba(42,107,200,0.08)'; actionColor = 'var(--accent2)'; actionBorder = 'var(--accent2)';
   } else if (days > 15) {
     action = '⏰ TIME STOP — Day ' + days + '. This setup has run its course. Exit Monday morning at market price. Sell ' + qty + ' shares of ' + (t ? t.sym : '') + ' at market open.';
     actionBg = 'var(--red-bg)'; actionColor = 'var(--red)'; actionBorder = 'var(--red)';
