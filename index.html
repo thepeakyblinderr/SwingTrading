@@ -2350,6 +2350,7 @@ async function runDiscover() {
   const meta = document.getElementById('discoverMeta');
   const container = document.getElementById('discoverSectors');
 
+  discoverData = {};
   btn.disabled = true;
   btn.innerHTML = '<span class="loader"></span> Fetching...';
   container.innerHTML = `<div style="text-align:center;padding:32px;color:var(--text3);">⏳ Fetching price data for all sectors...</div>`;
@@ -2800,7 +2801,7 @@ function openSync() {
     document.getElementById('syncGistStatus').textContent = 'Connected to Firebase';
     const last = localStorage.getItem('st_lastSync');
     const el = document.getElementById('syncLastSync');
-    if (el) el.textContent = last ? 'Last synced: ' + new Date(parseInt(last)).toLocaleString('en-IN') : 'Never synced on this device';
+    if (el) { const d = last ? new Date(parseInt(last)) : null; el.textContent = d && !isNaN(d) ? 'Last synced: ' + d.toLocaleString('en-IN') : 'Never synced on this device'; }
   } else {
     document.getElementById('syncGistStatus').textContent = 'Not connected';
   }
@@ -2862,9 +2863,10 @@ function applyPayload(payload) {
   if (Object.prototype.hasOwnProperty.call(payload, 'learnings'))     localStorage.setItem('st_learnings',     payload.learnings || '');
   if (Object.prototype.hasOwnProperty.call(payload, 'sectorBaskets') && payload.sectorBaskets)
                                                                         localStorage.setItem('st_sectorBaskets', JSON.stringify(payload.sectorBaskets));
-  watchlist = JSON.parse(localStorage.getItem('st_watchlist') || '[]');
-  trades    = JSON.parse(localStorage.getItem('st_trades')    || '[]');
-  plans     = JSON.parse(localStorage.getItem('st_plans')     || '[]');
+  function safeParse(key, fallback) { try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch(e) { return fallback; } }
+  watchlist = safeParse('st_watchlist', []);
+  trades    = safeParse('st_trades',    []);
+  plans     = safeParse('st_plans',     []);
   localStorage.setItem('st_lastSync', Date.now().toString());
   closeSyncModal();
   setTimeout(() => {
@@ -2926,7 +2928,8 @@ async function firebasePull() {
     const wlCount    = payload.watchlist   ? payload.watchlist.length   : 0;
     const planCount  = payload.plans       ? payload.plans.length       : 0;
     const savedDate  = payload.ts ? new Date(payload.ts).toLocaleString('en-IN') : 'unknown';
-    const confirmMsg = 'Pull from Firebase?\n\nLast saved: ' + savedDate + '\n• ' + wlCount + ' watchlist stocks\n• ' + tradeCount + ' journal trades\n• ' + planCount + ' plans\n\nThis replaces your current local data.';
+    const localTradeCount = trades ? trades.length : 0;
+    const confirmMsg = 'Pull from Firebase?\n\nRemote data (last saved: ' + savedDate + '):\n• ' + wlCount + ' watchlist stocks\n• ' + tradeCount + ' journal trades\n• ' + planCount + ' plans\n\nThis will overwrite your ' + localTradeCount + ' local trade(s). This cannot be undone.';
     if (!confirm(confirmMsg)) {
       btn.disabled = false; btn.textContent = 'Pull Now';
       setSyncStatus('idle'); return;
@@ -3019,7 +3022,7 @@ function getSectorForSym(sym) {
         if (name.indexOf('Banking') >= 0 || name.indexOf('Finance') >= 0) return 'Banking';
         if (name.indexOf('IT') >= 0) return 'IT';
         if (name.indexOf('Pharma') >= 0) return 'Pharma';
-        if (name.indexOf('Chem') >= 0) return 'Chemicals';
+        if (name.indexOf('Chemical') >= 0 || name.indexOf('Pesticide') >= 0 || name.indexOf('Fertilizer') >= 0) return 'Chemicals';
         if (name.indexOf('Auto') >= 0) return 'Auto';
         if (name.indexOf('Consumer') >= 0 || name.indexOf('FMCG') >= 0) return 'Consumer';
         if (name.indexOf('Metal') >= 0 || name.indexOf('Steel') >= 0) return 'Metals';
@@ -3204,7 +3207,8 @@ async function runScreener() {
     document.getElementById('screenerBody').innerHTML =
       `<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--red);">
         ❌ No data fetched. Yahoo Finance may be temporarily unavailable.<br/>
-        <span style="font-size:12px;color:var(--text3);">Wait a few minutes and try again, or try from a different network.</span>
+        <span style="font-size:12px;color:var(--text3);">Wait a few minutes and try again, or try from a different network.</span><br/>
+        <button class="btn btn-sm btn-secondary" style="margin-top:10px;" onclick="runScreener()">🔄 Retry</button>
       </td></tr>`;
   } else {
     results.sort((a, b) => b.score - a.score);
@@ -3273,7 +3277,7 @@ async function fetchStockData(symbol) {
   const ema50     = calcEMA(closes, 50);
   const rsi       = calcRSI(closes, 14);
   const vols      = volumes.filter(v => v > 0);
-  const avgVol20  = vols.slice(-21, -1).reduce((a, b) => a + b, 0) / 20;
+  const avgVol20  = vols.slice(-21, -1).reduce((a, b) => a + b, 0) / Math.min(20, Math.max(1, vols.length - 1));
   const lastVol   = vols[vols.length - 1] || 0;
   const volSpike  = avgVol20 > 0 ? lastVol / avgVol20 : 0;
   const high52    = Math.max(...closes);
@@ -3923,7 +3927,8 @@ function calcRisk() {
 
   const maxLoss      = capital * riskPct / 100;
   const riskPerShare = entry - sl;
-  const calcQty      = Math.floor(maxLoss / riskPerShare);
+  const maxByCapital = entry > 0 ? Math.floor(capital / entry) : 0;
+  const calcQty      = Math.min(Math.floor(maxLoss / riskPerShare), maxByCapital);
   // Allow manual override (e.g. when free capital is limited)
   const overrideEl   = document.getElementById('r_qty_override');
   const rawOverride  = overrideEl ? parseInt(overrideEl.value) : NaN;
@@ -4227,7 +4232,7 @@ function editPlan(id) {
   var tabs = document.querySelectorAll('.tab-btn');
   switchTab('risk', tabs[2]);
   // Pre-fill journal tags for when user later logs this trade
-  autoFillJournalTags(sym);
+  autoFillJournalTags(p.sym);
   setTimeout(function() {
     // Show a note that this is an edit
     var note = document.getElementById('r_sl_note');
@@ -4293,7 +4298,7 @@ function checkMonday(id) {
   const openPrice = parseFloat(document.getElementById('mon_' + id).value);
   const resultEl  = document.getElementById('monResult_' + id);
   const p         = plans.find(p => p.id === id);
-  if (!p || isNaN(openPrice) || openPrice <= 0) return;
+  if (!p || isNaN(openPrice) || openPrice < 1) return;
 
   // ── Core metrics — everything is derived from these ───────────────────────
   const capital    = p.capital  || 25000;
