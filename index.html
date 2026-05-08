@@ -3275,6 +3275,17 @@ async function fetchStockData(symbol) {
 
   if (!closes || closes.length < 55) return null;
 
+  // Normalize to last 100 candles before all calculations so score is
+  // identical regardless of whether TD (120) or YF (125+) was used.
+  // Without this, EMA seeds differ between sources → score flips on same data.
+  const N = Math.min(closes.length, 100);
+  closes     = closes.slice(-N);
+  opens      = opens.slice(-N);
+  highs      = highs.slice(-N);
+  lows       = lows.slice(-N);
+  volumes    = volumes.slice(-N);
+  timestamps = timestamps.slice(-N);
+
   const chartCandles = closes.slice(-60).map((cv, i) => {
     const idx = closes.length - 60 + i;
     return { c: cv, o: opens[idx], h: highs[idx], l: lows[idx], v: volumes[idx], ts: timestamps[idx] };
