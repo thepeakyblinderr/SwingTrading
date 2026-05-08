@@ -4284,7 +4284,7 @@ function saveSundayPlan() {
   const planRawOvr    = planOverrideEl ? parseInt(planOverrideEl.value) : NaN;
   const planOvrVal    = (!isNaN(planRawOvr) && planRawOvr > 0) ? Math.min(planRawOvr, maxByCapital) : NaN;
   const qty           = (!isNaN(planOvrVal) && planOvrVal > 0) ? planOvrVal : calcPlanQty;
-  const rr            = target ? ((target - entry) / riskPerShare).toFixed(2) : null;
+  const rr            = (target && riskPerShare > 0) ? ((target - entry) / riskPerShare).toFixed(2) : null;
 
   const plan = {
     id: Date.now(),
@@ -4754,7 +4754,7 @@ function updateMonitor(id, entry, sl, tgt, days, curPriceStr) {
       action = '⚠️ Day ' + days + ' — Action zone. Stock not progressing. Prepare to exit if no movement by day 15. Check: is RSI above 50? Is price above 20 EMA on TradingView?';
     }
     actionBg = 'var(--orange-bg)'; actionColor = 'var(--orange)'; actionBorder = 'var(--orange)';
-  } else if (cur < entry) {
+  } else if (cur < entry && riskZone > 0) {
     const slPct = ((entry - cur) / riskZone * 100).toFixed(0);
     action = '📉 Stock below entry by ₹' + (entry - cur).toFixed(2) + ' (' + slPct + '% toward SL). Hold — SL at ₹' + sl.toFixed(2) + ' is protecting you. Do NOT exit early — let SL do its job.';
     actionBg = 'var(--surface2)'; actionColor = 'var(--text2)'; actionBorder = 'var(--border)';
@@ -5433,7 +5433,7 @@ function renderStats() {
   if (closed.length === 0) {
     if (emptyEl) emptyEl.style.display = 'block';
     ['st_trades','st_winrate','st_avgR','st_pf','st_netpnl','st_retpct','st_annret','st_vsfd',
-     'st_rChart','st_monthlyChart','st_best','st_worst','st_winners','st_losers','st_exitQuality']
+     'st_rChart','st_monthlyChart','st_best','st_worst','st_winners','st_losers','st_exitQuality','st_kelly']
       .forEach(id => { const el=document.getElementById(id); if(el) el.innerHTML='—'; });
     return;
   }
