@@ -3314,6 +3314,9 @@ async function fetchStockData(symbol) {
   if (price > ema20)           { score += 20; signals.ema20 = 'pass'; } else { signals.ema20 = 'fail'; }
   if (price > ema50)           { score += 20; signals.ema50 = 'pass'; } else { signals.ema50 = 'fail'; }
 
+  // EMA stack: 20 EMA must be above 50 EMA to confirm the uptrend is real
+  signals.emaStack = ema20 > ema50 ? 'pass' : 'fail';
+
   if (volSpike >= 1.5)         { score += 20; signals.vol = 'pass'; }
   else if (volSpike >= 1.0)    { signals.vol = 'neutral'; }
   else                         { signals.vol = 'fail'; }
@@ -3323,6 +3326,7 @@ async function fetchStockData(symbol) {
   if (signals.rsi === 'overbought')                         score = Math.min(score, 60);
   if (signals.ema20 === 'fail' && signals.ema50 === 'fail') score = Math.min(score, 40);
   if (rsi < 50)                                             score = Math.min(score, 50);
+  if (signals.emaStack === 'fail')                          score = Math.min(score, 60);
 
   const fullName = NSE_STOCKS[symbol] || '';
   const atr      = calcATR(chartCandles, 14);
@@ -3428,8 +3432,10 @@ function renderScreenerResults(results) {
     const changeColor = r.changePct >= 0 ? 'var(--green)' : 'var(--red)';
     const barColor    = r.score >= 70 ? '#1e7a4e' : r.score >= 50 ? '#d4780a' : '#c0392b';
     const obWarning   = r.signals.rsi === 'overbought';
-    var relStrength   = _marketRegime === 'bear' && r.signals && r.signals.ema50 === 'pass';
-    var rsBadge       = relStrength ? ' <span style="background:#1e5c36;color:white;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;">RELSTR</span>' : '';
+    // RS+ badge: stock outperforming Nifty by 1.5x or more over 20 days (any regime)
+    var rsBadge = (r.rs !== null && r.rs >= 1.5)
+      ? ' <span title="Outperforming Nifty by ' + r.rs.toFixed(1) + 'x over 20 days" style="background:#1e5c36;color:white;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;">RS+</span>'
+      : '';
     const chgSign     = r.changePct >= 0 ? '+' : '';
 
     // RSI cell
@@ -3458,12 +3464,19 @@ function renderScreenerResults(results) {
     const h52Bg    = h52pass ? 'var(--green-bg)' : r.pctFrom52High <= 30 ? 'var(--orange-bg)' : 'var(--red-bg)';
     const h52Cell  = '<span style="display:inline-block;padding:2px 6px;border-radius:5px;background:' + h52Bg + ';color:' + h52Color + ';font-family:\'DM Mono\',monospace;font-size:12px;font-weight:600;">' + r.pctFrom52High.toFixed(1) + '% ' + (h52pass ? '✓' : '✗') + '</span>';
 
+    // EMA stack badge — shown on symbol cell
+    const emaStackPass = r.signals.emaStack === 'pass';
+    const emaStackBadge = emaStackPass
+      ? ' <span title="EMA Stack: 20 EMA above 50 EMA — confirmed uptrend" style="background:#1e5c36;color:white;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;">STACK ✓</span>'
+      : ' <span title="EMA Stack broken: 20 EMA below 50 EMA — score capped at 60" style="background:var(--orange);color:white;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;">STACK ✗</span>';
+
     // Score breakdown
     const breakdown = (r.signals.rsi==='pass'?'+20':' 0') + ' RSI | '
       + (r.signals.ema20==='pass'?'+20':' 0') + ' 20E | '
       + (r.signals.ema50==='pass'?'+20':' 0') + ' 50E | '
       + (r.signals.vol==='pass'?'+20':' 0') + ' VOL | '
-      + (r.signals.high52==='pass'?'+20':' 0') + ' 52W';
+      + (r.signals.high52==='pass'?'+20':' 0') + ' 52W | '
+      + (emaStackPass ? 'STACK ✓' : 'STACK ✗ cap 60');
 
     // RS vs Nifty cell
     var rsCell;
@@ -3477,7 +3490,7 @@ function renderScreenerResults(results) {
     }
 
     return '<tr id="row_' + idx + '">'
-      + '<td><strong class="mono">' + r.symbol + rsBadge + '</strong>'
+      + '<td><strong class="mono">' + r.symbol + rsBadge + '</strong>' + emaStackBadge
       + (r.fullName ? '<br/><span style="font-size:10px;color:var(--text3);">' + r.fullName + '</span>' : '') + '</td>'
       + '<td class="mono">₹' + r.price.toFixed(2) + '<br/><span style="font-size:11px;color:' + changeColor + ';">' + chgSign + r.changePct.toFixed(2) + '%</span></td>'
       + '<td>' + rsiCell + '</td>'
@@ -3530,7 +3543,7 @@ function drawChart(idx, container) {
 
   // Layout constants — generous padding so labels never overlap
   const PAD_L   = 52;   // Y-axis labels
-  const PAD_R   = 36;   // EMA end labels
+  const PAD_R   = 54;   // level labels on right
   const PAD_T   = 30;   // Trend label
   const PAD_B   = 6;
   const SIG_H   = 18;   // Signal badges row height
@@ -3612,7 +3625,7 @@ function drawChart(idx, container) {
     // Label with background box on RIGHT side
     const lx = W - PAD_R + 2;
     svg += '<rect x="' + lx + '" y="' + (parseFloat(ly)-8) + '" width="' + (PAD_R-2) + '" height="11" fill="var(--surface)" opacity="0.9"/>';
-    svg += '<text x="' + (lx+1) + '" y="' + (parseFloat(ly)+2) + '" font-size="8" fill="' + lv.col + '" font-family="DM Mono,monospace" font-weight="700">' + lv.label.substring(0, 7) + '</text>';
+    svg += '<text x="' + (lx+1) + '" y="' + (parseFloat(ly)+2) + '" font-size="8" fill="' + lv.col + '" font-family="DM Mono,monospace" font-weight="700">' + lv.label.substring(0, 9) + '</text>';
   });
 
   // ── Volume bars ──────────────────────────────────────────────────────────
@@ -3622,63 +3635,65 @@ function drawChart(idx, container) {
     const vh  = VBAR_H * ((c.v || 0) / maxVol);
     const vy2 = vbarBot - vh;
     const isBull = c.c >= c.o;
-    svg += '<rect x="' + x.toFixed(1) + '" y="' + vy2.toFixed(1) + '" width="' + candleW + '" height="' + vh.toFixed(1) + '" fill="' + (isBull ? '#1e7a4e' : '#555') + '" opacity="0.4"/>';
+    svg += '<rect x="' + x.toFixed(1) + '" y="' + vy2.toFixed(1) + '" width="' + candleW + '" height="' + vh.toFixed(1) + '" fill="' + (isBull ? '#26a65b' : '#c0392b') + '" opacity="0.35"/>';
   });
 
-  // ── Candles — filled=bullish, hollow=bearish ─────────────────────────────
+  // ── Candles — green=bullish, red=bearish ─────────────────────────────────
   candles.forEach((c, i) => {
     const x      = px(i);
     const isBull = c.c >= c.o;
     const top    = py(Math.max(c.o, c.c));
     const bot    = py(Math.min(c.o, c.c));
     const bodyH  = Math.max(1.5, bot - top);
+    const col    = isBull ? '#26a65b' : '#c0392b';
 
-    svg += '<line x1="' + x.toFixed(1) + '" y1="' + py(c.h).toFixed(1) + '" x2="' + x.toFixed(1) + '" y2="' + py(c.l).toFixed(1) + '" stroke="var(--text2)" stroke-width="0.8"/>';
-
-    if (isBull) {
-      svg += '<rect x="' + (x - candleW/2).toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + candleW + '" height="' + bodyH.toFixed(1) + '" fill="var(--text)" rx="1"/>';
-    } else {
-      svg += '<rect x="' + (x - candleW/2).toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + candleW + '" height="' + bodyH.toFixed(1) + '" fill="none" stroke="var(--text2)" stroke-width="1.2" rx="1"/>';
-    }
+    // Wick — same color as candle body for clarity
+    svg += '<line x1="' + x.toFixed(1) + '" y1="' + py(c.h).toFixed(1) + '" x2="' + x.toFixed(1) + '" y2="' + py(c.l).toFixed(1) + '" stroke="' + col + '" stroke-width="1"/>';
+    svg += '<rect x="' + (x - candleW/2).toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + candleW + '" height="' + bodyH.toFixed(1) + '" fill="' + col + '" rx="1"/>';
   });
 
-  // ── EMA lines — solid (20) vs dashed (50) ───────────────────────────────
+  // ── EMA lines — solid blue (20) vs dashed orange (50) ───────────────────
   let ema20path = '', ema50path = '';
   ema20arr.forEach((v, i) => { if (v != null) ema20path += (ema20path===''?'M':'L') + px(i).toFixed(1) + ',' + py(v).toFixed(1) + ' '; });
   ema50arr.forEach((v, i) => { if (v != null) ema50path += (ema50path===''?'M':'L') + px(i).toFixed(1) + ',' + py(v).toFixed(1) + ' '; });
 
-  if (ema20path) {
-    svg += '<path d="' + ema20path + '" fill="none" stroke="#2a6bc8" stroke-width="1.5"/>';
-    // Label inside chart area (right edge, above last candle)
-    const lv20 = ema20arr[ema20arr.length-1];
-    if (lv20) {
-      svg += '<rect x="' + (W-PAD_R+2) + '" y="' + (py(lv20)-8).toFixed(1) + '" width="28" height="10" fill="var(--surface)" opacity="0.9"/>';
-      svg += '<text x="' + (W-PAD_R+3) + '" y="' + (py(lv20)+1).toFixed(1) + '" font-size="8.5" fill="#2a6bc8" font-weight="700" font-family="DM Mono,monospace">─20E</text>';
-    }
-  }
+  // Labels placed INSIDE chart at ~75% width — away from right-side level labels
+  const emaLabelX = (PAD_L + plotW * 0.75).toFixed(1);
+
   if (ema50path) {
-    svg += '<path d="' + ema50path + '" fill="none" stroke="#c8722a" stroke-width="1.5" stroke-dasharray="5,3"/>';
+    svg += '<path d="' + ema50path + '" fill="none" stroke="#c8722a" stroke-width="2.2" stroke-dasharray="6,4"/>';
     const lv50 = ema50arr[ema50arr.length-1];
     if (lv50) {
-      svg += '<rect x="' + (W-PAD_R+2) + '" y="' + (py(lv50)-8).toFixed(1) + '" width="28" height="10" fill="var(--surface)" opacity="0.9"/>';
-      svg += '<text x="' + (W-PAD_R+3) + '" y="' + (py(lv50)+1).toFixed(1) + '" font-size="8.5" fill="#c8722a" font-weight="700" font-family="DM Mono,monospace">╌50E</text>';
+      const ly50 = py(lv50).toFixed(1);
+      svg += '<rect x="' + emaLabelX + '" y="' + (py(lv50)-8).toFixed(1) + '" width="36" height="11" rx="2" fill="var(--surface)" opacity="0.88"/>';
+      svg += '<text x="' + (parseFloat(emaLabelX)+3) + '" y="' + (py(lv50)+1.5).toFixed(1) + '" font-size="9" fill="#c8722a" font-weight="700" font-family="DM Mono,monospace">EMA 50</text>';
+    }
+  }
+  if (ema20path) {
+    svg += '<path d="' + ema20path + '" fill="none" stroke="#2a6bc8" stroke-width="2.2"/>';
+    const lv20 = ema20arr[ema20arr.length-1];
+    if (lv20) {
+      const labelX20 = (PAD_L + plotW * 0.88).toFixed(1);
+      svg += '<rect x="' + labelX20 + '" y="' + (py(lv20)-8).toFixed(1) + '" width="36" height="11" rx="2" fill="var(--surface)" opacity="0.88"/>';
+      svg += '<text x="' + (parseFloat(labelX20)+3) + '" y="' + (py(lv20)+1.5).toFixed(1) + '" font-size="9" fill="#2a6bc8" font-weight="700" font-family="DM Mono,monospace">EMA 20</text>';
     }
   }
 
   // ── Signal badges — BELOW volume, above RSI panel ───────────────────────
   const sig     = r.signals || {};
   const sigList = [
-    { label: '20EMA', pass: sig.ema20  === 'pass' },
-    { label: '50EMA', pass: sig.ema50  === 'pass' },
-    { label: 'VOL',   pass: sig.vol    === 'pass', neutral: sig.vol === 'neutral' },
-    { label: '52WH',  pass: sig.high52 === 'pass' },
+    { label: '20EMA', pass: sig.ema20     === 'pass' },
+    { label: '50EMA', pass: sig.ema50     === 'pass' },
+    { label: 'STACK', pass: sig.emaStack  === 'pass', fail: sig.emaStack === 'fail' },
+    { label: 'VOL',   pass: sig.vol       === 'pass', neutral: sig.vol === 'neutral' },
+    { label: '52WH',  pass: sig.high52    === 'pass' },
   ];
   let bx = PAD_L;
   const badgeY = sigTop + 12;
   sigList.forEach(function(s) {
     const sym2 = s.pass ? '✓' : (s.neutral ? '~' : '✗');
-    const col2 = s.pass ? '#1e7a4e' : (s.neutral ? '#d4780a' : '#888');
-    const bg2  = s.pass ? '#eaf5ef' : (s.neutral ? '#fef5e7' : 'var(--surface2)');
+    const col2 = s.pass ? '#1e7a4e' : (s.neutral ? '#d4780a' : (s.fail ? '#c0392b' : '#888'));
+    const bg2  = s.pass ? '#eaf5ef' : (s.neutral ? '#fef5e7' : (s.fail ? '#fdecea' : 'var(--surface2)'));
     const txt  = sym2 + ' ' + s.label;
     const tw   = txt.length * 5.8 + 8;
     svg += '<rect x="' + bx + '" y="' + (badgeY-10) + '" width="' + tw + '" height="13" rx="3" fill="' + bg2 + '"/>';
@@ -3730,7 +3745,10 @@ function drawChart(idx, container) {
     + (r.atr ? ' · ATR ₹' + r.atr.toFixed(1) + ' (' + r.atrPct.toFixed(1) + '%)' : '')
     + '</div>'
     + '<div style="font-size:10px;color:var(--text3);margin-top:2px;padding:0 4px;">'
-    + '■ Filled = bullish candle · □ Hollow = bearish candle · ─ = 20 EMA · ╌ = 50 EMA'
+    + '<span style="color:#26a65b;font-weight:700;">■</span> Bullish &nbsp;'
+    + '<span style="color:#c0392b;font-weight:700;">■</span> Bearish &nbsp;'
+    + '<span style="color:#2a6bc8;font-weight:700;">─</span> EMA 20 &nbsp;'
+    + '<span style="color:#c8722a;font-weight:700;">╌</span> EMA 50'
     + '</div>';
 }
 
