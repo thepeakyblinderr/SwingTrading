@@ -3594,22 +3594,27 @@ function renderScreenerResults(results) {
   // Regime-aware filtering
   var filteredResults = results;
   if (_marketRegime === 'choppy') {
-    // Situation 1: only 80+ scores, RSI 58-68, vol 1.8x+
+    // Below 50 EMA, above 200 EMA — only high-conviction setups
+    filteredResults = results.filter(function(r) { return r.score >= 80; });
+    if (!filteredResults.length) filteredResults = results;
+  } else if (_marketRegime === 'bear') {
+    // Below both EMAs — only RS+ stocks at 85+
     filteredResults = results.filter(function(r) {
-      return r.score >= 80
-        && r.rsi >= 58 && r.rsi <= 68
-        && r.volSpike >= 1.8;
+      return r.score >= 85 && r.signals && r.signals.ema200 === 'pass';
     });
-    if (!filteredResults.length) filteredResults = results; // show all if none pass
+    if (!filteredResults.length) filteredResults = results;
   }
 
   var filterNote = '';
   if (_marketRegime === 'choppy' && filteredResults.length < results.length) {
     filterNote = '<div style="padding:8px 12px;background:var(--orange-bg);border-radius:8px;font-size:12px;color:var(--orange);margin-bottom:10px;">'
-      + '🟡 Choppy market filter active — showing ' + filteredResults.length + '/' + results.length + ' stocks meeting tighter criteria (score 80+, RSI 58-68, vol 1.8×+)</div>';
+      + '🟡 Choppy market — showing ' + filteredResults.length + '/' + results.length + ' stocks scoring 80+ (tighter filter). Reduce position size to 50%.</div>';
+  } else if (_marketRegime === 'bear' && filteredResults.length < results.length) {
+    filterNote = '<div style="padding:8px 12px;background:var(--red-bg);border-radius:8px;font-size:12px;color:var(--red);margin-bottom:10px;">'
+      + '🔴 Bear market — showing ' + filteredResults.length + '/' + results.length + ' stocks scoring 85+ with price above 200 EMA (RS survivors only).</div>';
   } else if (_marketRegime === 'bear') {
     filterNote = '<div style="padding:8px 12px;background:var(--red-bg);border-radius:8px;font-size:12px;color:var(--red);margin-bottom:10px;">'
-      + '🔴 Bear market — showing all results. ⭐ stocks are above their own 50 EMA (relative strength) — only these are worth considering.</div>';
+      + '🔴 Bear market — no stocks meet the 85+ / above 200 EMA criteria. Sit on cash.</div>';
   }
 
   const tableEl = document.getElementById('screenerResults');
@@ -4404,16 +4409,14 @@ function renderCapitalDashboard() {
   // ── Regime advisory ─────────────────────────────────────────────────────────
   var regimeAdvisory = '';
   if (_marketRegime === 'choppy') {
-    var openCnt = trades.filter(function(t) { return !t.exit; }).length;
-    regimeAdvisory = '<div style="padding:8px 12px;background:var(--orange-bg);border-radius:8px;border-left:3px solid var(--orange);font-size:12px;color:var(--orange);margin-bottom:8px;">'
-      + '<strong>🟡 Choppy Market — Use 1% risk</strong><br/>'
-      + 'Tighter criteria: RSI 58-68 · Vol 1.8×+ · Score 80+ · Max 1 open trade'
-      + (openCnt >= 1 ? '<br/>⚠️ You have ' + openCnt + ' open trade' + (openCnt > 1 ? 's' : '') + ' — no new entries until one closes.' : '')
+    regimeAdvisory = '<div style="padding:8px 12px;background:var(--orange-bg);border-radius:8px;border-left:3px solid var(--orange);font-size:12px;color:var(--orange);margin-bottom:8px;line-height:1.6;">'
+      + '<strong>🟡 Choppy Market — Nifty below 50 EMA, above 200 EMA</strong><br/>'
+      + 'Market is correcting but long-term trend intact. Only take score 80+ setups. Reduce position size to 50% (risk 1.5%). Expect more whipsaws.'
       + '</div>';
   } else if (_marketRegime === 'bear') {
-    regimeAdvisory = '<div style="padding:8px 12px;background:var(--red-bg);border-radius:8px;border-left:3px solid var(--red);font-size:12px;color:var(--red);margin-bottom:8px;">'
-      + '<strong>🔴 Bear Market — No new entries</strong><br/>'
-      + 'Only consider ⭐ relative strength stocks (above their own 50 EMA). Reduce risk to 1% if you must trade.'
+    regimeAdvisory = '<div style="padding:8px 12px;background:var(--red-bg);border-radius:8px;border-left:3px solid var(--red);font-size:12px;color:var(--red);margin-bottom:8px;line-height:1.6;">'
+      + '<strong>🔴 Bear Market — Nifty below 50 EMA and 200 EMA</strong><br/>'
+      + 'Avoid new longs. If you must trade, only RS+ stocks scoring 85+ with price above 200 EMA. Risk 1% max. Most setups will fail.'
       + '</div>';
   }
 
@@ -4479,7 +4482,11 @@ function savePlans() {
 function saveSundayPlan() {
   // Situation 2: warn before saving in bear market
   if (_marketRegime === 'bear') {
-    if (!confirm('⚠️ Market is in BEAR regime (Nifty below 50 EMA).\n\nMost setups fail in bear markets. Are you sure you want to save this plan?')) {
+    if (!confirm('⚠️ Bear Market — Nifty is below both 50 EMA and 200 EMA.\n\nMost setups fail in a bear market. Only proceed if this stock has RS+ badge and scores 85+. Are you sure?')) {
+      return;
+    }
+  } else if (_marketRegime === 'choppy') {
+    if (!confirm('🟡 Choppy Market — Nifty is below 50 EMA.\n\nMarket is correcting. Only proceed if this stock scores 80+ and you are using reduced position size (1.5% risk). Are you sure?')) {
       return;
     }
   }
@@ -6003,65 +6010,61 @@ async function refreshMarketRegime() {
   if (badge) { badge.textContent = '⏳ Market'; badge.style.background = 'var(--surface2)'; badge.style.color = 'var(--text3)'; }
 
   try {
-    var yfUrl = 'https://query2.finance.yahoo.com/v8/finance/chart/%5ENSEI?interval=1d&range=3mo';
+    // Need 1y of data to compute reliable 200 EMA for Nifty
+    var yfUrl = 'https://query2.finance.yahoo.com/v8/finance/chart/%5ENSEI?interval=1d&range=1y';
     var raw   = await yfFetch(yfUrl, 10000);
     if (!raw || !raw.chart || !raw.chart.result || !raw.chart.result[0]) throw new Error('no data');
 
     var closes = (raw.chart.result[0].indicators.quote[0].close || []).filter(function(v) { return v != null; });
     if (closes.length < 50) throw new Error('not enough data');
 
-    var price = closes[closes.length - 1];
-    var ema50 = calcEMA(closes, 50);
-    var ema20 = calcEMA(closes, 20);
+    var price  = closes[closes.length - 1];
+    var ema50  = calcEMA(closes, 50);
+    var ema200 = closes.length >= 150 ? calcEMA(closes, 200) : null;
+
     // Store Nifty 20-day return for RS calculation in screener
     if (closes.length >= 21) {
       var niftyOld = closes[closes.length - 21];
       _niftyRet20 = niftyOld > 0 ? (price - niftyOld) / niftyOld * 100 : null;
     }
 
+    // Three-tier regime:
+    // Bull   — price > 50 EMA → uptrend intact, trade freely
+    // Choppy — price < 50 EMA but > 200 EMA → correction/consolidation, be selective
+    // Bear   — price < 50 EMA AND < 200 EMA → downtrend, avoid new longs
     var regime, emoji, bg, col;
     if (price > ema50) {
-      if (price > ema20) {
-        regime = 'bull'; emoji = '🟢'; bg = 'var(--green-bg)'; col = 'var(--green)';
-        _marketRegime = 'bull';
-      } else {
-        regime = 'choppy'; emoji = '🟡'; bg = 'var(--orange-bg)'; col = 'var(--orange)';
-        _marketRegime = 'choppy';
-      }
+      regime = 'bull';   emoji = '🟢'; bg = 'var(--green-bg)';  col = 'var(--green)';
+    } else if (ema200 === null || price > ema200) {
+      regime = 'choppy'; emoji = '🟡'; bg = 'var(--orange-bg)'; col = 'var(--orange)';
     } else {
-      regime = 'bear'; emoji = '🔴'; bg = 'var(--red-bg)'; col = 'var(--red)';
-      _marketRegime = 'bear';
+      regime = 'bear';   emoji = '🔴'; bg = 'var(--red-bg)';    col = 'var(--red)';
     }
+    _marketRegime = regime;
 
-    var label = regime === 'bull' ? 'Bull Market' : regime === 'choppy' ? 'Choppy' : 'Bear Market';
+    var label = regime === 'bull' ? 'Bull' : regime === 'choppy' ? 'Choppy' : 'Bear';
+    var ema200Str = ema200 ? ' | 200 EMA: ₹' + ema200.toFixed(0) : '';
     if (badge) {
       badge.textContent = emoji + ' ' + label;
       badge.style.background = bg;
       badge.style.color      = col;
       badge.style.border     = '1px solid ' + col;
-      badge.title = 'Nifty: ₹' + price.toFixed(0) + ' | 50 EMA: ₹' + ema50.toFixed(0) + ' | 20 EMA: ₹' + ema20.toFixed(0) + ' — Click to refresh';
+      badge.title = 'Nifty: ₹' + price.toFixed(0) + ' | 50 EMA: ₹' + ema50.toFixed(0) + ema200Str + ' — Click to refresh';
     }
 
-    // Show screener warning if not bull
     renderRegimeBanner();
+
     // Auto-suggest risk % based on regime
     var riskEl = document.getElementById('r_riskPct');
     if (riskEl) {
-      if (regime === 'bear' || regime === 'choppy') {
-        if (parseFloat(riskEl.value) > 1) {
-          riskEl.value = 1;
-          calcRisk();
-        }
-      } else if (regime === 'bull') {
-        if (parseFloat(riskEl.value) < 2) {
-          riskEl.value = 2;
-          calcRisk();
-        }
+      var suggested = regime === 'bull' ? 2 : regime === 'choppy' ? 1.5 : 1;
+      if (parseFloat(riskEl.value) !== suggested) {
+        riskEl.value = suggested;
+        calcRisk();
       }
     }
-    // Refresh checklist with new regime data
+
     renderChecklist();
-    // Refresh capital dashboard with regime advisory
     renderCapitalDashboard();
 
   } catch(e) {
@@ -6075,10 +6078,14 @@ function renderRegimeBanner() {
   if (!bannerEl) return;
   if (_marketRegime === 'bear') {
     bannerEl.style.display = 'block';
-    bannerEl.innerHTML = '<div style="padding:8px 14px;background:var(--red-bg);border-left:3px solid var(--red);border-radius:8px;font-size:12px;color:var(--red);margin-bottom:12px;">🔴 <strong>Bear Market:</strong> Nifty is below its 50 EMA. Avoid new entries. Manage existing trades only.</div>';
+    bannerEl.innerHTML = '<div style="padding:10px 14px;background:var(--red-bg);border-left:3px solid var(--red);border-radius:8px;font-size:12px;color:var(--red);margin-bottom:12px;line-height:1.6;">'
+      + '🔴 <strong>Bear Market — Nifty below 50 EMA and 200 EMA.</strong><br/>'
+      + 'Avoid new longs. Only consider RS+ stocks scoring 85+ with EMA stack intact. Risk 1% max. Manage existing trades only.</div>';
   } else if (_marketRegime === 'choppy') {
     bannerEl.style.display = 'block';
-    bannerEl.innerHTML = '<div style="padding:8px 14px;background:var(--orange-bg);border-left:3px solid var(--orange);border-radius:8px;font-size:12px;color:var(--orange);margin-bottom:12px;">🟡 <strong>Choppy Market:</strong> Nifty between 20 and 50 EMA. Reduce risk to 1%, only take 80+ score setups.</div>';
+    bannerEl.innerHTML = '<div style="padding:10px 14px;background:var(--orange-bg);border-left:3px solid var(--orange);border-radius:8px;font-size:12px;color:var(--orange);margin-bottom:12px;line-height:1.6;">'
+      + '🟡 <strong>Choppy Market — Nifty below 50 EMA but above 200 EMA.</strong><br/>'
+      + 'Market is correcting but long-term trend intact. Be selective — only take 80+ score setups. Reduce position size to 50% (risk 1.5%).</div>';
   } else {
     bannerEl.style.display = 'none';
   }
