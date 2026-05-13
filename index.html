@@ -966,7 +966,7 @@
             <div style="padding:10px;background:var(--green-bg);border-radius:8px;color:var(--green);border:1px solid #b8e0cc;">✅ Max 2 open trades at once. Focus beats diversification at <span id="g_capital2">₹25K</span>.</div>
             <div style="padding:10px;background:var(--red-bg);border-radius:8px;color:var(--red);border:1px solid #f5c6c2;">❌ Avoid stocks above <strong id="g_maxPrice">₹2,000</strong>/share — can't get adequate quantity.</div>
             <div style="padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">🎯 <strong>Best price range:</strong> <span id="g_priceRange">₹50–₹800</span>/share for <span id="g_capital3">₹25K</span>.</div>
-            <div style="padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">⏱️ <strong>Hold:</strong> 5–15 trading days. Review every Friday &amp; Sunday.</div>
+            <div style="padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">⏱️ <strong>Hold:</strong> 5–15 trading days. Review every evening.</div>
             <div style="padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">📅 <strong>Market:</strong> NSE 9:15 AM–3:30 PM IST. Best entry: 9:30–10:30 AM or 2–3 PM.</div>
           </div>
         </div>
@@ -1099,7 +1099,7 @@
   <div id="g_weekly" class="g-panel" style="display:none;">
     <div class="grid-2">
       <div class="card">
-        <div class="card-title">📅 Sunday Evening Review (20–30 min)</div>
+        <div class="card-title">📅 Evening Review (20–30 min)</div>
         <div style="display:grid;gap:10px;font-size:13px;color:var(--text2);">
           <div style="font-size:12px;font-weight:600;color:var(--text);">Part 1 — Open trade health check (5 min each)</div>
           <div class="guide-step">
@@ -1123,7 +1123,7 @@
       </div>
       <div>
         <div class="card">
-          <div class="card-title">✅ Sunday Checklist</div>
+          <div class="card-title">✅ Pre-Trade Checklist</div>
           <div id="guideChecklist" style="display:grid;gap:6px;font-size:13px;">
             <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;"><input type="checkbox" style="margin-top:2px;width:auto;"/> Reviewed all open trades on TradingView (EMA + RSI)</label>
             <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;"><input type="checkbox" style="margin-top:2px;width:auto;"/> Updated trailing SL in Kite GTT if needed (edit OCO GTT → update SL trigger)</label>
@@ -4824,9 +4824,10 @@ function renderSundayPlans() {
             + '</div>';
         })() : '')
       + (isDone ? '' :
-        '<div style="display:flex;align-items:center;gap:8px;">'
-        + '<label style="font-size:12px;color:var(--text2);white-space:nowrap;font-weight:500;text-transform:none;letter-spacing:0;">Monday open ₹</label>'
-        + '<input type="number" id="mon_' + p.id + '" placeholder="Enter next open price" style="flex:1;" oninput="checkMonday(' + p.id + ')"/>'
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+        + '<label style="font-size:12px;color:var(--text2);white-space:nowrap;font-weight:500;">Current price ₹</label>'
+        + '<input type="number" id="mon_' + p.id + '" placeholder="Enter or fetch live price" style="flex:1;min-width:100px;" oninput="checkMonday(' + p.id + ')"/>'
+        + '<button class="btn btn-sm btn-secondary" onclick="fetchPlanPrice(' + p.id + ')" title="Fetch live price">📡 Live</button>'
         + '</div>'
         + '<div id="monResult_' + p.id + '"></div>'
       )
@@ -4836,6 +4837,28 @@ function renderSundayPlans() {
 
   wrap.innerHTML = active.map(renderPlan).join('')
     + (done.length ? '<div style="font-size:11px;color:var(--text3);margin:12px 0 6px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Completed plans</div>' + done.map(renderPlan).join('') : '');
+}
+
+async function fetchPlanPrice(id) {
+  const p = plans.find(p => p.id === id);
+  if (!p) return;
+  const btn = document.querySelector('button[onclick="fetchPlanPrice(' + id + ')"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  try {
+    const d = await fetchPriceData(p.sym);
+    if (d && d.price) {
+      const input = document.getElementById('mon_' + id);
+      if (input) {
+        input.value = d.price.toFixed(2);
+        checkMonday(id);
+      }
+    } else {
+      alert('Could not fetch price for ' + p.sym + '. Enter manually.');
+    }
+  } catch(e) {
+    alert('Could not fetch price for ' + p.sym + '. Enter manually.');
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '📡 Live'; }
 }
 
 function sendToJournal() {
