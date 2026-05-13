@@ -571,11 +571,12 @@
           <tr>
             <th>Symbol</th>
             <th>Price · Chg%</th>
-            <th title="RSI 55–70 = +20pts">RSI (14) 🔵</th>
+            <th title="RSI 55–70 = +15pts">RSI (14) 🔵</th>
             <th title="Vol ≥1.5× avg = +20pts">Vol Spike 🔵</th>
-            <th title="Above 20 EMA = +20pts">20 EMA 🔵</th>
-            <th title="Above 50 EMA = +20pts">50 EMA 🔵</th>
+            <th title="Above 20 EMA = +15pts">20 EMA 🔵</th>
+            <th title="Above 50 EMA = +15pts">50 EMA 🔵</th>
             <th title="Within 15% of 52W High = +20pts">52W High 🔵</th>
+            <th title="ADX >25 = strong trend +15pts. 20–25 = neutral. <20 = choppy, no pts">ADX (14) 🔵</th>
             <th title="Stock 20d return ÷ Nifty 20d return. >1 = outperforming. Load market regime first.">RS vs Nifty</th>
             <th>ATR (14)</th>
             <th>Score /100</th>
@@ -3247,7 +3248,7 @@ async function fetchStockData(symbol) {
 
   // Try Twelve Data first
   if (getTDKey()) {
-    var td = await tdTimeSeries(symbol, 120);
+    var td = await tdTimeSeries(symbol, 200);
     if (td) {
       var p = parseTDCandles(td);
       closes = p.closes; opens = p.opens; highs = p.highs;
@@ -3258,7 +3259,7 @@ async function fetchStockData(symbol) {
 
   // Fallback: Yahoo Finance
   if (!usedTD) {
-    const yfUrl = 'https://query2.finance.yahoo.com/v8/finance/chart/' + symbol + '.NS?interval=1d&range=6mo&includePrePost=false';
+    const yfUrl = 'https://query2.finance.yahoo.com/v8/finance/chart/' + symbol + '.NS?interval=1d&range=1y&includePrePost=false';
     const raw = await yfFetch(yfUrl, 10000);
     if (!raw || !raw.chart || !raw.chart.result || !raw.chart.result[0]) return null;
     const chart = raw.chart.result[0];
@@ -3275,8 +3276,11 @@ async function fetchStockData(symbol) {
 
   if (!closes || closes.length < 55) return null;
 
+  // 200 EMA — computed from full raw dataset before normalization (needs ≥150 bars)
+  const ema200raw = closes.length >= 150 ? calcEMA(closes, 200) : null;
+
   // Normalize to last 100 candles before all calculations so score is
-  // identical regardless of whether TD (120) or YF (125+) was used.
+  // identical regardless of whether TD (200) or YF (250) was used.
   // Without this, EMA seeds differ between sources → score flips on same data.
   const N = Math.min(closes.length, 100);
   closes     = closes.slice(-N);
@@ -3304,15 +3308,17 @@ async function fetchStockData(symbol) {
   const high52    = Math.max(...closes);
   const pctFrom52High = (high52 - price) / high52 * 100;
 
+  const adxVal = calcADX(highs, lows, closes, 14);
+
   let score = 0;
   const signals = {};
 
-  if (rsi >= 55 && rsi <= 70)  { score += 20; signals.rsi = 'pass'; }
+  if (rsi >= 55 && rsi <= 70)  { score += 15; signals.rsi = 'pass'; }
   else if (rsi > 70)           { signals.rsi = 'overbought'; }
   else                         { signals.rsi = 'fail'; }
 
-  if (price > ema20)           { score += 20; signals.ema20 = 'pass'; } else { signals.ema20 = 'fail'; }
-  if (price > ema50)           { score += 20; signals.ema50 = 'pass'; } else { signals.ema50 = 'fail'; }
+  if (price > ema20)           { score += 15; signals.ema20 = 'pass'; } else { signals.ema20 = 'fail'; }
+  if (price > ema50)           { score += 15; signals.ema50 = 'pass'; } else { signals.ema50 = 'fail'; }
 
   // EMA stack: 20 EMA must be above 50 EMA to confirm the uptrend is real
   signals.emaStack = ema20 > ema50 ? 'pass' : 'fail';
@@ -3322,6 +3328,15 @@ async function fetchStockData(symbol) {
   else                         { signals.vol = 'fail'; }
 
   if (pctFrom52High <= 15)     { score += 20; signals.high52 = 'pass'; } else { signals.high52 = 'fail'; }
+
+  // ADX: measures trend strength (not direction). >25 = trending, <20 = choppy
+  if (adxVal !== null && adxVal >= 25)      { score += 15; signals.adx = 'pass'; }
+  else if (adxVal !== null && adxVal >= 20) { signals.adx = 'neutral'; }
+  else if (adxVal !== null)                 { signals.adx = 'fail'; }
+  else                                      { signals.adx = 'na'; }
+
+  // 200 EMA badge (informational only — not scored)
+  signals.ema200 = ema200raw !== null ? (price > ema200raw ? 'pass' : 'fail') : 'na';
 
   if (signals.rsi === 'overbought')                         score = Math.min(score, 60);
   if (signals.ema20 === 'fail' && signals.ema50 === 'fail') score = Math.min(score, 40);
@@ -3340,7 +3355,7 @@ async function fetchStockData(symbol) {
   }
 
   return { symbol, fullName, price, changePct, rsi, ema20, volSpike, pctFrom52High,
-           score, signals, chartCandles, closes, atr, atrPct, rs,
+           score, signals, chartCandles, closes, atr, atrPct, rs, adx: adxVal, ema200: ema200raw,
            source: usedTD ? 'TD' : 'YF' };
 }
 
@@ -3355,6 +3370,40 @@ function calcEMA(data, period) {
     ema = data[i] * k + ema * (1 - k);
   }
   return ema;
+}
+
+function calcADX(highs, lows, closes, period) {
+  period = period || 14;
+  if (!highs || highs.length < period * 2 + 2) return null;
+  var trArr = [], pdmArr = [], ndmArr = [];
+  for (var i = 1; i < highs.length; i++) {
+    var tr  = Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i-1]), Math.abs(lows[i] - closes[i-1]));
+    var up  = highs[i] - highs[i-1];
+    var dn  = lows[i-1] - lows[i];
+    trArr.push(tr);
+    pdmArr.push(up > dn && up > 0 ? up : 0);
+    ndmArr.push(dn > up && dn > 0 ? dn : 0);
+  }
+  // Initial Wilder sums
+  var sTR = 0, sPDM = 0, sNDM = 0;
+  for (var j = 0; j < period; j++) { sTR += trArr[j]; sPDM += pdmArr[j]; sNDM += ndmArr[j]; }
+  var dxArr = [];
+  for (var i = period; i < trArr.length; i++) {
+    sTR  = sTR  - sTR  / period + trArr[i];
+    sPDM = sPDM - sPDM / period + pdmArr[i];
+    sNDM = sNDM - sNDM / period + ndmArr[i];
+    var pdi = sTR > 0 ? sPDM / sTR * 100 : 0;
+    var ndi = sTR > 0 ? sNDM / sTR * 100 : 0;
+    var dxSum = pdi + ndi;
+    dxArr.push(dxSum > 0 ? Math.abs(pdi - ndi) / dxSum * 100 : 0);
+  }
+  if (dxArr.length < period) return null;
+  // ADX = Wilder smooth of DX values
+  var adx = 0;
+  for (var j = 0; j < period; j++) adx += dxArr[j];
+  adx /= period;
+  for (var i = period; i < dxArr.length; i++) adx = (adx * (period - 1) + dxArr[i]) / period;
+  return adx;
 }
 
 function calcRSI(data, period = 14) {
@@ -3393,7 +3442,7 @@ function renderScreenerResults(results) {
   _screenerResults = results;
   const tbody = document.getElementById('screenerBody');
   if (!results.length) {
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--text3);">No data could be fetched. Check your internet connection.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:24px;color:var(--text3);">No data could be fetched. Check your internet connection.</td></tr>';
     return;
   }
 
@@ -3470,12 +3519,31 @@ function renderScreenerResults(results) {
       ? ' <span title="EMA Stack: 20 EMA above 50 EMA — confirmed uptrend" style="background:#1e5c36;color:white;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;">STACK ✓</span>'
       : ' <span title="EMA Stack broken: 20 EMA below 50 EMA — score capped at 60" style="background:var(--orange);color:white;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;">STACK ✗</span>';
 
+    // 200 EMA badge (informational — not scored)
+    var ema200sig = r.signals.ema200;
+    var ema200Badge = ema200sig === 'pass'
+      ? ' <span title="Price above 200 EMA — long-term uptrend intact" style="background:#1a3a6b;color:white;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;">200E ✓</span>'
+      : ema200sig === 'fail'
+      ? ' <span title="Price below 200 EMA — long-term downtrend" style="background:#555;color:white;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;">200E ✗</span>'
+      : '';
+
+    // ADX cell
+    var adxSig = r.signals.adx;
+    var adxVal2 = r.adx;
+    var adxColor = adxSig === 'pass' ? 'var(--green)' : adxSig === 'neutral' ? 'var(--orange)' : 'var(--red)';
+    var adxBg    = adxSig === 'pass' ? 'var(--green-bg)' : adxSig === 'neutral' ? 'var(--orange-bg)' : (adxSig === 'na' ? 'var(--surface2)' : 'var(--red-bg)');
+    var adxLabel = adxSig === 'pass' ? ' ✓' : adxSig === 'neutral' ? ' ~' : (adxSig === 'na' ? '' : ' ✗');
+    var adxCell  = adxVal2 !== null
+      ? '<span style="display:inline-block;padding:2px 6px;border-radius:5px;background:' + adxBg + ';color:' + adxColor + ';font-family:\'DM Mono\',monospace;font-size:12px;font-weight:600;">' + adxVal2.toFixed(1) + adxLabel + '</span>'
+      : '<span style="color:var(--text3);font-size:11px;">—</span>';
+
     // Score breakdown
-    const breakdown = (r.signals.rsi==='pass'?'+20':' 0') + ' RSI | '
-      + (r.signals.ema20==='pass'?'+20':' 0') + ' 20E | '
-      + (r.signals.ema50==='pass'?'+20':' 0') + ' 50E | '
+    const breakdown = (r.signals.rsi==='pass'?'+15':' 0') + ' RSI | '
+      + (r.signals.ema20==='pass'?'+15':' 0') + ' 20E | '
+      + (r.signals.ema50==='pass'?'+15':' 0') + ' 50E | '
       + (r.signals.vol==='pass'?'+20':' 0') + ' VOL | '
       + (r.signals.high52==='pass'?'+20':' 0') + ' 52W | '
+      + (r.signals.adx==='pass'?'+15':' 0') + ' ADX | '
       + (emaStackPass ? 'STACK ✓' : 'STACK ✗ cap 60');
 
     // RS vs Nifty cell
@@ -3490,7 +3558,7 @@ function renderScreenerResults(results) {
     }
 
     return '<tr id="row_' + idx + '">'
-      + '<td><strong class="mono">' + r.symbol + rsBadge + '</strong>' + emaStackBadge
+      + '<td><strong class="mono">' + r.symbol + rsBadge + '</strong>' + emaStackBadge + ema200Badge
       + (r.fullName ? '<br/><span style="font-size:10px;color:var(--text3);">' + r.fullName + '</span>' : '') + '</td>'
       + '<td class="mono">₹' + r.price.toFixed(2) + '<br/><span style="font-size:11px;color:' + changeColor + ';">' + chgSign + r.changePct.toFixed(2) + '%</span></td>'
       + '<td>' + rsiCell + '</td>'
@@ -3498,6 +3566,7 @@ function renderScreenerResults(results) {
       + '<td>' + ema20Cell + '</td>'
       + '<td>' + ema50Cell + '</td>'
       + '<td>' + h52Cell + '</td>'
+      + '<td>' + adxCell + '</td>'
       + '<td>' + rsCell + '</td>'
       + '<td class="mono">'
       + (r.atr ? '₹' + r.atr.toFixed(1) + '<br/><span style="font-size:10px;color:var(--text3);">' + r.atrPct.toFixed(1) + '%</span>' : '—')
@@ -3511,7 +3580,7 @@ function renderScreenerResults(results) {
       + '</div></td>'
       + '</tr>'
       + '<tr id="chart_' + idx + '" style="display:none;">'
-      + '<td colspan="11" style="padding:0;background:var(--surface2);">'
+      + '<td colspan="12" style="padding:0;background:var(--surface2);">'
       + (obWarning ? '<div style="padding:8px 16px;background:var(--red-bg);color:var(--red);font-size:12px;border-bottom:1px solid var(--border);">⚠️ RSI ' + r.rsi.toFixed(1) + ' — Overbought. Score capped at 60. Wait for RSI to pull back below 70 before entering.</div>' : '')
       + '<div style="padding:16px 20px;" id="chartWrap_' + idx + '"></div>'
       + '</td></tr>';
@@ -3682,11 +3751,12 @@ function drawChart(idx, container) {
   // ── Signal badges — BELOW volume, above RSI panel ───────────────────────
   const sig     = r.signals || {};
   const sigList = [
-    { label: '20EMA', pass: sig.ema20     === 'pass' },
-    { label: '50EMA', pass: sig.ema50     === 'pass' },
-    { label: 'STACK', pass: sig.emaStack  === 'pass', fail: sig.emaStack === 'fail' },
-    { label: 'VOL',   pass: sig.vol       === 'pass', neutral: sig.vol === 'neutral' },
-    { label: '52WH',  pass: sig.high52    === 'pass' },
+    { label: '20EMA', pass: sig.ema20    === 'pass' },
+    { label: '50EMA', pass: sig.ema50    === 'pass' },
+    { label: 'STACK', pass: sig.emaStack === 'pass', fail: sig.emaStack === 'fail' },
+    { label: 'VOL',   pass: sig.vol      === 'pass', neutral: sig.vol === 'neutral' },
+    { label: '52WH',  pass: sig.high52   === 'pass' },
+    { label: 'ADX',   pass: sig.adx      === 'pass', neutral: sig.adx === 'neutral', fail: sig.adx === 'fail' },
   ];
   let bx = PAD_L;
   const badgeY = sigTop + 12;
@@ -4127,7 +4197,9 @@ function calcRisk() {
     var streak = 0;
     for (var si = 0; si < closed.length; si++) {
       var t2 = closed[si];
-      var net2 = (parseFloat(t2.exit) - parseFloat(t2.entry)) * parseInt(t2.qty);
+      var pe2 = t2.partialExit;
+      var remQty2  = pe2 ? (parseInt(t2.qty) - pe2.qty) : parseInt(t2.qty);
+      var net2 = (pe2 ? pe2.pnl : 0) + (parseFloat(t2.exit) - parseFloat(t2.entry)) * remQty2;
       if (net2 < 0) streak++;
       else break;
     }
@@ -4988,21 +5060,28 @@ function renderJournal() {
     // Patch t so all downstream refs work safely
     t = Object.assign({}, t, { entry, sl, tgt, qty, exit: exitP });
 
-    const pnl = t.exit ? (t.exit - t.entry) * t.qty : null;
-    let netPnl = pnl, chTotal = null;
-    if (pnl !== null) {
-      chTotal = calcCharges(t.entry * t.qty, t.exit * t.qty).total;
+    // P&L — account for partial exit if recorded
+    let pnl = null, netPnl = null, chTotal = null;
+    if (t.exit) {
+      const pe        = t.partialExit;
+      const remQty    = pe ? (t.qty - pe.qty) : t.qty;
+      const partGross = pe ? pe.pnl : 0;
+      const partCh    = pe ? calcCharges(t.entry * pe.qty, pe.price * pe.qty).total : 0;
+      const finGross  = (t.exit - t.entry) * remQty;
+      const finCh     = calcCharges(t.entry * remQty, t.exit * remQty).total;
+      pnl     = partGross + finGross;
+      chTotal = partCh + finCh;
       netPnl  = pnl - chTotal;
     }
     const pnlStr  = netPnl !== null
       ? (netPnl >= 0 ? '+₹' : '-₹') + Math.abs(netPnl).toFixed(0)
         + '<div style="font-size:10px;color:var(--text3);font-weight:400;">-₹' + (chTotal||0).toFixed(0) + ' chg</div>'
       : '—';
-    const pnlColor = pnl === null ? '' : netPnl >= 0 ? 'color:var(--green);' : 'color:var(--red);';
+    const pnlColor = netPnl === null ? '' : netPnl >= 0 ? 'color:var(--green);' : 'color:var(--red);';
     const rr = t.tgt && t.sl ? ((t.tgt - t.entry) / (t.entry - t.sl)).toFixed(2) : '—';
     let status, statusClass;
     if (!t.exit) { status = '⏳ Open'; statusClass = 'status-open'; }
-    else if (t.exit > t.entry) { status = '✅ Win'; statusClass = 'status-win'; }
+    else if (netPnl > 0) { status = '✅ Win'; statusClass = 'status-win'; }
     else { status = '❌ Loss'; statusClass = 'status-loss'; }
 
     return `<tr>
@@ -5477,10 +5556,16 @@ function renderStats() {
     const tgt2   = t.tgt ? parseFloat(t.tgt) : null;
     const qty2   = parseInt(t.qty)     || 0;
     t = Object.assign({}, t, { entry: entry2, exit: exit2, sl: sl2, tgt: tgt2, qty: qty2 });
-    const gross    = (t.exit - t.entry) * t.qty;
-    const ch       = calcCharges(t.entry * t.qty, t.exit * t.qty);
-    const net      = gross - ch.total;
-    const invested = t.entry * t.qty;
+    // Account for partial exit if recorded
+    const pe        = t.partialExit;
+    const remQty    = pe ? (t.qty - pe.qty) : t.qty;
+    const partGross = pe ? pe.pnl : 0;
+    const partCh    = pe ? calcCharges(t.entry * pe.qty, pe.price * pe.qty).total : 0;
+    const finGross  = (t.exit - t.entry) * remQty;
+    const ch        = calcCharges(t.entry * remQty, t.exit * remQty);
+    const gross     = partGross + finGross;
+    const net       = gross - partCh - ch.total;
+    const invested  = t.entry * t.qty;
     const retPct   = net / invested * 100;
 
     // Trading days held
