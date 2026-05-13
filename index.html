@@ -3472,6 +3472,117 @@ function calcATR(candles, period = 14) {
 
 let _screenerResults = [];
 
+function generateTradeRead(r) {
+  if (!r || !r.chartCandles || r.chartCandles.length < 15) return null;
+  const candles = r.chartCandles.slice(-45);
+  const today   = candles[candles.length - 1];
+  const price   = r.price;
+
+  // ── Candle quality ────────────────────────────────────────────────────────
+  const range    = today.h - today.l || 0.01;
+  const body     = Math.abs(today.c - today.o);
+  const upperWick = today.h - Math.max(today.c, today.o);
+  const closePos  = (today.c - today.l) / range; // 0=closed at bottom, 1=closed at top
+
+  let candleMsg = '', candleOk = true;
+  if (closePos >= 0.65 && body >= range * 0.45) {
+    candleMsg = 'Strong bullish close (top ' + Math.round((1 - closePos) * 100) + '% of today\'s range).';
+  } else if (upperWick >= body * 2 && upperWick >= range * 0.35) {
+    candleMsg = 'Rejection candle — long upper wick, closed near lows. Wait for a better day.';
+    candleOk = false;
+  } else if (body < range * 0.15) {
+    candleMsg = 'Doji / indecision candle today — no clear direction. Wait for tomorrow\'s candle.';
+    candleOk = false;
+  } else if (closePos < 0.35) {
+    candleMsg = 'Weak close in lower part of today\'s range.';
+    candleOk = false;
+  } else {
+    candleMsg = 'Neutral close — not a strong signal either way.';
+  }
+
+  // ── Entry timing: distance from 20-day high (resistance) ─────────────────
+  const prior20High = Math.max(...candles.slice(-21, -1).map(c => c.h));
+  const breakoutPct = (price - prior20High) / prior20High * 100;
+
+  // How many days ago was that high set?
+  let daysAgo = 0;
+  for (let i = candles.length - 2; i >= 0; i--) {
+    if (candles[i].h >= prior20High * 0.999) { daysAgo = candles.length - 1 - i; break; }
+  }
+
+  let timingMsg = '', timingStatus = '';
+  if (breakoutPct >= -1.5 && breakoutPct <= 2) {
+    timingMsg = 'Price is right at the breakout level (₹' + prior20High.toFixed(0) + ') — ideal entry zone.';
+    timingStatus = 'good';
+  } else if (breakoutPct > 2 && breakoutPct <= 6) {
+    timingMsg = 'Price is ' + breakoutPct.toFixed(1) + '% above breakout (₹' + prior20High.toFixed(0) + ') — slightly extended but still acceptable.';
+    timingStatus = 'extended';
+  } else if (breakoutPct > 6) {
+    timingMsg = 'Price is ' + breakoutPct.toFixed(1) + '% above breakout level — too extended, risk/reward has deteriorated. Wait for a pullback to ₹' + (r.ema20 ? r.ema20.toFixed(0) : 'the 20 EMA') + '.';
+    timingStatus = 'late';
+  } else if (r.ema20 && price <= r.ema20 * 1.02 && price >= r.ema20 * 0.99) {
+    timingMsg = 'Pulling back to 20 EMA (₹' + r.ema20.toFixed(0) + ') — potential second-chance entry if it holds here.';
+    timingStatus = 'pullback';
+  } else {
+    timingMsg = 'Price is ' + Math.abs(breakoutPct).toFixed(1) + '% below resistance (₹' + prior20High.toFixed(0) + '). Not broken out yet — watch this level.';
+    timingStatus = 'approaching';
+  }
+
+  // ── Volume ────────────────────────────────────────────────────────────────
+  let volMsg = '';
+  if (r.volSpike >= 2.0)      volMsg = 'Volume ' + r.volSpike.toFixed(1) + '× average — strong institutional participation.';
+  else if (r.volSpike >= 1.5) volMsg = 'Volume ' + r.volSpike.toFixed(1) + '× average — breakout confirmed.';
+  else if (r.volSpike >= 1.0) volMsg = 'Volume only ' + r.volSpike.toFixed(1) + '× average — weak confirmation, wait for a higher volume day.';
+  else                        volMsg = 'Volume ' + r.volSpike.toFixed(1) + '× average — breakout NOT confirmed by volume yet.';
+  const volOk = r.volSpike >= 1.5;
+
+  // ── SL / Target / R:R ─────────────────────────────────────────────────────
+  const recentLows = candles.slice(-10).map(c => c.l);
+  const swingLow   = Math.min(...recentLows) * 0.995;
+  const riskPS     = price - swingLow;
+  const target     = price + 2 * riskPS;
+  const rr         = riskPS > 0 ? (2 * riskPS / riskPS).toFixed(1) : null;
+  const rrMsg      = riskPS > 0
+    ? 'SL ₹' + swingLow.toFixed(0) + ' · Target ₹' + target.toFixed(0) + ' · R:R 1:2.0 (2R move).'
+    : '';
+
+  // ── Final verdict ─────────────────────────────────────────────────────────
+  let verdict = '', verdictBg = '', verdictColor = '';
+  if (timingStatus === 'good' && candleOk && volOk) {
+    verdict = '✅ Valid entry now — all conditions met.';
+    verdictBg = '#eaf5ef'; verdictColor = '#1e7a4e';
+  } else if (timingStatus === 'good' && candleOk && !volOk) {
+    verdict = '⏳ Right level, right candle — but volume hasn\'t confirmed. Watch for a high-volume day.';
+    verdictBg = '#fef5e7'; verdictColor = '#d4780a';
+  } else if (timingStatus === 'good' && !candleOk) {
+    verdict = '⏳ Right level but today\'s candle is weak. Wait for a strong close tomorrow before entering.';
+    verdictBg = '#fef5e7'; verdictColor = '#d4780a';
+  } else if (timingStatus === 'pullback') {
+    verdict = candleOk && volOk ? '✅ Pullback entry — holding 20 EMA with volume. Valid second-chance entry.' : '⏳ Pullback to 20 EMA — wait for a strong bounce candle with volume to confirm.';
+    verdictBg = candleOk && volOk ? '#eaf5ef' : '#fef5e7';
+    verdictColor = candleOk && volOk ? '#1e7a4e' : '#d4780a';
+  } else if (timingStatus === 'extended') {
+    verdict = '⚠️ Slightly extended. If you enter, keep position size small. Better to wait for a 2–3 day pullback toward ₹' + (r.ema20 ? r.ema20.toFixed(0) : '20 EMA') + '.';
+    verdictBg = '#fef5e7'; verdictColor = '#d4780a';
+  } else if (timingStatus === 'late') {
+    verdict = '❌ Too extended — chasing here is dangerous. Wait for pullback to ₹' + (r.ema20 ? r.ema20.toFixed(0) : '20 EMA') + ' before entering.';
+    verdictBg = '#fdecea'; verdictColor = '#c0392b';
+  } else {
+    verdict = '👀 Not broken out yet. Add to watchlist and wait for price to close above ₹' + prior20High.toFixed(0) + ' with volume.';
+    verdictBg = '#eef3fc'; verdictColor = '#2a6bc8';
+  }
+
+  return '<div style="margin:12px 16px 0;padding:12px 14px;background:' + verdictBg + ';border-radius:8px;border-left:3px solid ' + verdictColor + ';">'
+    + '<div style="font-size:13px;font-weight:700;color:' + verdictColor + ';margin-bottom:6px;">' + verdict + '</div>'
+    + '<div style="font-size:12px;color:var(--text2);line-height:1.7;">'
+    + '· ' + timingMsg + '<br/>'
+    + '· ' + candleMsg + '<br/>'
+    + '· ' + volMsg + '<br/>'
+    + (rrMsg ? '· ' + rrMsg : '')
+    + '</div>'
+    + '</div>';
+}
+
 function renderScreenerResults(results) {
   _screenerResults = results;
   const tbody = document.getElementById('screenerBody');
@@ -3617,6 +3728,7 @@ function renderScreenerResults(results) {
       + '<tr id="chart_' + idx + '" style="display:none;">'
       + '<td colspan="12" style="padding:0;background:var(--surface2);">'
       + (obWarning ? '<div style="padding:8px 16px;background:var(--red-bg);color:var(--red);font-size:12px;border-bottom:1px solid var(--border);">⚠️ RSI ' + r.rsi.toFixed(1) + ' — Overbought. Score capped at 60. Wait for RSI to pull back below 70 before entering.</div>' : '')
+      + (generateTradeRead(r) || '')
       + '<div style="padding:16px 20px;" id="chartWrap_' + idx + '"></div>'
       + '</td></tr>';
   }).join('');
