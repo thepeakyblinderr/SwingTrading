@@ -4127,7 +4127,9 @@ function calcRisk() {
     var streak = 0;
     for (var si = 0; si < closed.length; si++) {
       var t2 = closed[si];
-      var net2 = (parseFloat(t2.exit) - parseFloat(t2.entry)) * parseInt(t2.qty);
+      var pe2 = t2.partialExit;
+      var remQty2  = pe2 ? (parseInt(t2.qty) - pe2.qty) : parseInt(t2.qty);
+      var net2 = (pe2 ? pe2.pnl : 0) + (parseFloat(t2.exit) - parseFloat(t2.entry)) * remQty2;
       if (net2 < 0) streak++;
       else break;
     }
@@ -4988,21 +4990,28 @@ function renderJournal() {
     // Patch t so all downstream refs work safely
     t = Object.assign({}, t, { entry, sl, tgt, qty, exit: exitP });
 
-    const pnl = t.exit ? (t.exit - t.entry) * t.qty : null;
-    let netPnl = pnl, chTotal = null;
-    if (pnl !== null) {
-      chTotal = calcCharges(t.entry * t.qty, t.exit * t.qty).total;
+    // P&L — account for partial exit if recorded
+    let pnl = null, netPnl = null, chTotal = null;
+    if (t.exit) {
+      const pe        = t.partialExit;
+      const remQty    = pe ? (t.qty - pe.qty) : t.qty;
+      const partGross = pe ? pe.pnl : 0;
+      const partCh    = pe ? calcCharges(t.entry * pe.qty, pe.price * pe.qty).total : 0;
+      const finGross  = (t.exit - t.entry) * remQty;
+      const finCh     = calcCharges(t.entry * remQty, t.exit * remQty).total;
+      pnl     = partGross + finGross;
+      chTotal = partCh + finCh;
       netPnl  = pnl - chTotal;
     }
     const pnlStr  = netPnl !== null
       ? (netPnl >= 0 ? '+₹' : '-₹') + Math.abs(netPnl).toFixed(0)
         + '<div style="font-size:10px;color:var(--text3);font-weight:400;">-₹' + (chTotal||0).toFixed(0) + ' chg</div>'
       : '—';
-    const pnlColor = pnl === null ? '' : netPnl >= 0 ? 'color:var(--green);' : 'color:var(--red);';
+    const pnlColor = netPnl === null ? '' : netPnl >= 0 ? 'color:var(--green);' : 'color:var(--red);';
     const rr = t.tgt && t.sl ? ((t.tgt - t.entry) / (t.entry - t.sl)).toFixed(2) : '—';
     let status, statusClass;
     if (!t.exit) { status = '⏳ Open'; statusClass = 'status-open'; }
-    else if (t.exit > t.entry) { status = '✅ Win'; statusClass = 'status-win'; }
+    else if (netPnl > 0) { status = '✅ Win'; statusClass = 'status-win'; }
     else { status = '❌ Loss'; statusClass = 'status-loss'; }
 
     return `<tr>
@@ -5477,10 +5486,16 @@ function renderStats() {
     const tgt2   = t.tgt ? parseFloat(t.tgt) : null;
     const qty2   = parseInt(t.qty)     || 0;
     t = Object.assign({}, t, { entry: entry2, exit: exit2, sl: sl2, tgt: tgt2, qty: qty2 });
-    const gross    = (t.exit - t.entry) * t.qty;
-    const ch       = calcCharges(t.entry * t.qty, t.exit * t.qty);
-    const net      = gross - ch.total;
-    const invested = t.entry * t.qty;
+    // Account for partial exit if recorded
+    const pe        = t.partialExit;
+    const remQty    = pe ? (t.qty - pe.qty) : t.qty;
+    const partGross = pe ? pe.pnl : 0;
+    const partCh    = pe ? calcCharges(t.entry * pe.qty, pe.price * pe.qty).total : 0;
+    const finGross  = (t.exit - t.entry) * remQty;
+    const ch        = calcCharges(t.entry * remQty, t.exit * remQty);
+    const gross     = partGross + finGross;
+    const net       = gross - partCh - ch.total;
+    const invested  = t.entry * t.qty;
     const retPct   = net / invested * 100;
 
     // Trading days held
