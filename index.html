@@ -576,7 +576,7 @@
             <th title="Above 20 EMA = +15pts">20 EMA 🔵</th>
             <th title="Above 50 EMA = +15pts">50 EMA 🔵</th>
             <th title="Within 15% of 52W High = +20pts">52W High 🔵</th>
-            <th title="ADX >25 = strong trend +15pts. 20–25 = neutral. <20 = choppy, no pts">ADX (14) 🔵</th>
+            <th title="ADX >25 = strong trend +15pts. 20–25 = neutral. <20 = choppy — score capped at 60">ADX (14) 🔵</th>
             <th title="Stock 20d return ÷ Nifty 20d return. >1 = outperforming. Load market regime first.">RS vs Nifty</th>
             <th>ATR (14)</th>
             <th>Score /100</th>
@@ -3375,6 +3375,7 @@ async function fetchStockData(symbol) {
   if (signals.ema20 === 'fail' && signals.ema50 === 'fail') score = Math.min(score, 40);
   if (rsi < 50)                                             score = Math.min(score, 50);
   if (signals.emaStack === 'fail')                          score = Math.min(score, 60);
+  if (signals.adx === 'fail')                               score = Math.min(score, 60);
 
   const fullName = NSE_STOCKS[symbol] || '';
   const atr      = calcATR(chartCandles, 14);
@@ -3577,7 +3578,8 @@ function renderScreenerResults(results) {
       + (r.signals.vol==='pass'?'+20':' 0') + ' VOL | '
       + (r.signals.high52==='pass'?'+20':' 0') + ' 52W | '
       + (r.signals.adx==='pass'?'+15':' 0') + ' ADX | '
-      + (emaStackPass ? 'STACK ✓' : 'STACK ✗ cap 60');
+      + (emaStackPass ? 'STACK ✓' : 'STACK ✗ cap60') + ' | '
+      + (r.signals.adx==='fail' ? 'ADX ✗ cap60' : r.signals.adx==='pass' ? 'ADX ✓' : 'ADX ~');
 
     // RS vs Nifty cell
     var rsCell;
