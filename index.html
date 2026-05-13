@@ -3432,8 +3432,10 @@ function renderScreenerResults(results) {
     const changeColor = r.changePct >= 0 ? 'var(--green)' : 'var(--red)';
     const barColor    = r.score >= 70 ? '#1e7a4e' : r.score >= 50 ? '#d4780a' : '#c0392b';
     const obWarning   = r.signals.rsi === 'overbought';
-    var relStrength   = _marketRegime === 'bear' && r.signals && r.signals.ema50 === 'pass';
-    var rsBadge       = relStrength ? ' <span style="background:#1e5c36;color:white;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;">RELSTR</span>' : '';
+    // RS+ badge: stock outperforming Nifty by 1.5x or more over 20 days (any regime)
+    var rsBadge = (r.rs !== null && r.rs >= 1.5)
+      ? ' <span title="Outperforming Nifty by ' + r.rs.toFixed(1) + 'x over 20 days" style="background:#1e5c36;color:white;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;">RS+</span>'
+      : '';
     const chgSign     = r.changePct >= 0 ? '+' : '';
 
     // RSI cell
