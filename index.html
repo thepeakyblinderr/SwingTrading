@@ -571,12 +571,12 @@
           <tr>
             <th>Symbol</th>
             <th>Price · Chg%</th>
-            <th title="RSI 55–70 = +15pts">RSI (14) 🔵</th>
-            <th title="Vol ≥1.5× avg = +20pts">Vol Spike 🔵</th>
-            <th title="Above 20 EMA = +15pts">20 EMA 🔵</th>
-            <th title="Above 50 EMA = +15pts">50 EMA 🔵</th>
+            <th title="RSI 55–70 = +20pts">RSI (14) 🔵</th>
+            <th title="Vol ≥1.5× avg = entry trigger only — not scored">Vol Spike</th>
+            <th title="Above 20 EMA = +20pts">20 EMA 🔵</th>
+            <th title="Above 50 EMA = +20pts">50 EMA 🔵</th>
             <th title="Within 15% of 52W High = +20pts">52W High 🔵</th>
-            <th title="ADX >25 = strong trend +15pts. 20–25 = neutral. <20 = choppy — score capped at 60">ADX (14) 🔵</th>
+            <th title="ADX >25 = strong trend +20pts. 20–25 = neutral. <20 = choppy — score capped at 60">ADX (14) 🔵</th>
             <th title="Stock 20d return ÷ Nifty 20d return. >1 = outperforming. Load market regime first.">RS vs Nifty</th>
             <th>ATR (14)</th>
             <th>Score /100</th>
@@ -3346,24 +3346,25 @@ async function fetchStockData(symbol) {
   let score = 0;
   const signals = {};
 
-  if (rsi >= 55 && rsi <= 70)  { score += 15; signals.rsi = 'pass'; }
+  if (rsi >= 55 && rsi <= 70)  { score += 20; signals.rsi = 'pass'; }
   else if (rsi > 70)           { signals.rsi = 'overbought'; }
   else                         { signals.rsi = 'fail'; }
 
-  if (price > ema20)           { score += 15; signals.ema20 = 'pass'; } else { signals.ema20 = 'fail'; }
-  if (price > ema50)           { score += 15; signals.ema50 = 'pass'; } else { signals.ema50 = 'fail'; }
+  if (price > ema20)           { score += 20; signals.ema20 = 'pass'; } else { signals.ema20 = 'fail'; }
+  if (price > ema50)           { score += 20; signals.ema50 = 'pass'; } else { signals.ema50 = 'fail'; }
 
   // EMA stack: 20 EMA must be above 50 EMA to confirm the uptrend is real
   signals.emaStack = ema20 > ema50 ? 'pass' : 'fail';
 
-  if (volSpike >= 1.5)         { score += 20; signals.vol = 'pass'; }
-  else if (volSpike >= 1.0)    { signals.vol = 'neutral'; }
-  else                         { signals.vol = 'fail'; }
+  // Volume — informational only, not scored (day-specific signal, not setup signal)
+  if (volSpike >= 1.5)      signals.vol = 'pass';
+  else if (volSpike >= 1.0) signals.vol = 'neutral';
+  else                      signals.vol = 'fail';
 
   if (pctFrom52High <= 15)     { score += 20; signals.high52 = 'pass'; } else { signals.high52 = 'fail'; }
 
-  // ADX: measures trend strength (not direction). >25 = trending, <20 = choppy
-  if (adxVal !== null && adxVal >= 25)      { score += 15; signals.adx = 'pass'; }
+  // ADX: measures trend strength (not direction). >25 = trending, <20 = choppy → cap at 60
+  if (adxVal !== null && adxVal >= 25)      { score += 20; signals.adx = 'pass'; }
   else if (adxVal !== null && adxVal >= 20) { signals.adx = 'neutral'; }
   else if (adxVal !== null)                 { signals.adx = 'fail'; }
   else                                      { signals.adx = 'na'; }
@@ -3688,12 +3689,11 @@ function renderScreenerResults(results) {
       : '<span style="color:var(--text3);font-size:11px;">—</span>';
 
     // Score breakdown
-    const breakdown = (r.signals.rsi==='pass'?'+15':' 0') + ' RSI | '
-      + (r.signals.ema20==='pass'?'+15':' 0') + ' 20E | '
-      + (r.signals.ema50==='pass'?'+15':' 0') + ' 50E | '
-      + (r.signals.vol==='pass'?'+20':' 0') + ' VOL | '
+    const breakdown = (r.signals.rsi==='pass'?'+20':' 0') + ' RSI | '
+      + (r.signals.ema20==='pass'?'+20':' 0') + ' 20E | '
+      + (r.signals.ema50==='pass'?'+20':' 0') + ' 50E | '
       + (r.signals.high52==='pass'?'+20':' 0') + ' 52W | '
-      + (r.signals.adx==='pass'?'+15':' 0') + ' ADX | '
+      + (r.signals.adx==='pass'?'+20':' 0') + ' ADX | '
       + (emaStackPass ? 'STACK ✓' : 'STACK ✗ cap60') + ' | '
       + (r.signals.adx==='fail' ? 'ADX ✗ cap60' : r.signals.adx==='pass' ? 'ADX ✓' : 'ADX ~');
 
