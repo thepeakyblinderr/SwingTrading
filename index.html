@@ -3537,14 +3537,16 @@ function generateTradeRead(r) {
   else                        volMsg = 'Volume ' + r.volSpike.toFixed(1) + '× average — breakout NOT confirmed by volume yet.';
   const volOk = r.volSpike >= 1.5;
 
-  // ── SL / Target / R:R ─────────────────────────────────────────────────────
-  const recentLows = candles.slice(-10).map(c => c.l);
-  const swingLow   = Math.min(...recentLows) * 0.995;
-  const riskPS     = price - swingLow;
-  const target     = price + 2 * riskPS;
-  const rr         = riskPS > 0 ? (2 * riskPS / riskPS).toFixed(1) : null;
-  const rrMsg      = riskPS > 0
-    ? 'SL ₹' + swingLow.toFixed(0) + ' · Target ₹' + target.toFixed(0) + ' · R:R 1:2.0 (2R move).'
+  // ── SL / Target / R:R — use same helpers as risk calculator ─────────────
+  var slSwing = calcSwingLowSL(candles, price, r.atr);
+  var slATR   = calcATRSL(price, r.atr);
+  var swingLow = slSwing || slATR || price * 0.95;
+  var slMethod2 = slSwing ? 'Swing low' : slATR ? 'ATR×1.5' : '5% fallback';
+  var riskPS   = price - swingLow;
+  var target   = calcSwingHighTarget(candles, price, swingLow, r.atr) || (price + 2 * riskPS);
+  var rrVal    = riskPS > 0 ? ((target - price) / riskPS).toFixed(1) : null;
+  var rrMsg    = riskPS > 0
+    ? slMethod2 + ' SL ₹' + swingLow.toFixed(0) + ' · Target ₹' + target.toFixed(0) + ' · R:R 1:' + rrVal + '.'
     : '';
 
   // ── Final verdict ─────────────────────────────────────────────────────────
@@ -3790,14 +3792,14 @@ function drawChart(idx, container) {
   const ema50arr = calcEMAArray(closes, 50);
   const rsiArr14 = calcRSIArray(closes, 14);
 
-  // SL / Target levels
-  const recentLows = candles.slice(-10).map(c => c.l);
-  const swingLowSL = Math.min(...recentLows) * 0.995;
-  const atrSL      = r.atr ? (r.price - r.atr * 1.5) : null;
-  const suggestSL  = atrSL && atrSL > swingLowSL ? atrSL : swingLowSL;
-  const slMethod   = atrSL && atrSL > swingLowSL ? 'ATR' : 'Swing';
-  const suggestTgt = r.price + 2 * (r.price - suggestSL);
+  // SL / Target — same helpers as risk calculator so chart matches ⚖️ output
   const entryPrice = r.price;
+  const slSwingC   = calcSwingLowSL(candles, entryPrice, r.atr);
+  const slATRC     = calcATRSL(entryPrice, r.atr);
+  const suggestSL  = slSwingC || slATRC || entryPrice * 0.95;
+  const slMethod   = slSwingC ? 'Swing' : slATRC ? 'ATR' : 'Est';
+  const suggestTgt = calcSwingHighTarget(candles, entryPrice, suggestSL, r.atr)
+                     || (entryPrice + 2 * (entryPrice - suggestSL));
 
   // Price range for Y axis — include SL/Target
   const allPrices = candles.flatMap(c => [c.h, c.l]).concat([suggestSL, suggestTgt]);
