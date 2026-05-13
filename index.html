@@ -3314,6 +3314,9 @@ async function fetchStockData(symbol) {
   if (price > ema20)           { score += 20; signals.ema20 = 'pass'; } else { signals.ema20 = 'fail'; }
   if (price > ema50)           { score += 20; signals.ema50 = 'pass'; } else { signals.ema50 = 'fail'; }
 
+  // EMA stack: 20 EMA must be above 50 EMA to confirm the uptrend is real
+  signals.emaStack = ema20 > ema50 ? 'pass' : 'fail';
+
   if (volSpike >= 1.5)         { score += 20; signals.vol = 'pass'; }
   else if (volSpike >= 1.0)    { signals.vol = 'neutral'; }
   else                         { signals.vol = 'fail'; }
@@ -3323,6 +3326,7 @@ async function fetchStockData(symbol) {
   if (signals.rsi === 'overbought')                         score = Math.min(score, 60);
   if (signals.ema20 === 'fail' && signals.ema50 === 'fail') score = Math.min(score, 40);
   if (rsi < 50)                                             score = Math.min(score, 50);
+  if (signals.emaStack === 'fail')                          score = Math.min(score, 60);
 
   const fullName = NSE_STOCKS[symbol] || '';
   const atr      = calcATR(chartCandles, 14);
@@ -3458,12 +3462,19 @@ function renderScreenerResults(results) {
     const h52Bg    = h52pass ? 'var(--green-bg)' : r.pctFrom52High <= 30 ? 'var(--orange-bg)' : 'var(--red-bg)';
     const h52Cell  = '<span style="display:inline-block;padding:2px 6px;border-radius:5px;background:' + h52Bg + ';color:' + h52Color + ';font-family:\'DM Mono\',monospace;font-size:12px;font-weight:600;">' + r.pctFrom52High.toFixed(1) + '% ' + (h52pass ? '✓' : '✗') + '</span>';
 
+    // EMA stack badge — shown on symbol cell
+    const emaStackPass = r.signals.emaStack === 'pass';
+    const emaStackBadge = emaStackPass
+      ? ' <span title="EMA Stack: 20 EMA above 50 EMA — confirmed uptrend" style="background:#1e5c36;color:white;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;">STACK ✓</span>'
+      : ' <span title="EMA Stack broken: 20 EMA below 50 EMA — score capped at 60" style="background:var(--orange);color:white;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;">STACK ✗</span>';
+
     // Score breakdown
     const breakdown = (r.signals.rsi==='pass'?'+20':' 0') + ' RSI | '
       + (r.signals.ema20==='pass'?'+20':' 0') + ' 20E | '
       + (r.signals.ema50==='pass'?'+20':' 0') + ' 50E | '
       + (r.signals.vol==='pass'?'+20':' 0') + ' VOL | '
-      + (r.signals.high52==='pass'?'+20':' 0') + ' 52W';
+      + (r.signals.high52==='pass'?'+20':' 0') + ' 52W | '
+      + (emaStackPass ? 'STACK ✓' : 'STACK ✗ cap 60');
 
     // RS vs Nifty cell
     var rsCell;
@@ -3477,7 +3488,7 @@ function renderScreenerResults(results) {
     }
 
     return '<tr id="row_' + idx + '">'
-      + '<td><strong class="mono">' + r.symbol + rsBadge + '</strong>'
+      + '<td><strong class="mono">' + r.symbol + rsBadge + '</strong>' + emaStackBadge
       + (r.fullName ? '<br/><span style="font-size:10px;color:var(--text3);">' + r.fullName + '</span>' : '') + '</td>'
       + '<td class="mono">₹' + r.price.toFixed(2) + '<br/><span style="font-size:11px;color:' + changeColor + ';">' + chgSign + r.changePct.toFixed(2) + '%</span></td>'
       + '<td>' + rsiCell + '</td>'
