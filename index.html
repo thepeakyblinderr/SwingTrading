@@ -2363,23 +2363,32 @@ async function runDiscover() {
   discoverData = {};
   btn.disabled = true;
   btn.innerHTML = '<span class="loader"></span> Fetching...';
-  container.innerHTML = `<div style="text-align:center;padding:32px;color:var(--text3);">⏳ Fetching price data for all sectors...</div>`;
+  container.innerHTML = `<div style="text-align:center;padding:32px;color:var(--text3);">⏳ Fetching data for all sectors — this includes scores, may take ~30s...</div>`;
 
-  // Collect unique symbols
-  // Use custom baskets if saved, else default
   const activeSectors = getActiveSectorBaskets();
   const allSyms = [...new Set(activeSectors.flatMap(b => b.stocks.map(s => s.sym)))];
 
-  // Fetch all in parallel batches of 5
-  const BATCH = 5;
+  // Use fetchStockData (full OHLCV + score) so scores show inline in Discover.
+  // Batch of 4 to stay within TD rate limits.
+  const BATCH = 4;
   for (let i = 0; i < allSyms.length; i += BATCH) {
     const batch = allSyms.slice(i, i + BATCH);
     await Promise.allSettled(batch.map(async sym => {
       try {
-        const d = await fetchPriceData(sym);
-        if (d) discoverData[sym] = d;
+        const d = await fetchStockData(sym);
+        if (d) {
+          // Add chg1d/chg5d fields for heat map compatibility
+          d.chg1d = d.changePct || 0;
+          d.chg5d = d.closes && d.closes.length >= 6
+            ? (d.closes[d.closes.length-1] - d.closes[d.closes.length-6]) / d.closes[d.closes.length-6] * 100
+            : d.changePct || 0;
+          discoverData[sym] = d;
+          _screenerCache[sym] = d; // reused by screener so "Screen now" skips re-fetch
+        }
       } catch(e) {}
     }));
+    // Update progress after each batch
+    meta.textContent = `${Object.keys(discoverData).length}/${allSyms.length} fetched…`;
   }
 
   discoverLoaded = true;
@@ -2564,7 +2573,11 @@ function renderSectorHeat() {
     const avgChg = results.length
       ? results.reduce((sum, s) => sum + s.data.chg5d, 0) / results.length
       : null;
-    return { ...basket, results, avgChg };
+    const scoredResults = results.filter(s => s.data.score !== undefined);
+    const avgScore = scoredResults.length
+      ? Math.round(scoredResults.reduce((sum, s) => sum + s.data.score, 0) / scoredResults.length)
+      : null;
+    return { ...basket, results, avgChg, avgScore };
   }).filter(b => b.avgChg !== null);
 
   // Sort hottest → coldest
@@ -2585,7 +2598,7 @@ function renderSectorHeat() {
     const avgSign     = basket.avgChg >= 0 ? '+' : '';
 
     const stockRows = basket.results
-      .sort((a,b) => b.data.chg5d - a.data.chg5d)
+      .sort((a,b) => (b.data.score || 0) - (a.data.score || 0))
       .map(s => {
         const inWL    = watchlist.includes(s.sym);
         const c5      = s.data.chg5d;
@@ -2594,21 +2607,31 @@ function renderSectorHeat() {
         const c1Color = c1 >= 0 ? 'var(--green)' : 'var(--red)';
         const c1Sign  = c1 >= 0 ? '+' : '';
         const c5Sign  = c5 >= 0 ? '+' : '';
-        const btnIcon = inWL ? '&#10003;' : '+';
+        const btnIcon   = inWL ? '&#10003;' : '+';
         const btnBorder = inWL ? 'var(--green)' : 'var(--border)';
         const btnBg     = inWL ? 'var(--green-bg)' : 'var(--surface2)';
         const btnColor  = inWL ? 'var(--green)' : 'var(--text2)';
+        // Score badge
+        const sc      = s.data.score;
+        const scColor = sc >= 70 ? '#1e7a4e' : sc >= 50 ? '#d4780a' : '#888';
+        const scBg    = sc >= 70 ? '#eaf5ef' : sc >= 50 ? '#fef5e7' : 'var(--surface2)';
+        const emaOk   = s.data.signals && s.data.signals.emaStack === 'pass';
+        const stackDot = emaOk ? '<span style="color:#1e7a4e;font-size:9px;margin-left:2px;">▲</span>' : '<span style="color:var(--orange);font-size:9px;margin-left:2px;">▼</span>';
+        const scoreBadge = sc !== undefined
+          ? '<span style="padding:2px 7px;border-radius:5px;background:' + scBg + ';color:' + scColor + ';font-family:\'DM Mono\',monospace;font-size:12px;font-weight:700;">' + sc + '</span>' + stackDot
+          : '<span style="color:var(--text3);font-size:11px;">—</span>';
         return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);">'
           + '<div style="flex:1;min-width:0;">'
           + '<span style="font-family:\'DM Mono\',monospace;font-size:12px;font-weight:600;">' + s.sym + '</span>'
-          + '<span style="font-size:11px;color:var(--text3);margin-left:4px;">' + s.name + '</span>'
+          + (s.name ? '<span style="font-size:11px;color:var(--text3);margin-left:4px;">' + s.name + '</span>' : '')
           + '</div>'
-          + '<div style="text-align:right;min-width:52px;">'
-          + '<div style="font-size:11px;color:var(--text3);">1D</div>'
+          + '<div style="text-align:center;min-width:44px;">' + scoreBadge + '</div>'
+          + '<div style="text-align:right;min-width:46px;">'
+          + '<div style="font-size:10px;color:var(--text3);">1D</div>'
           + '<div style="font-family:\'DM Mono\',monospace;font-size:12px;font-weight:600;color:' + c1Color + ';">' + c1Sign + c1.toFixed(1) + '%</div>'
           + '</div>'
-          + '<div style="text-align:right;min-width:52px;">'
-          + '<div style="font-size:11px;color:var(--text3);">5D</div>'
+          + '<div style="text-align:right;min-width:46px;">'
+          + '<div style="font-size:10px;color:var(--text3);">5D</div>'
           + '<div style="font-family:\'DM Mono\',monospace;font-size:12px;font-weight:600;color:' + c5Color + ';">' + c5Sign + c5.toFixed(1) + '%</div>'
           + '</div>'
           + '<button onclick="discoverAdd(\'' + s.sym + '\',this)"'
@@ -2626,8 +2649,9 @@ function renderSectorHeat() {
           <span style="font-size:13px;font-weight:600;color:var(--text);">${basket.name}</span>
           <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:${bgColor};color:${accentColor};font-weight:600;">${rankLabel}</span>
         </div>
-        <div style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:${accentColor};">
-          ${avgSign}${basket.avgChg.toFixed(2)}%
+        <div style="display:flex;align-items:center;gap:8px;">
+          ${basket.avgScore !== null ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:${basket.avgScore>=70?'#eaf5ef':basket.avgScore>=50?'#fef5e7':'var(--surface2)'};color:${basket.avgScore>=70?'#1e7a4e':basket.avgScore>=50?'#d4780a':'#888'};">avg ${basket.avgScore}</span>` : ''}
+          <div style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:${accentColor};">${avgSign}${basket.avgChg.toFixed(2)}%</div>
         </div>
       </div>
       <div style="height:6px;background:var(--border);border-radius:3px;margin-bottom:12px;overflow:hidden;">
@@ -2674,16 +2698,25 @@ function discoverAdd(sym, btn) {
 function screenSector(rank) {
   var basket = _scoredBaskets[rank];
   if (!basket) return;
-  // Add all stocks from this sector to watchlist (deduplicated)
   basket.stocks.forEach(function(s) {
     if (!watchlist.includes(s.sym)) watchlist.push(s.sym);
   });
   saveWatchlist();
   renderWatchlist();
-  // Switch to screener tab and auto-run
+
+  // If discover already fetched full data for all sector stocks, render directly
+  // without re-fetching — saves time and API calls
+  var cached = basket.stocks.map(function(s) { return discoverData[s.sym]; }).filter(Boolean);
   var tabs = document.querySelectorAll('.tab-btn');
   switchTab('screener', tabs[0]);
-  setTimeout(function() { runScreener(); }, 300);
+  if (cached.length === basket.stocks.length) {
+    setTimeout(function() {
+      _screenerResults = cached;
+      renderScreenerResults(cached);
+    }, 300);
+  } else {
+    setTimeout(function() { runScreener(); }, 300);
+  }
 }
 
 function addAllSector(idx) {
