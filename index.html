@@ -31,6 +31,37 @@
     --radius-sm: 8px;
   }
 
+  body.dark {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3350;
+    --text: #e8eaf0;
+    --text2: #9ba3c0;
+    --text3: #636b88;
+    --accent: #e8883a;
+    --accent2: #5b9be8;
+    --green: #2ecc71;
+    --green-bg: #0d2b1e;
+    --red: #e74c3c;
+    --red-bg: #2b0d0d;
+    --orange: #f39c12;
+    --orange-bg: #2b1d00;
+    --gold: #f1c40f;
+    --shadow: 0 2px 12px rgba(0,0,0,0.35);
+    --shadow-lg: 0 8px 32px rgba(0,0,0,0.50);
+  }
+
+  body.dark input, body.dark select, body.dark textarea {
+    background: var(--surface2);
+    color: var(--text);
+    border-color: var(--border);
+  }
+  body.dark input:focus, body.dark select:focus, body.dark textarea:focus {
+    background: var(--surface2);
+    border-color: var(--accent);
+  }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   html { overflow-x: hidden; }
@@ -423,6 +454,7 @@
       <span id="syncPillText">Sync</span>
     </div>
     <span id="regimeBadge" onclick="refreshMarketRegime()" title="Click to refresh · Nifty 50 vs 50 EMA" style="cursor:pointer;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--text3);border:1px solid var(--border);margin-right:6px;">⏳ Market</span>
+    <button id="themeToggle" onclick="toggleTheme()" title="Toggle dark/light mode" style="padding:4px 10px;border-radius:20px;font-size:13px;font-weight:600;background:var(--surface2);color:var(--text2);border:1px solid var(--border);cursor:pointer;">🌙</button>
     <div class="header-badge" onclick="openSettings()" style="cursor:pointer;" title="Click to edit">
       ✏️ <span id="badgeText">Midcap · Smallcap · ₹25K Capital</span>
     </div>
@@ -5309,6 +5341,22 @@ if (watchlist.length === 0) {
   watchlist = [...getPreset()];
   saveWatchlist();
 }
+
+// ── Theme (dark / light) ─────────────────────────────────────────────────────
+function toggleTheme() {
+  const isDark = document.body.classList.toggle('dark');
+  localStorage.setItem('st_theme', isDark ? 'dark' : 'light');
+  document.getElementById('themeToggle').textContent = isDark ? '☀️' : '🌙';
+  document.querySelector('meta[name="theme-color"]').content = isDark ? '#0f1117' : '#f5f0e8';
+}
+(function initTheme() {
+  if (localStorage.getItem('st_theme') === 'dark') {
+    document.body.classList.add('dark');
+    const btn = document.getElementById('themeToggle');
+    if (btn) btn.textContent = '☀️';
+    document.querySelector('meta[name="theme-color"]').content = '#0f1117';
+  }
+})();
 
 loadSettings();
 updateECLabel();
